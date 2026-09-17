@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-choose-remote"
+description = "Enables the choose_remote command without any pre-configured scope."
+commands.allow = ["choose_remote"]
+
+[[permission]]
+identifier = "deny-choose-remote"
+description = "Denies the choose_remote command without any pre-configured scope."
+commands.deny = ["choose_remote"]

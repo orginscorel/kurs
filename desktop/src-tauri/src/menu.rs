@@ -156,7 +156,17 @@ fn handle<R: Runtime>(app: &AppHandle<R>, event: MenuEvent) {
             }
         }
         "home" => {
-            if let Some(w) = window::main_window(app) {
+            // Yerel kipte pencere her koşulda paketteki yerel sunucuya döner (açılış jetonuyla birlikte);
+            // çevrimiçi kipte sayfanın kendi kökünde kalır.
+            let local = app.state::<AppCtx>().settings.read().map(|s| s.mode == Mode::Local).unwrap_or(false);
+            if local {
+                let h = app.clone();
+                tauri::async_runtime::spawn(async move {
+                    if let Err(e) = crate::setup_flow::start_and_open(&h).await {
+                        log::warn!("Yerel uygulamaya dönülemedi: {e}");
+                    }
+                });
+            } else if let Some(w) = window::main_window(app) {
                 let _ = w.eval("window.location.assign('/')");
             }
         }

@@ -143,6 +143,8 @@ class LocalSyncEngine
         $this->state->put('pushed_up_to', (int) (DB::table('sync_changes')->max('id') ?? 0));
         $this->state->put('snapshot_done_at', now()->toIso8601String());
         $this->afterApply(array_column($manifest['tables'], 'table'));
+        // Kurulum HENÜZ ÇEVRİMİÇİYKEN numara bloğunu al: cihaz ilk günden çevrimdışı öğrenci kaydı açabilsin.
+        $this->refillBlocksSafely();
 
         return ['tables' => count($manifest['tables']), 'rows' => $rows, 'cursor' => (int) $manifest['cursor'],
             'deferred' => count($deferred), 'ms' => (int) ((hrtime(true) - $t0) / 1e6)];
@@ -177,9 +179,11 @@ class LocalSyncEngine
         $out = ['status' => 'ok'];
         try {
             $out['sweep'] = $this->sweeper->sweep();
-            $out['blocks'] = $this->refillBlocks();
+            // ÖNCE gönder: bekleyen değişiklikler ikincil adımların (numara bloğu, dosya) hatasına takılmasın.
             $out['push'] = $this->pushAll();
             $out['pull'] = $this->pullAll();
+            // Numara bloğu ikincildir (yalnız yeni öğrenci numarası içindir): hatası turu düşürmez.
+            $out['blocks'] = $this->refillBlocksSafely();
             // Dosyalar (satırlardan sonra: sahibi sunucuda olmalı). Dosya hatası satır eşitlemesini durdurmaz.
             try {
                 $out['files'] = $this->files->run();
@@ -189,8 +193,16 @@ class LocalSyncEngine
                 Log::warning('Dosya eşitleme hatası', ['e' => $e->getMessage(), 'at' => $e->getFile().':'.$e->getLine()]);
                 $out['files'] = ['error' => $e->getMessage()];
             }
-            $status = $this->client->status($this->state->pendingCount());
-            $out['key'] = $this->refreshKeyIfChanged($status['data_key'] ?? null);
+            // Gönderme ve çekme bitti: tur başarılıdır. Durum yoklaması yalnız gösterge bilgisidir;
+            // hatası (ör. bu sırada bağlantının kopması) başarılı turu geri almasın.
+            $status = [];
+            try {
+                $status = $this->client->status($this->state->pendingCount());
+                $out['key'] = $this->refreshKeyIfChanged($status['data_key'] ?? null);
+            } catch (\Throwable $e) {
+                Log::info('Eşitleme durumu alınamadı (tur başarılı sayıldı)', ['e' => $e->getMessage()]);
+                $out['status_error'] = $e->getMessage();
+            }
             $this->state->put('last_success_at', now()->toIso8601String());
             $this->state->put('sync_requested_at', null);
             $this->state->put('failures', 0);
@@ -249,7 +261,11 @@ class LocalSyncEngine
     {
         $failures = (int) $this->state->get('failures', '0') + 1;
         $this->state->put('failures', $failures);
-        $delay = min((int) config('sync.max_backoff_seconds', 600), (int) (15 * (2 ** min(10, $failures - 1))));
+        // Çevrimdışıyken beklemeyi büyütmeyiz: bağlantı geri geldiğinde kuyruk dakikalarca beklemesin.
+        // Üstel geri çekilme yalnız sunucunun yanıt VERDİĞİ hatalar içindir (yükü artırmayalım).
+        $delay = $phase === 'offline'
+            ? max(5, (int) config('sync.offline_retry_seconds', 20))
+            : min((int) config('sync.max_backoff_seconds', 600), (int) (15 * (2 ** min(10, $failures - 1))));
         $this->state->put('sync_requested_at', null);
         $this->state->writeFile([
             'phase' => $phase, 'last_error' => mb_substr($message, 0, 300),
@@ -452,6 +468,30 @@ class LocalSyncEngine
         }
 
         return $left;
+    }
+
+    /**
+     * Yeni numara bloğu (azaldıysa) — hatası turu düşürmez.
+     * Cihaz erişimi iptal edildiyse (revoked) yine de yukarı taşınır: o durumun ayrı bir aşaması var.
+     *
+     * @return array<string, string>
+     */
+    private function refillBlocksSafely(): array
+    {
+        try {
+            return $this->refillBlocks();
+        } catch (SyncHttpException $e) {
+            if ($e->isRevoked()) {
+                throw $e;
+            }
+            Log::info('Numara bloğu alınamadı (tur sürüyor)', ['e' => $e->getMessage()]);
+
+            return ['error' => $e->getMessage()];
+        } catch (\Throwable $e) {
+            Log::warning('Numara bloğu hatası', ['e' => $e->getMessage(), 'at' => $e->getFile().':'.$e->getLine()]);
+
+            return ['error' => $e->getMessage()];
+        }
     }
 
     /** Yeni numara bloğu (azaldıysa). */

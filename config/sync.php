@@ -41,5 +41,8 @@ return [
     'interval_seconds' => (int) env('SYNC_INTERVAL', 30),
     'timeout_seconds' => (int) env('SYNC_TIMEOUT', 30),
     'state_file' => env('SYNC_STATE_FILE', 'sync/state.json'),     // storage/app/private altında
-    'max_backoff_seconds' => (int) env('SYNC_MAX_BACKOFF', 600),
+    'max_backoff_seconds' => (int) env('SYNC_MAX_BACKOFF', 600),   // sunucunun YANIT VERDİĞİ hatalarda üstel geri çekilme tavanı
+    // Sunucuya hiç ulaşılamıyorken (çevrimdışı) sabit yeniden deneme aralığı: bağlantı gelince kuyruk
+    // dakikalarca beklemesin. Denemenin maliyeti yok (bağlantı zaten anında reddediliyor).
+    'offline_retry_seconds' => (int) env('SYNC_OFFLINE_RETRY', 20),
 ];

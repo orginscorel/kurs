@@ -29,6 +29,11 @@ export type Paginated<T> = { data: T[]; meta: ListMeta }
 
 const BASE = '/api/v1'
 
+/** Masaüstü yerel kurulumu mu (KURS_NODE=local)? Sayfa kabuğundaki meta etiketinden okunur. */
+export function isLocalNode(): boolean {
+  return typeof document !== 'undefined' && document.querySelector('meta[name="kurs-node"]')?.getAttribute('content') === 'local'
+}
+
 function readCookie(name: string): string | null {
   const match = document.cookie.match(new RegExp('(?:^|; )' + name.replace(/[-.]/g, '\\$&') + '=([^;]*)'))
   return match ? decodeURIComponent(match[1]!) : null
@@ -70,7 +75,13 @@ async function request<T>(method: string, path: string, body?: unknown, query?: 
   try {
     response = await fetch(BASE + path + buildQuery(query), { method, headers, body: payload, credentials: 'same-origin' })
   } catch {
-    throw new ApiError(0, { message: 'Sunucuya ulaşılamadı. İnternet bağlantınızı kontrol edin.', error_code: 'network' })
+    // Yerel kurulumda (masaüstü) istek bilgisayarın kendi sunucusuna gider: internetle ilgisi yoktur.
+    throw new ApiError(0, {
+      message: isLocalNode()
+        ? 'Uygulamanın yerel sunucusuna ulaşılamadı. Uygulamayı kapatıp yeniden açın; sorun sürerse menüden Günlükler klasörünü gönderin.'
+        : 'Sunucuya ulaşılamadı. İnternet bağlantınızı kontrol edin.',
+      error_code: 'network',
+    })
   }
 
   if (response.status === 419 && !retried) {

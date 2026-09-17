@@ -1,5 +1,32 @@
 [
   {
+    "version": "0.1.2",
+    "date": "2026-09-17",
+    "title": "Çevrimdışı çalışma düzeltmeleri",
+    "items": [
+      {
+        "type": "duzeltme",
+        "text": "Yerel kipte pencere artık kurum web sitesine taşınmıyor; bağlantılar tarayıcıda açılıyor, uygulama internetsizken de çalışmaya devam ediyor"
+      },
+      {
+        "type": "duzeltme",
+        "text": "İnternet geri geldiğinde bekleyen değişiklikler 10 dakikaya kadar bekliyordu; artık 20 saniyede bir deneniyor"
+      },
+      {
+        "type": "duzeltme",
+        "text": "Eşitleme turunda ağ gerektiren bir adım hata verdiğinde bekleyen değişiklikler hiç gönderilmiyordu"
+      },
+      {
+        "type": "duzeltme",
+        "text": "Yerel kurulumda girişin engellenmesine yol açabilen parola yenileme adımı kaldırıldı"
+      },
+      {
+        "type": "duzeltme",
+        "text": "Yeni kurulan bilgisayarda çevrimdışı öğrenci eklemesi numara aralığı hatası veriyordu; aralık kurulum sırasında alınıyor"
+      }
+    ]
+  },
+  {
     "version": "0.1.1",
     "date": "2026-09-17",
     "title": "Açılış düzeltmesi",

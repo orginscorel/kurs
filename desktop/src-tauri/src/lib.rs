@@ -150,9 +150,13 @@ pub fn run() {
                 paths.data.display()
             );
 
+            // Yerel kipte kurum sunucusu ana pencerede AÇILMAZ: tek bir bağlantı tıklaması pencereyi
+            // internetteki siteye taşıyordu ve internet yokken geri dönüş yolu kalmıyordu.
             let mut origins = Vec::new();
-            if let Some(o) = settings.server_url.as_deref().and_then(window::origin_of) {
-                origins.push(o);
+            if settings.mode != Mode::Local {
+                if let Some(o) = settings.server_url.as_deref().and_then(window::origin_of) {
+                    origins.push(o);
+                }
             }
             app.manage(AppCtx {
                 paths,
@@ -167,9 +171,11 @@ pub fn run() {
                 setup_lock: tokio::sync::Mutex::new(()),
                 pending_path: RwLock::new(None),
             });
-            // Kayıtlı sunucu varsayılan değilse köprü iznini ver
-            if let Some(o) = settings.server_url.as_deref().and_then(window::origin_of) {
-                window::allow_origin(&handle, &o);
+            // Kayıtlı sunucu varsayılan değilse köprü iznini ver (yalnız çevrimiçi kipte)
+            if settings.mode != Mode::Local {
+                if let Some(o) = settings.server_url.as_deref().and_then(window::origin_of) {
+                    window::allow_origin(&handle, &o);
+                }
             }
 
             menu::install(&handle)?;

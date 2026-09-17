@@ -202,7 +202,9 @@ class AuthController extends ApiController
             throw ValidationException::withMessages(['login' => 'Hesabınız pasif durumda. Kurum yöneticisiyle görüşün.']);
         }
 
-        if (Hash::needsRehash($user->password)) {
+        // Yerel kurulumda (masaüstü) parola özeti sunucu-otoriteldir: yeniden özetleme users satırını
+        // kirletir ve ChangeRecorder girişi 409 ile düşürür → çevrimdışı hiç giriş yapılamazdı.
+        if (config('kurs.node') !== 'local' && Hash::needsRehash($user->password)) {
             $user->forceFill(['password' => $password]);
         }
         $user->forceFill(['last_login_at' => now(), 'last_login_ip' => $request->ip()])->save();

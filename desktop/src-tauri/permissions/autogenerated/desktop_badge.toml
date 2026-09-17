@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-desktop-badge"
+description = "Enables the desktop_badge command without any pre-configured scope."
+commands.allow = ["desktop_badge"]
+
+[[permission]]
+identifier = "deny-desktop-badge"
+description = "Denies the desktop_badge command without any pre-configured scope."
+commands.deny = ["desktop_badge"]

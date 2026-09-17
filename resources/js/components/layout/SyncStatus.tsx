@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { AlertTriangle, CheckCircle2, CloudOff, Link2Off, RefreshCw } from 'lucide-react'
-import { api } from '@/lib/api'
+import { api, isLocalNode } from '@/lib/api'
 import { cn } from '@/lib/cn'
 import { dateTime, num, relative } from '@/lib/format'
 import { Button } from '@/components/ui/Button'
@@ -10,9 +10,7 @@ import { Button } from '@/components/ui/Button'
  * Yerel kurulum (KURS_NODE=local) eşitleme göstergesi: Çevrimdışı / Eşitleniyor / Eşitlendi · N bekleyen.
  * Sunucuda (web) hiç görünmez ve istek atmaz: düğüm türü sayfa kabuğundaki meta etiketinden okunur.
  */
-export function isLocalNode(): boolean {
-  return typeof document !== 'undefined' && document.querySelector('meta[name="kurs-node"]')?.getAttribute('content') === 'local'
-}
+export { isLocalNode }
 
 type LocalStatus = {
   node: 'local' | 'server'

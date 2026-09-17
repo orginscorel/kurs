@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\Attendance\DeviceController;
 use App\Http\Controllers\Api\Attendance\DeviceIdentityController;
 use App\Http\Controllers\Api\Attendance\LivePresenceController;
 use App\Http\Controllers\Api\Attendance\StudentQrController;
+use App\Http\Controllers\Api\Attendance\ZkDeviceController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -46,6 +47,20 @@ Route::prefix('attendance')->group(function () {
         Route::put('devices/{device}', [DeviceController::class, 'update'])->middleware('throttle:writes');
         Route::delete('devices/{device}', [DeviceController::class, 'destroy'])->middleware('throttle:writes');
         Route::post('devices/{device}/token', [DeviceController::class, 'issueToken'])->middleware('throttle:writes');
+
+        // Biyometrik terminal köprüsü (ZKTeco / Perkotek YT-33) — docs/CIHAZ-KOPRUSU.md
+        Route::prefix('zk')->group(function () {
+            Route::post('test', [ZkDeviceController::class, 'test'])->middleware('throttle:writes');
+            Route::post('cihazlar/{device}/baglanti', [ZkDeviceController::class, 'saveConnection'])->middleware('throttle:writes');
+            Route::post('cihazlar/{device}/test', [ZkDeviceController::class, 'test'])->middleware('throttle:writes');
+            Route::post('cihazlar/{device}/cek', [ZkDeviceController::class, 'pullNow'])->middleware('throttle:writes');
+            Route::get('cihazlar/{device}/durum', [ZkDeviceController::class, 'status']);
+            Route::get('cihazlar/{device}/kullanicilar', [ZkDeviceController::class, 'users']);
+            Route::get('eslemeler', [ZkDeviceController::class, 'mappings']);
+            Route::post('eslemeler', [ZkDeviceController::class, 'storeMapping'])->middleware('throttle:writes');
+            Route::delete('eslemeler/{identity}', [ZkDeviceController::class, 'destroyMapping'])->middleware('throttle:writes');
+            Route::get('bekleyenler', [ZkDeviceController::class, 'pending']);
+        });
 
         Route::get('identities', [DeviceIdentityController::class, 'index']);
         Route::post('identities', [DeviceIdentityController::class, 'store'])->middleware('throttle:writes');
