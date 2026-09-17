@@ -202,7 +202,7 @@ jobs:
       - uses: actions/cache/save@v4
         with:
           path: _bundle/laravel.tar.gz
-          key: laravel-bundle-${{ github.run_id }}-${{ github.run_attempt }}
+          key: laravel-bundle-${{ github.run_id }}
           enableCrossOsArchive: true
 
   # ------------------------------------------------------------------ 4) Tauri derleme + imza + notarization + yayın
@@ -219,6 +219,24 @@ jobs:
       UNSIGNED: ${{ github.event_name == 'workflow_dispatch' && inputs.unsigned && 'true' || 'false' }}
     steps:
       - uses: actions/checkout@v4
+
+      # Release yüklemesi: uploads.github.com büyük DMG'de ara sıra 504 veriyor → dosya başına yeniden dene
+      - name: Yükleme yardımcısı
+        run: |
+          cat > "$RUNNER_TEMP/upload.sh" <<'SH'
+          upload_with_retry() {
+            local tag="$1" dir="$2" f n
+            for f in "$dir"/*; do
+              for n in 1 2 3 4 5; do
+                if gh release upload "$tag" "$f" --clobber; then break; fi
+                [ "$n" = 5 ] && { echo "::error::Yüklenemedi: $f"; return 1; }
+                echo "::warning::Yükleme denemesi $n başarısız: $(basename "$f"); $((n * 20)) sn sonra tekrar"
+                sleep $((n * 20))
+              done
+            done
+          }
+          SH
+          echo "BASH_ENV=$RUNNER_TEMP/upload.sh" >> "$GITHUB_ENV"
 
       - uses: actions/setup-node@v4
         with:
@@ -238,7 +256,7 @@ jobs:
       - uses: actions/cache/restore@v4
         with:
           path: _bundle/laravel.tar.gz
-          key: laravel-bundle-${{ github.run_id }}-${{ github.run_attempt }}
+          key: laravel-bundle-${{ github.run_id }}
           enableCrossOsArchive: true
           fail-on-cache-miss: true
 
@@ -456,9 +474,10 @@ jobs:
         run: |
           TAG="desktop-deneme-${GITHUB_RUN_NUMBER}"
           D="${{ steps.out.outputs.dir }}"
-          gh release create "$TAG" "$D"/* --draft --prerelease --target "$GITHUB_SHA" \
+          gh release view "$TAG" >/dev/null 2>&1 || gh release create "$TAG" --draft --prerelease --target "$GITHUB_SHA" \
             --title "Deneme #${GITHUB_RUN_NUMBER} — macOS $VERSION$([ "$UNSIGNED" = true ] && echo ' (imzasız)')" \
             --notes "Yayın dışı deneme derlemesi (çalışma ${GITHUB_RUN_ID})."
+          upload_with_retry "$TAG" "$D"
           echo "Taslak: $TAG"
 
       - name: GitHub Release
@@ -470,11 +489,8 @@ jobs:
           D="${{ steps.out.outputs.dir }}"
           # shellcheck disable=SC2016 # node betiğindeki şablon dizesi
           NOTES="$(node -e 'const c=require(process.argv[1])[0]; const L={yeni:"Yeni",iyilestirme:"İyileştirme",duzeltme:"Düzeltme"}; console.log(`## ${c.title}\n\n`+c.items.map(i=>`- **${L[i.type]}:** ${i.text}`).join("\n"))' "$PWD/$DESKTOP_DIR/CHANGELOG.json")"
-          if gh release view "$TAG" >/dev/null 2>&1; then
-            gh release upload "$TAG" "$D"/* --clobber
-          else
-            gh release create "$TAG" "$D"/* --title "Erbaa Kurs macOS $VERSION" --notes "$NOTES" --target "$GITHUB_SHA"
-          fi
+          gh release view "$TAG" >/dev/null 2>&1 || gh release create "$TAG" --title "Erbaa Kurs macOS $VERSION" --notes "$NOTES" --target "$GITHUB_SHA"
+          upload_with_retry "$TAG" "$D"
           echo "Yayımlandı: $TAG — sunucu 15 dk içinde çeker (php artisan kurs:desktop-release-sync ile hemen)."
 
       - name: Anahtar zincirini temizle
