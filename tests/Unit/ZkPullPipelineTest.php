@@ -215,6 +215,8 @@ class ZkPullPipelineTest extends TestCase
 
     public function test_comm_key_is_stored_encrypted(): void
     {
+        // Kurum veri anahtarı yerel düğümde zorunlu; CI ortamında .env'den gelmez, testte kur
+        config(['kurs.data_key' => 'base64:'.base64_encode(random_bytes(32))]);
         $this->device->zk_comm_key = '123456';
         $this->device->save();
 
