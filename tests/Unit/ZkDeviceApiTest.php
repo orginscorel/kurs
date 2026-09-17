@@ -37,7 +37,8 @@ class ZkDeviceApiTest extends TestCase
             $this->fail('Bu test yalnız bellek içi SQLite ile çalışmalı.');
         }
 
-        config(['kurs.silent_events' => true]);
+        // Kurum veri anahtarı: iletişim şifresi şifreli sütuna yazılır; CI'da .env yok, testte kur.
+        config(['kurs.silent_events' => true, 'kurs.data_key' => 'base64:'.base64_encode(random_bytes(32))]);
         $this->artisan('migrate', ['--force' => true])->run();
 
         $this->branch = Branch::query()->create(['code' => 'ERBAA', 'name' => 'Merkez']);

@@ -17,6 +17,10 @@ Köprü saf PHP'dir (`stream_socket_client`), ek PHP eklentisi gerekmez; aynı k
 
 ---
 
+> **Kurulumdan önce:** `2026_09_17_970100_add_zk_bridge_columns_to_devices` migration'ı çalışmalıdır
+> (`devices` tablosuna 11 yeni sütun ekler; yalnız ekleme yapar, geri alınabilir). Çalışmadan
+> "Terminal Köprüsü" sekmesi hata verir.
+
 ## 1. Cihazda yapılacak ayarlar
 
 Terminalin menüsünde (model/yazılıma göre adlar biraz değişebilir):
@@ -72,6 +76,29 @@ Terminalin menüsünde (model/yazılıma göre adlar biraz değişebilir):
    Masaüstü uygulamasında bu komut zamanlayıcıdan düzenli çalışır.
 
 ---
+
+## 2b. Ekran: Yoklama > Cihazlar > **Terminal Köprüsü**
+
+Üç bölüm:
+
+1. **Bağlantı** — IP, port, bağlantı türü (TCP/UDP) ve iletişim şifresi. "Bağlantıyı test et"
+   cihaz künyesini (seri no, yazılım, kayıt sayısı, cihaz saati) ve son okutmaları gösterir;
+   ulaşılamazsa ne yapılacağını yazar. Yanda **köprü durumu**: son çekme, sonuç, imleç, son hata
+   ve "Yeni kayıtları çek" / "Tümünü çek" düğmeleri.
+2. **Cihaz kullanıcıları** — cihazdaki kullanıcı numaraları, adları ve ada göre **öğrenci önerisi**.
+   Öneriye tıklayarak ya da öğrenci arayarak eşleme yapılır. Otomatik eşleme YOKTUR: yanlış eşleme
+   yanlış velinin telefonuna bildirim gönderir.
+3. **Bekleyen okutmalar** — hiçbir öğrenciye bağlanamamış okutmalar.
+
+> Bu üç işlem cihaza LAN üzerinden bağlanır. **Web sunucusundan çalışmaz** (sunucu kurumun yerel
+> ağına giremez); kurumdaki **masaüstü uygulamasından** yapılmalıdır. Ekran bunu açıkça söyler.
+
+## 2c. Otomatik çekme (zamanlanmış)
+
+Masaüstü uygulamasında (`KURS_NODE=local`) `kurs:cihaz-cek` **dakikada bir** çalışır
+(`routes/schedules/devices.php`). Üst üste binmez (`withoutOverlapping` + cihaz başına `Cache::lock`),
+cihaz kapalıysa sessizce geçer ve hatayı cihaz kaydına yazar (ekranda "Son çekmede hata" olarak görünür).
+Web sunucusunda bu zamanlama **hiç kurulmaz**.
 
 ## 3. Veri nereye yazılır?
 

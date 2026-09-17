@@ -163,7 +163,13 @@ pub fn allow_origin<R: Runtime>(app: &AppHandle<R>, origin: &str) {
             .window(MAIN)
             .permission("allow-desktop-info")
             .permission("allow-desktop-notify")
-            .permission("allow-desktop-badge");
+            .permission("allow-desktop-badge")
+            // Sayfa üstündeki güncelleme şeridi (bridge.js)
+            .permission("allow-update-info")
+            .permission("allow-update-install")
+            .permission("allow-update-later")
+            .permission("core:event:allow-listen")
+            .permission("core:event:allow-unlisten");
         if let Err(e) = app.add_capability(cap) {
             log::warn!("Köprü izni eklenemedi ({origin}): {e}");
         }

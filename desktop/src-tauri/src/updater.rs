@@ -1,18 +1,27 @@
 //! Otomatik güncelleme (tauri-plugin-updater). Bildirim: https://kurs.bogahostdeveloper.com.tr/desktop/latest.json
-//! Açılıştan 20 sn sonra ve 6 saatte bir denetlenir; yeni sürüm varsa "Yeni sürüm yayında" penceresi açılır.
+//! Açılıştan 20 sn sonra, saatte bir ve ana pencere odağa geldiğinde (en sık 15 dakikada bir) denetlenir.
+//! Yeni sürüm bulununca ana penceredeki şeride (`update://available`, src/bridge.js) haber verilir; şerit
+//! yanıt vermezse (kurulum/hata ekranı ya da enjeksiyon engellenmiş) yedek yol olarak ayrı pencere açılır.
 //! "Daha sonra" aynı sürüm için 24 saat susturur. Kurulumdan önce yerel sunucu düzgün durdurulur.
 
 use crate::{window, AppCtx};
 use serde::Serialize;
-use std::sync::atomic::Ordering;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tauri::{AppHandle, Emitter, Manager, Runtime};
 use tauri_plugin_notification::NotificationExt;
 use tauri_plugin_updater::UpdaterExt;
 
 const FIRST_CHECK: Duration = Duration::from_secs(20);
-const INTERVAL: Duration = Duration::from_secs(6 * 60 * 60);
+const INTERVAL: Duration = Duration::from_secs(60 * 60);
+/// Ana pencere odağa geldiğinde denetim: en sık bu aralıkla.
+const FOCUS_MIN_GAP: u64 = 15 * 60;
+/// Şerit bu süre içinde `update_info` ile kendini bildirmezse ayrı pencere açılır.
+const BANNER_WAIT: Duration = Duration::from_millis(2500);
 const SNOOZE_SECS: u64 = 24 * 60 * 60;
+
+/// Son denetim zamanı (unix sn) — odak denetimini sınırlar.
+static LAST_CHECK: AtomicU64 = AtomicU64::new(0);
 
 #[derive(Clone, Serialize)]
 pub struct UpdateInfo {
@@ -20,6 +29,8 @@ pub struct UpdateInfo {
     pub current_version: String,
     pub date: Option<String>,
     pub notes: Option<String>,
+    /// Kullanıcı bu sürüm için "Daha sonra" dediyse (şerit kendiliğinden geri gelmesin diye)
+    pub snoozed: bool,
 }
 
 #[derive(Clone, Serialize)]
@@ -43,8 +54,36 @@ pub fn spawn_checker<R: Runtime>(app: AppHandle<R>) {
     });
 }
 
+/// Ana pencere odağa geldi: son denetimin üzerinden 15 dakika geçtiyse sessizce yeniden denetle.
+pub fn check_on_focus<R: Runtime>(app: &AppHandle<R>) {
+    if now().saturating_sub(LAST_CHECK.load(Ordering::SeqCst)) < FOCUS_MIN_GAP {
+        return;
+    }
+    let app = app.clone();
+    tauri::async_runtime::spawn(async move { check(&app, false).await });
+}
+
+/// Ana penceredeki şeride haber verir. Şerit `update_info` çağırarak kendini bildirmezse
+/// (kurulum ekranı, izinsiz köken, enjeksiyon engeli) eski ayrı pencere yedek yol olarak açılır.
+async fn present<R: Runtime>(app: &AppHandle<R>, event: &str, payload: Option<UpdateInfo>) {
+    let seen = app.state::<AppCtx>().banner_seen.load(Ordering::SeqCst);
+    let sent = match payload {
+        Some(info) => app.emit(event, info),
+        None => app.emit(event, ()),
+    };
+    if let Err(e) = sent {
+        log::warn!("Güncelleme olayı gönderilemedi: {e}");
+    }
+    tokio::time::sleep(BANNER_WAIT).await;
+    if app.state::<AppCtx>().banner_seen.load(Ordering::SeqCst) == seen {
+        log::info!("Güncelleme şeridi yanıt vermedi; ayrı pencere açılıyor.");
+        window::open_update_window(app);
+    }
+}
+
 /// `manual`: menüden "Güncellemeleri denetle" — sonuç ne olursa olsun kullanıcıya gösterilir.
 pub async fn check<R: Runtime>(app: &AppHandle<R>, manual: bool) {
+    LAST_CHECK.store(now(), Ordering::SeqCst);
     let ctx = app.state::<AppCtx>();
     let updater = match app.updater() {
         Ok(u) => u,
@@ -63,13 +102,15 @@ pub async fn check<R: Runtime>(app: &AppHandle<R>, manual: bool) {
                 s.snoozed_version.as_deref() == Some(version.as_str()) && s.update_snoozed_until.unwrap_or(0) > now()
             };
             if manual || !snoozed {
-                window::open_update_window(app);
+                if let Some(i) = info(app).await {
+                    present(app, "update://available", Some(i)).await;
+                }
             }
         }
         Ok(None) => {
             *ctx.pending_update.lock().await = None;
             if manual {
-                window::open_update_window(app); // "Uygulama güncel"
+                present(app, "update://none", None).await; // "Uygulama güncel"
             }
         }
         Err(e) => {
@@ -88,8 +129,10 @@ pub async fn check<R: Runtime>(app: &AppHandle<R>, manual: bool) {
 
 pub async fn info<R: Runtime>(app: &AppHandle<R>) -> Option<UpdateInfo> {
     let ctx = app.state::<AppCtx>();
+    let s = ctx.settings_snapshot();
     let guard = ctx.pending_update.lock().await;
     guard.as_ref().map(|u| UpdateInfo {
+        snoozed: s.snoozed_version.as_deref() == Some(u.version.as_str()) && s.update_snoozed_until.unwrap_or(0) > now(),
         version: u.version.clone(),
         current_version: u.current_version.clone(),
         date: u.date.map(|d| d.to_string()),
@@ -106,6 +149,7 @@ pub async fn snooze<R: Runtime>(app: &AppHandle<R>) {
             s.update_snoozed_until = Some(now() + SNOOZE_SECS);
         });
     }
+    let _ = app.emit("update://dismissed", ());
     if let Some(w) = app.get_webview_window(window::UPDATE) {
         let _ = w.close();
     }

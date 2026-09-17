@@ -216,8 +216,13 @@ pub fn quit_app<R: Runtime>(app: AppHandle<R>) {
     request_quit(app);
 }
 
+/// Şerit (bridge.js) ve güncelleme penceresi bunu çağırır. Ana pencereden gelen çağrı aynı zamanda
+/// "şerit çalışıyor" işaretidir: gelmezse updater ayrı pencereyi açar (src/updater.rs › present).
 #[tauri::command]
-pub async fn update_info<R: Runtime>(app: AppHandle<R>) -> Option<updater::UpdateInfo> {
+pub async fn update_info<R: Runtime>(app: AppHandle<R>, window: WebviewWindow<R>) -> Option<updater::UpdateInfo> {
+    if window.label() == window::MAIN {
+        app.state::<AppCtx>().banner_seen.fetch_add(1, Ordering::SeqCst);
+    }
     updater::info(&app).await
 }
 

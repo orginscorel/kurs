@@ -137,11 +137,11 @@ desktop/                              (sunucuda /home/oritoriu/kurs-desktop)
 │       ├── runtime.rs                php -S, zamanlayıcı, çökme gözetimi, yedek, durdurma
 │       ├── php.rs                    ortam, .env, artisan çalıştırma (satır satır JSON olaylar)
 │       ├── secrets.rs                Anahtar Zinciri
-│       ├── window.rs                 pencere, gezinme koruması, indirmeler, Kip B, güncelleme penceresi
-│       ├── updater.rs                güncelleme denetimi/kurulumu
+│       ├── window.rs                 pencere, gezinme koruması, indirmeler, Kip B, yedek güncelleme penceresi
+│       ├── updater.rs                güncelleme denetimi/kurulumu (şeride olay, yedekte ayrı pencere)
 │       ├── menu.rs                   menü çubuğu + tepsi
 │       ├── settings.rs, paths.rs
-│       └── bridge.js                 web sayfalarına eklenen köprü
+│       └── bridge.js                 web sayfalarına eklenen köprü + sayfa üstü güncelleme şeridi (shadow DOM)
 ├── scripts/
 │   ├── build-static-php.sh           static-php-cli 2.8.5 ile PHP 8.4 (CI, macOS)
 │   ├── bundle-laravel.sh             web uygulamasının üretim kopyası → build/laravel
@@ -217,9 +217,14 @@ Sunucu tarafı (`/home/oritoriu/kurs-app/.env`, elle eklenir): `DESKTOP_GITHUB_T
      `desktop/<sürüm>/` olarak koyar, `latest.json` adreslerini kendi alan adına çevirir, `release.json` (indirme
      sayfası) ve `changelog.json` yazar, eski sürümlerden 2'sini tutar. Hemen yayın için komutu elle çalıştırın
      (`--dry-run`, `--tag=desktop-v0.2.0`, `--force`).
-  3. Uygulama açılıştan 20 sn sonra ve 6 saatte bir denetler; yeni sürüm varsa "Yeni sürüm yayında" penceresi
-     (web'deki UpdateNotifier ile aynı dil: sürüm notları, "Daha sonra" = aynı sürüm için 24 saat, "Şimdi güncelle").
-     Kurulumdan önce yerel sunucu düzgün durdurulur, sonra uygulama yeniden başlar; açılışta SQLite yedeği + migrate.
+  3. Uygulama açılıştan 20 sn sonra, saatte bir ve ana pencere odağa geldiğinde (en sık 15 dakikada bir) denetler.
+     Yeni sürüm varsa ana pencerenin üstünde ince bir şerit çıkar ("Yeni sürüm 0.1.3 hazır · Daha sonra / Güncelle");
+     şerit `src/bridge.js` içinde, sayfanın DOM/CSS'ine karışmayan shadow DOM öğesidir ve `update://available`,
+     `update://progress`, `update://none`, `update://dismissed` olaylarıyla sürülür. İndirme yüzdesi aynı şeritte akar.
+     "Daha sonra" = aynı sürüm için 24 saat (snooze) — şerit o sürüm için kendiliğinden geri gelmez.
+     Şerit 2,5 sn içinde kendini bildirmezse (kurulum/hata ekranı, enjeksiyon engeli) eski ayrı "Güncelleme" penceresi
+     yedek yol olarak açılır. Kurulumdan önce yerel sunucu düzgün durdurulur, sonra uygulama yeniden başlar;
+     açılışta SQLite yedeği + migrate.
 * Güncelleme paketi minisign ile imzalıdır; açık anahtar uygulamaya gömülüdür. **Özel anahtarı kaybederseniz
   mevcut kurulumlar yeni sürümü kabul etmez** (anahtarı güvenli yerde yedekleyin).
 * **Sürüm:** masaüstü kendi semver'i ile (`desktop/CHANGELOG.json`, en üst kayıt), web sürümünden bağımsız.

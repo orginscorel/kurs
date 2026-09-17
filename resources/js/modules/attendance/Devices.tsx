@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/Button'
 import { Field, Input, Select } from '@/components/ui/form'
 import { ConfirmDialog, Drawer, Menu, Modal } from '@/components/ui/overlay'
 import { StudentSearch, type StudentHit } from './LivePresence'
+import ZkBridge from './ZkBridge'
 import { DEVICE_KIND_LABEL, IDENTITY_KIND_LABEL, type DeviceKind, type DeviceRow, type IdentityRow } from './types'
 
 const KIND_ICON: Record<DeviceKind, ReactNode> = {
@@ -257,13 +258,22 @@ function IdentitiesTab() {
 }
 
 export default function Devices() {
-  const [tab, setTab] = useState<'devices' | 'identities'>('devices')
+  const [tab, setTab] = useState<'devices' | 'identities' | 'bridge'>('devices')
 
   return (
     <div className="animate-fade-in">
       <PageHeader title="Cihazlar" description="Parmak izi, RFID, QR terminalleri ve öğrenci kimlik eşlemeleri" />
-      <Tabs className="mb-4" value={tab} onChange={setTab} tabs={[{ value: 'devices', label: 'Cihazlar' }, { value: 'identities', label: 'Kimlik Eşlemeleri' }]} />
-      {tab === 'devices' ? <DevicesTab /> : <IdentitiesTab />}
+      <Tabs
+        className="mb-4"
+        value={tab}
+        onChange={setTab}
+        tabs={[
+          { value: 'devices', label: 'Cihazlar' },
+          { value: 'identities', label: 'Kimlik Eşlemeleri' },
+          { value: 'bridge', label: 'Terminal Köprüsü' },
+        ]}
+      />
+      {tab === 'devices' ? <DevicesTab /> : tab === 'identities' ? <IdentitiesTab /> : <ZkBridge />}
     </div>
   )
 }

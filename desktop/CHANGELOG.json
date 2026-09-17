@@ -1,5 +1,32 @@
 [
   {
+    "version": "0.1.3",
+    "date": "2026-09-17",
+    "title": "Parmak izi terminali ve güncelleme şeridi",
+    "items": [
+      {
+        "type": "yeni",
+        "text": "Parmak izi / yüz tanıma terminali (Perkotek YT-33 ve ZKTeco ailesi) desteği: cihaz aynı ağdan bağlanır, okutmalar yoklamaya otomatik işlenir, internet yokken de çalışır"
+      },
+      {
+        "type": "yeni",
+        "text": "Yoklama › Cihazlar altında Terminal Köprüsü: bağlantı testi, cihazdaki kişileri öğrencilerle eşleştirme, bekleyen okutmalar ve son durum"
+      },
+      {
+        "type": "duzeltme",
+        "text": "Aynı gün ikinci kez giriş çıkış okutulduğunda yerel kurulumda kayıt hatası oluşuyordu"
+      },
+      {
+        "type": "iyilestirme",
+        "text": "Güncelleme bildirimi artık ayrı pencere yerine uygulamanın üstünde ince bir şerit olarak çıkıyor; indirme yüzdesi de aynı şeritte akıyor"
+      },
+      {
+        "type": "iyilestirme",
+        "text": "Güncelleme denetimi 6 saat yerine saatte bir, ayrıca pencere öne geldiğinde (en sık 15 dakikada bir) yapılıyor"
+      }
+    ]
+  },
+  {
     "version": "0.1.2",
     "date": "2026-09-17",
     "title": "Çevrimdışı çalışma düzeltmeleri",

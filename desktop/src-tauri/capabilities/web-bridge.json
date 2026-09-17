@@ -1,9 +1,11 @@
 {
   "$schema": "../gen/schemas/remote-schema.json",
   "identifier": "web-bridge",
-  "description": "Kurum web sayfalarına (çevrimiçi kip) ve paketteki yerel sunucuya (yerel kip) yalnız bildirim köprüsü açılır. Farklı bir sunucu adresi seçilirse aynı izinler çalışma anında o adres için eklenir (src/window.rs).",
+  "description": "Kurum web sayfalarına (çevrimiçi kip) ve paketteki yerel sunucuya (yerel kip) bildirim köprüsü ve sayfa üstündeki güncelleme şeridi açılır. Farklı bir sunucu adresi seçilirse aynı izinler çalışma anında o adres için eklenir (src/window.rs).",
   "local": false,
-  "windows": ["main"],
+  "windows": [
+    "main"
+  ],
   "remote": {
     "urls": [
       "https://kurs.bogahostdeveloper.com.tr/*",
@@ -13,6 +15,11 @@
   "permissions": [
     "allow-desktop-info",
     "allow-desktop-notify",
-    "allow-desktop-badge"
+    "allow-desktop-badge",
+    "allow-update-info",
+    "allow-update-install",
+    "allow-update-later",
+    "core:event:allow-listen",
+    "core:event:allow-unlisten"
   ]
 }

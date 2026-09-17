@@ -37,7 +37,7 @@ export type SetupProgress = {
 
 export type RuntimeStatus = { phase: 'starting' | 'migrating' | 'ready' | 'restarting' | 'error'; message: string }
 
-export type UpdateInfo = { version: string; current_version: string; date: string | null; notes: string | null }
+export type UpdateInfo = { version: string; current_version: string; date: string | null; notes: string | null; snoozed: boolean }
 export type UpdateProgress = { downloaded: number; total: number | null; phase: 'downloading' | 'installing' | 'restarting' }
 
 export type ResetResult = { done: boolean; pending: number; message: string }
@@ -77,7 +77,7 @@ async function mockInvoke<T>(cmd: string, args?: Record<string, unknown>): Promi
     }
     case 'update_info':
       return {
-        version: '0.2.0', current_version: '0.1.0', date: '2026-09-20T10:00:00Z',
+        version: '0.2.0', current_version: '0.1.0', date: '2026-09-20T10:00:00Z', snoozed: false,
         notes: JSON.stringify([{ version: '0.2.0', date: '2026-09-20', title: 'Çevrimdışı iyileştirmeler', items: [
           { type: 'yeni', text: 'Tepsi menüsünden "Şimdi eşitle"' },
           { type: 'iyilestirme', text: 'İlk kurulum %30 daha hızlı' },

@@ -21,5 +21,6 @@ return [
     'data_key' => env('KURS_DATA_KEY'),
 
     // Yerel düğümde yalnız bu zamanlayıcı dosyaları yüklenir (routes/schedules/*.php).
-    'local_schedule_files' => ['sync.php'],
+    // devices.php: biyometrik terminalden yoklama çekme — cihaz YALNIZ yerel ağdan erişilebilir.
+    'local_schedule_files' => ['sync.php', 'devices.php'],
 ];

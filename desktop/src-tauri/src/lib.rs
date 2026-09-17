@@ -18,7 +18,7 @@ mod window;
 
 use paths::Paths;
 use settings::{Mode, Settings};
-use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
 use std::sync::{Arc, RwLock};
 use tauri::{Manager, RunEvent, WindowEvent};
 use tauri_plugin_deep_link::DeepLinkExt;
@@ -36,6 +36,9 @@ pub struct AppCtx {
     pub allowed_origins: Arc<RwLock<Vec<String>>>,
     pub app_base_url: RwLock<Option<url::Url>>,
     pub capability_seq: AtomicU32,
+    /// Ana penceredeki güncelleme şeridinin "buradayım" sayacı: `update_info` her çağrıldığında artar.
+    /// Şerit yanıt vermezse (kurulum ekranı) updater ayrı pencereyi yedek yol olarak açar.
+    pub banner_seen: AtomicU64,
     pub quitting: AtomicBool,
     pub setup_lock: tokio::sync::Mutex<()>,
     /// Derin bağlantıyla gelen, yerel sunucu hazır olunca açılacak yol
@@ -167,6 +170,7 @@ pub fn run() {
                 allowed_origins: Arc::new(RwLock::new(origins)),
                 app_base_url: RwLock::new(None),
                 capability_seq: AtomicU32::new(1),
+                banner_seen: AtomicU64::new(0),
                 quitting: AtomicBool::new(false),
                 setup_lock: tokio::sync::Mutex::new(()),
                 pending_path: RwLock::new(None),
@@ -242,6 +246,10 @@ pub fn run() {
                     let _ = w.hide();
                 }
             }
+        }
+        // Pencere öne geldiğinde (en sık 15 dakikada bir) güncelleme denetimi
+        RunEvent::WindowEvent { label, event: WindowEvent::Focused(true), .. } if label == window::MAIN => {
+            updater::check_on_focus(handle);
         }
         RunEvent::ExitRequested { api, code, .. } => {
             let ctx = handle.state::<AppCtx>();
