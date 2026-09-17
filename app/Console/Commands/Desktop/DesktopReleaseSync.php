@@ -223,6 +223,10 @@ Options -Indexes
 <FilesMatch "\.(tar\.gz|sig)$">
     Header set Cache-Control "public, max-age=86400"
 </FilesMatch>
+# Kök .htaccess arşiv uzantılarını kapatıyor; güncelleyicinin indirdiği paket burada açık olmalı
+<FilesMatch "^ErbaaKurs_[0-9.]+_universal\.app\.tar\.gz(\.sig)?$">
+    Require all granted
+</FilesMatch>
 HT);
     }
 
