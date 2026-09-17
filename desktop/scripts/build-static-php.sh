@@ -14,6 +14,8 @@
 set -euo pipefail
 
 OUT="${1:?Kullanım: build-static-php.sh <çıktı-dosyası>}"
+# Aşağıda derleme klasörüne geçiliyor; göreli yol çağıranın klasörüne göre mutlaklaştırılır
+case "$OUT" in /*) ;; *) OUT="$PWD/$OUT" ;; esac
 SPC_VERSION="${SPC_VERSION:-2.8.5}"
 PHP_VERSION="${PHP_VERSION:-8.4}"
 export MACOSX_DEPLOYMENT_TARGET="${MACOSX_DEPLOYMENT_TARGET:-12.0}"
