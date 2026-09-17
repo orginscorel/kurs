@@ -117,8 +117,11 @@ class DesktopReleaseSync extends Command
                     continue;
                 }
                 $target = "$tmp/$name";
-                $gh()->timeout(900)->withHeaders(['Accept' => 'application/octet-stream'])
+                $res = $gh()->timeout(900)->replaceHeaders(['Accept' => 'application/octet-stream']) // withHeaders birleştirir → GitHub JSON döner
                     ->sink($target)->get("https://api.github.com/repos/{$repo}/releases/assets/{$a['id']}")->throw();
+                // Akış kapanmadan son tampon diske yazılmaz; boyut ölçümünden önce kapat
+                $res->toPsrResponse()->getBody()->close();
+                clearstatcache(true, $target);
                 if (isset($a['size']) && filesize($target) !== (int) $a['size']) {
                     throw new \RuntimeException("$name boyutu tutmuyor.");
                 }
