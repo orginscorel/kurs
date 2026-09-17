@@ -1,5 +1,24 @@
 [
   {
+    "version": "1.11.0",
+    "date": "2026-09-17",
+    "title": "Parmak izi terminali ve tek sürüm numarası",
+    "items": [
+      {
+        "type": "yeni",
+        "text": "Parmak izi / yüz tanıma terminali desteği (Perkotek YT-33 ve ZKTeco ailesi): cihaz okutmaları yoklamaya otomatik işlenir"
+      },
+      {
+        "type": "yeni",
+        "text": "Yoklama › Cihazlar altında Terminal Köprüsü: bağlantı testi, cihazdaki kişileri öğrencilerle eşleştirme, bekleyen okutmalar"
+      },
+      {
+        "type": "iyilestirme",
+        "text": "Web ve Mac uygulaması artık aynı sürüm numarasını kullanıyor"
+      }
+    ]
+  },
+  {
     "version": "1.10.0",
     "date": "2026-09-17",
     "title": "Masaüstü uygulaması (macOS)",
