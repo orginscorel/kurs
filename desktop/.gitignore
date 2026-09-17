@@ -1,0 +1,29 @@
+# Masaüstü projesi (depoda desktop/ altında)
+node_modules/
+dist/
+build/
+.spc/
+out/
+
+# Tauri / Rust
+src-tauri/target/
+src-tauri/gen/schemas/
+# CI'da üretilen gömülü PHP ikilileri (statik PHP, universal)
+src-tauri/binaries/php-*
+# CI'da indirilen CA listesi
+runtime/cacert.pem
+
+# Sırlar ASLA depoya girmez
+*.p12
+*.p8
+*.pem
+*.key
+*.cer
+*.mobileprovision
+.env
+.env.*
+*.keychain-db
+tauri-signing*.key
+
+.DS_Store
+*.log

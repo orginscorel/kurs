@@ -1,0 +1,237 @@
+[
+  {
+    "version": "1.10.0",
+    "date": "2026-09-17",
+    "title": "Masaüstü uygulaması (macOS)",
+    "items": [
+      {
+        "type": "yeni",
+        "text": "Uygulamalar sayfası: macOS masaüstü uygulamasının indirme bağlantısı, sürümü ve sistem gereksinimleri (Ayarlar › Uygulamalar; öğretmenler için /ogretmen/uygulamalar)"
+      },
+      {
+        "type": "yeni",
+        "text": "Masaüstü uygulaması iki biçimde kullanılır: kurum bilgisayarında çevrimdışı çalışan yerel kurulum ya da kurum sunucusunu açan çevrimiçi pencere"
+      },
+      {
+        "type": "iyilestirme",
+        "text": "Masaüstü yerel kurulumu yalnız uygulama penceresinden erişilebilir (tek kullanımlık açılış anahtarı)"
+      }
+    ]
+  },
+  {
+    "version": "1.9.2",
+    "date": "2026-09-17",
+    "title": "Eşitleme eksikleri",
+    "items": [
+      {
+        "type": "iyilestirme",
+        "text": "Masaüstü kurulumda iade, gelir-gider, hesap aktarımı, POS yatışı, senet, tahsilat takibi ve ödeme planı değişiklikleri çevrimdışı yapılabiliyor; web'de aynı belge numarasıyla işleniyor"
+      },
+      {
+        "type": "iyilestirme",
+        "text": "Öğrenci fotoğrafı, belgeler, ödev dosyaları ve disiplin ekleri masaüstü kurulumla karşılıklı aktarılıyor"
+      },
+      {
+        "type": "iyilestirme",
+        "text": "Eşitleme çakışmaları ekranında finans mutabakatı açıklaması tüm finans işlemlerini kapsıyor; dar ekranda taşmalar giderildi"
+      }
+    ]
+  },
+  {
+    "version": "1.9.1",
+    "date": "2026-09-17",
+    "title": "Form ve tablo düzenlemeleri",
+    "items": [
+      {
+        "type": "duzeltme",
+        "text": "Form hataları artık Türkçe ve ilgili alanın altında görünüyor (\"validation.required\" gibi ham yazılar kalktı)"
+      },
+      {
+        "type": "iyilestirme",
+        "text": "Zorunlu alanlar yıldızla, diğerleri \"(isteğe bağlı)\" ile belirtildi; öğrenci formu göndermeden önce eksikleri listeler"
+      },
+      {
+        "type": "iyilestirme",
+        "text": "Tablo başlıkları ve ikinci satırlar açık yazıldı (Öğrenci no, Kurum sırası, Doğru / Yanlış / Boş, Kalan borç…)"
+      },
+      {
+        "type": "iyilestirme",
+        "text": "Telefon, e-posta ve adresler simgeli ve tıklanabilir; veli listesinden borç süzgeci kaldırıldı"
+      },
+      {
+        "type": "yeni",
+        "text": "Öğrenci, veli ve öğretmen portalına bildirim zili; ayrıntı sayfalarında üst çubukta sayfanın kendi başlığı"
+      },
+      {
+        "type": "duzeltme",
+        "text": "Mobilde tablo kartlarının ve düğmelerin sağdan kırpılması giderildi; küçük yazılar büyütüldü"
+      },
+      {
+        "type": "iyilestirme",
+        "text": "Tablolarda ad ve veli/iletişim sütunları sola, işlem düğmeleri sağa, diğer tüm veriler ortaya hizalandı"
+      },
+      {
+        "type": "iyilestirme",
+        "text": "Tahsilatlar tablosunda tutar öne alındı; menü adları sadeleştirildi (WhatsApp → Mesaj geçmişi)."
+      }
+    ]
+  },
+  {
+    "version": "1.9.0",
+    "date": "2026-09-17",
+    "title": "Güncelleme bildirimi, yenilikler sayfası ve form düzenlemeleri",
+    "items": [
+      {
+        "type": "yeni",
+        "text": "Sistem güncellendiğinde açık ekranlarda sürüm bildirimi ve \"Neler yeni\" penceresi çıkıyor; tek tıkla yeni sürüme geçiliyor."
+      },
+      {
+        "type": "yeni",
+        "text": "Yenilikler sayfası: tüm sürümlerin değişiklik günlüğü (menüde sürüm numarasına tıklayarak açılır)."
+      },
+      {
+        "type": "yeni",
+        "text": "Masaüstü ve mobil uygulamalar için eşitleme altyapısı: Ayarlar › Bağlı cihazlar ve Eşitleme çakışmaları."
+      },
+      {
+        "type": "iyilestirme",
+        "text": "Doğrulama mesajları Türkçe (\"Ad zorunludur.\", \"Telefon 11 haneli olmalıdır.\")."
+      },
+      {
+        "type": "iyilestirme",
+        "text": "Ön kayıt formunda öğrenci ya da veli telefonundan biri yeterli; zorunlu ve isteğe bağlı alanlar belirtildi."
+      },
+      {
+        "type": "iyilestirme",
+        "text": "Ön kayıt listesinde veli bilgisi ayrı sütunda; arama durumu yalnız \"Aranacak / Arandı\"."
+      },
+      {
+        "type": "iyilestirme",
+        "text": "Güncelleme penceresi yalnız yeni sürüm maddelerini gösterir; küçük derlemelerde kısa bilgi verir."
+      }
+    ]
+  },
+  {
+    "version": "1.8.0",
+    "date": "2026-09-17",
+    "title": "Toplu SMS / e-posta, portal yeni menü, veli birleştirme",
+    "items": [
+      {
+        "type": "yeni",
+        "text": "Toplu gönderim: öğrenci, veli, öğretmen ve personele SMS / e-posta (NetGSM, Mutlucell, VatanSMS, SMTP); İYS ve ret listesi."
+      },
+      {
+        "type": "yeni",
+        "text": "Öğrenci, veli ve öğretmen portalında solda gruplu menü; tablette ikon rayı, telefonda alt sekmeler."
+      },
+      {
+        "type": "yeni",
+        "text": "Mükerrer veli birleştirme ekranı; öğrenci profilinde Gözlemler sekmesi ve belge kısayolları."
+      },
+      {
+        "type": "yeni",
+        "text": "Ayarlar › Kurum › Portal sekmesi; ticari ileti onay kutuları."
+      },
+      {
+        "type": "iyilestirme",
+        "text": "Sınıf/program duyuruları velilere de görünüyor (\"Yalnız öğrencilere\" seçeneğiyle gizlenebilir)."
+      }
+    ]
+  },
+  {
+    "version": "1.7.0",
+    "date": "2026-09-17",
+    "title": "Finans, muhasebe, fatura ve senet",
+    "items": [
+      {
+        "type": "yeni",
+        "text": "Fatura (taslak → kesildi → iptal/iade), toplu fatura, e-Arşiv entegratörüne hazır yapı."
+      },
+      {
+        "type": "yeni",
+        "text": "Muhasebe: tek düzen hesap planı, otomatik yevmiye, büyük defter, mizan, dönem kilidi."
+      },
+      {
+        "type": "yeni",
+        "text": "Senet (bono) basımı: taksit başına, toplu; dekont, makbuz ve cari ekstre PDF."
+      },
+      {
+        "type": "yeni",
+        "text": "İade, POS/banka mutabakatı, gecikme takibi (yaşlandırma, ödeme sözü), veli toplu tahsilat."
+      },
+      {
+        "type": "yeni",
+        "text": "Genel Bakış ve portallarda vadesi geçmiş ödeme uyarısı."
+      }
+    ]
+  },
+  {
+    "version": "1.6.0",
+    "date": "2026-09-17",
+    "title": "Disiplin sistemi, öğretmen portalı, kurumsal tasarım",
+    "items": [
+      {
+        "type": "yeni",
+        "text": "Disiplin: olay kaydı, savunma, kademeli yaptırım, disiplin kurulu, itiraz, rapor."
+      },
+      {
+        "type": "yeni",
+        "text": "Öğretmen portalı: program, yoklama, ödev verme ve puanlama, gözlem, olay bildirme."
+      },
+      {
+        "type": "yeni",
+        "text": "Okul listesi (Erbaa ve Taşova liseleri) ve bölgeden okul ekleme."
+      },
+      {
+        "type": "yeni",
+        "text": "Liste ve çizelge çıktıları: sınıf listesi ve elle yoklama çizelgesi (PDF/Excel)."
+      },
+      {
+        "type": "iyilestirme",
+        "text": "Kurumsal lacivert tema, Inter yazı tipi, sade rozetler; tablolar telefonda kart görünümünde."
+      },
+      {
+        "type": "iyilestirme",
+        "text": "Genel Bakış yeni düzen; kenar menüsü yeniden sıralandı."
+      },
+      {
+        "type": "duzeltme",
+        "text": "Ön kayıttan öğrenciye çevirmede dolu alanlara rağmen çıkan hata giderildi."
+      }
+    ]
+  },
+  {
+    "version": "1.5.0",
+    "date": "2026-09-16",
+    "title": "Veli portalı, ders programı botu, rapor merkezi",
+    "items": [
+      {
+        "type": "yeni",
+        "text": "Veli portalı ve ilk girişte şifre belirleme; ayrılan öğrencinin hesabı otomatik kapanır."
+      },
+      {
+        "type": "yeni",
+        "text": "Ders programı botu: öğretmen saatlerine göre çakışmasız otomatik program."
+      },
+      {
+        "type": "yeni",
+        "text": "Rapor Merkezi, takvim, kurulum sihirbazı ve Excel'den içe aktarma."
+      },
+      {
+        "type": "yeni",
+        "text": "Ön kayıt sistemi ve kurumsal sınav sonuç belgesi."
+      }
+    ]
+  },
+  {
+    "version": "1.0.0",
+    "date": "2026-09-14",
+    "title": "İlk sürüm",
+    "items": [
+      {
+        "type": "yeni",
+        "text": "Öğrenci, veli, öğretmen, sınıf, yoklama, sınav, rehberlik, finans ve iletişim modülleri."
+      }
+    ]
+  }
+]

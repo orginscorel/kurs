@@ -1,0 +1,39 @@
+{
+  "apiBaseUrl": "https://kurs.bogahostdeveloper.com.tr/api/v1",
+  "deviceToken": "dev_BURAYA_CIHAZ_JETONUNU_YAPISTIRIN",
+  "driver": "simulator",
+
+  "_comment_driver": "driver: simulator | zkteco | serial-rfid",
+
+  "zkteco": {
+    "ip": "192.168.1.201",
+    "port": 4370,
+    "timeoutMs": 4000,
+    "inPort": 0
+  },
+
+  "serialRfid": {
+    "path": "COM3",
+    "baudRate": 9600,
+    "lineTerminator": "\n"
+  },
+
+  "simulator": {
+    "identities": [
+      { "identifier": "1001", "identifier_kind": "fingerprint", "label": "Test Öğrenci 1" },
+      { "identifier": "1002", "identifier_kind": "fingerprint", "label": "Test Öğrenci 2" }
+    ],
+    "autoIntervalMs": 0
+  },
+
+  "queue": {
+    "dbPath": "./data/queue.sqlite3",
+    "batchSize": 100,
+    "flushIntervalMs": 5000,
+    "maxBackoffMs": 300000
+  },
+
+  "heartbeatIntervalMs": 60000,
+  "identitySyncIntervalMs": 300000,
+  "logLevel": "info"
+}

@@ -1,0 +1,93 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Erbaa Kurs",
+  "mainBinaryName": "erbaa-kurs",
+  "version": "../package.json",
+  "identifier": "tr.com.erbaabilgi.kurs",
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "devUrl": "http://localhost:5183",
+    "beforeBuildCommand": "npm run build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "withGlobalTauri": false,
+    "windows": [],
+    "security": {
+      "csp": {
+        "default-src": "'self' ipc: http://ipc.localhost",
+        "connect-src": "'self' ipc: http://ipc.localhost",
+        "img-src": "'self' data:",
+        "style-src": "'self' 'unsafe-inline'",
+        "font-src": "'self' data:",
+        "script-src": "'self'"
+      },
+      "devCsp": "default-src 'self' ipc: http://ipc.localhost ws://localhost:5183 http://localhost:5183 'unsafe-inline' 'unsafe-eval' data:",
+      "freezePrototype": false
+    },
+    "macOSPrivateApi": false
+  },
+  "bundle": {
+    "active": true,
+    "targets": [
+      "app",
+      "dmg"
+    ],
+    "category": "Education",
+    "shortDescription": "Erbaa Bilgi Eğitim kurum uygulaması",
+    "longDescription": "Dershane yönetim sisteminin masaüstü uygulaması: çevrimdışı yerel kurulum (web ile eşitlenir) ya da kurum sunucusuna bağlanan çevrimiçi pencere.",
+    "copyright": "© Erbaa Bilgi Eğitim",
+    "publisher": "Erbaa Bilgi Eğitim",
+    "homepage": "https://kurs.bogahostdeveloper.com.tr/uygulamalar",
+    "createUpdaterArtifacts": true,
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "externalBin": [
+      "binaries/php"
+    ],
+    "resources": {
+      "../build/laravel/": "laravel/",
+      "../runtime/": "runtime/"
+    },
+    "macOS": {
+      "minimumSystemVersion": "12.0",
+      "hardenedRuntime": true,
+      "entitlements": "./Entitlements.plist",
+      "signingIdentity": null,
+      "dmg": {
+        "windowSize": {
+          "width": 660,
+          "height": 400
+        },
+        "appPosition": {
+          "x": 180,
+          "y": 190
+        },
+        "applicationFolderPosition": {
+          "x": 480,
+          "y": 190
+        }
+      }
+    }
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDRCRTM2MDVBRjQ4QzhFM0YKUldRL2pvejBXbURqUzZyekgxM0VlWnYxV0N4aGtIN2FXcXdFRFZCWGkyV21GLy93Y1RDS2VIZkoK",
+      "endpoints": [
+        "https://kurs.bogahostdeveloper.com.tr/desktop/latest.json"
+      ]
+    },
+    "deep-link": {
+      "desktop": {
+        "schemes": [
+          "erbaakurs"
+        ]
+      }
+    }
+  }
+}

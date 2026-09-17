@@ -1,0 +1,23 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "setup-ui",
+  "description": "Uygulamanın kendi yerel sayfaları (kurulum, başlatma, hata, güncelleme penceresi).",
+  "local": true,
+  "windows": ["main", "update"],
+  "permissions": [
+    "core:default",
+    "allow-app-state",
+    "allow-check-server",
+    "allow-choose-remote",
+    "allow-setup-local",
+    "allow-resume-setup",
+    "allow-start-local",
+    "allow-reset-setup",
+    "allow-open-logs",
+    "allow-quit-app",
+    "allow-update-info",
+    "allow-update-install",
+    "allow-update-later",
+    "allow-desktop-info"
+  ]
+}

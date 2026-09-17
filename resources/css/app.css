@@ -1,0 +1,233 @@
+@import "tailwindcss";
+
+/*
+ * Erbaa Bilgi Eğitim — tasarım sistemi.
+ * Tüm renkler CSS değişkeni (token). Marka rengi tek yerden değişir; koyu tema yalnızca
+ * token'ları yeniden tanımlar. Web ve mobil (React Native) aynı token adlarını kullanır.
+ */
+
+@custom-variant dark (&:where([data-theme=dark], [data-theme=dark] *));
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-ink-3: var(--ink-3);
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-soft: var(--primary-soft);
+  --color-primary-ink: var(--primary-ink);
+  --color-success: var(--success);
+  --color-success-soft: var(--success-soft);
+  --color-warning: var(--warning);
+  --color-warning-soft: var(--warning-soft);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --color-info: var(--info);
+  --color-info-soft: var(--info-soft);
+  --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
+
+  --font-sans: "Inter Variable", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, "JetBrains Mono", Menlo, Consolas, monospace;
+
+  --radius-xs: 6px;
+  --radius-sm: 8px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 18px;
+
+  --shadow-pop: 0 1px 2px rgb(16 16 30 / 0.04), 0 8px 24px -6px rgb(16 16 30 / 0.12);
+  --shadow-soft: 0 1px 2px rgb(20 26 50 / 0.05), 0 1px 1px rgb(20 26 50 / 0.03);
+
+  --animate-fade-in: fade-in 160ms ease-out;
+  --animate-slide-up: slide-up 180ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  --animate-slide-left: slide-left 220ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  --animate-pulse-dot: pulse-dot 2s ease-in-out infinite;
+}
+
+:root {
+  /* Kurumsal açık tema: nötr kırık beyaz yüzeyler, lacivert birincil renk */
+  --bg: #eef0f2;
+  --surface: #fbfbfc;
+  --surface-2: #f3f4f6;
+  --surface-3: #e7e9ed;
+  --line: #e0e3e8;
+  --line-strong: #cbd0d8;
+  --ink: #161a21;
+  --ink-2: #3d4452;
+  --ink-3: #636b79;
+
+  --primary: #1f3b63;
+  --primary-hover: #182f50;
+  --primary-soft: #e9eef5;
+  --primary-ink: #1c355a;
+
+  --success: #17714a;
+  --success-soft: #e8f3ed;
+  --warning: #9a5a0c;
+  --warning-soft: #f9f1e4;
+  --danger: #b0293b;
+  --danger-soft: #f9ecee;
+  --info: #2f5b88;
+  --info-soft: #ebf0f6;
+  --accent: #0f6b64;
+  --accent-soft: #e6f1ef;
+
+  color-scheme: light;
+}
+
+[data-theme="dark"] {
+  --bg: #0e1116;
+  --surface: #151a21;
+  --surface-2: #1b212a;
+  --surface-3: #232a35;
+  --line: #28303b;
+  --line-strong: #36404d;
+  --ink: #e9ecf1;
+  --ink-2: #aeb5c1;
+  --ink-3: #7c8594;
+
+  --primary: #6f9bd4;
+  --primary-hover: #86acdd;
+  --primary-soft: #1a2638;
+  --primary-ink: #a9c4e8;
+
+  --success: #45b681;
+  --success-soft: #11281e;
+  --warning: #e0a14a;
+  --warning-soft: #2c2314;
+  --danger: #ea6b7c;
+  --danger-soft: #331a1f;
+  --info: #7ea6d6;
+  --info-soft: #162234;
+  --accent: #4bb5aa;
+  --accent-soft: #10272a;
+
+  color-scheme: dark;
+}
+
+@layer base {
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    background: var(--bg);
+    /* üstte çok hafif nötr ışıma: düz gri yüzeyi kırar */
+    background-image: radial-gradient(1200px 520px at 70% -120px, rgb(31 59 99 / 0.035), transparent 70%);
+    background-attachment: fixed;
+    color: var(--ink);
+    font-family: var(--font-sans);
+    font-size: 14px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    font-feature-settings: "ss01", "cv01";
+    letter-spacing: -0.006em;
+  }
+  * { border-color: var(--line); }
+  ::selection { background: var(--primary-soft); color: var(--primary-ink); }
+  :focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; border-radius: 6px; }
+  input, select, textarea, button { font: inherit; color: inherit; }
+  .tabular { font-variant-numeric: tabular-nums; }
+}
+
+@layer components {
+  .scroll-thin { scrollbar-width: thin; scrollbar-color: var(--line-strong) transparent; }
+
+  /*
+   * Elle yazılmış tablolar için ortak dil (DataTable ile aynı mantık):
+   * başlık şeridi, zebra satır, hover; sütunlar içerik kadar yer kaplar, artan genişlik
+   * ilk sütunda (ya da .fill verilen sütunda) toplanır; sağa yaslı işlem sütunu sağda kalır.
+   * Hücreye verilen Tailwind sınıfları (px-*, text-right, whitespace-normal…) bu kuralları ezer.
+   */
+  .tbl { width: 100%; border-collapse: collapse; }
+  .tbl thead th {
+    height: 36px; padding: 0 12px; text-align: left; vertical-align: middle;
+    font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink-2);
+    background: linear-gradient(90deg, color-mix(in srgb, var(--primary-soft) 70%, transparent), var(--surface-2) 45%);
+    border-bottom: 1px solid var(--line);
+  }
+  .tbl tbody td { padding: 9px 12px; vertical-align: middle; border-bottom: 1px solid var(--line); }
+  .tbl tbody tr:last-child td { border-bottom: 0; }
+  .tbl tbody tr:nth-child(even) td { background: color-mix(in srgb, var(--surface-2) 35%, transparent); }
+  .tbl tbody tr:hover td { background: color-mix(in srgb, var(--primary-soft) 35%, transparent); }
+  .tbl tfoot td { padding: 9px 12px; font-weight: 600; border-top: 1px solid var(--line); background: var(--surface-2); }
+  .tbl th, .tbl td { width: 1%; white-space: nowrap; }
+  .tbl th.fill, .tbl td.fill,
+  .tbl:not(:has(.fill)) th:first-child, .tbl:not(:has(.fill)) td:first-child { width: auto; white-space: normal; }
+  .tbl.tbl-dense thead th { height: 32px; padding: 0 10px; }
+  .tbl.tbl-dense tbody td { padding: 6px 10px; }
+  .skeleton {
+    background: linear-gradient(90deg, var(--surface-2) 0%, var(--surface-3) 50%, var(--surface-2) 100%);
+    background-size: 200% 100%;
+    animation: shimmer 1.2s linear infinite;
+    border-radius: 6px;
+  }
+}
+
+@keyframes shimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+@keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes slide-up { from { opacity: 0; transform: translateY(6px) scale(0.99); } to { opacity: 1; transform: none; } }
+@keyframes slide-left { from { transform: translateX(24px); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes pulse-dot { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 1ms !important; transition-duration: 1ms !important; }
+}
+
+/* Grafik serileri — dataviz referans paletinden, sabit sırada (açık/koyu ayrı adımlar) */
+:root {
+  --series-1: #36659c; --series-2: #b9bdc5; --series-3: #2a2a35; --series-4: #c08a2e;
+  --series-5: #7d7d90; --series-6: #d3dcea; --series-7: #55556a; --series-8: #c9c9d4;
+  --chart-grid: #e8ebf2; --chart-axis: #9a9aab;
+}
+[data-theme="dark"] {
+  --series-1: #5d8fce; --series-2: #4a4a5c; --series-3: #d9d9e3; --series-4: #b9852f;
+  --series-5: #8a8aa0; --series-6: #26344a; --series-7: #a9a9bb; --series-8: #3a3a48;
+  --chart-grid: #1f1f29; --chart-axis: #6e6e84;
+}
+
+/* Kayıt renkleri (ders, sınıf, program etiketleri) — grafik serilerinden ayrı, gerçek renkli */
+:root {
+  --rec-indigo: #4c5fa8; --rec-sky: #3a74b0; --rec-teal: #0f9488; --rec-green: #3a9637;
+  --rec-rose: #b8475f; --rec-pink: #9c4f86; --rec-amber: #bf8209; --rec-orange: #c0652a; --rec-slate: #7a8194;
+}
+[data-theme="dark"] {
+  --rec-indigo: #8f86ff; --rec-sky: #5aa8f5; --rec-teal: #34c3b5; --rec-green: #6cc566;
+  --rec-rose: #f07595; --rec-pink: #e27cc4; --rec-amber: #f0b43c; --rec-orange: #f58c4f; --rec-slate: #8c8ca3;
+}
+
+/* Karanlık temada zemin ışıması yok */
+[data-theme="dark"] body { background-image: none; }
+
+/* Üst çubuk ve menü logo alanı: hafif marka tonu (başlık renksiz görünüyordu) */
+.app-topbar { background: rgb(251 251 252 / 0.92); }
+[data-theme="dark"] .app-topbar { background: rgb(21 26 33 / 0.9); }
+
+/* Bildirimler (sonner): türe göre sol renk şeridi — başarı / hata / uyarı / bilgi ilk bakışta ayrılır */
+[data-sonner-toast][data-type] { border-left-width: 4px !important; box-shadow: var(--shadow-pop) !important; }
+[data-sonner-toast][data-type="success"] { border-left-color: var(--success) !important; }
+[data-sonner-toast][data-type="error"] { border-left-color: var(--danger) !important; }
+[data-sonner-toast][data-type="warning"] { border-left-color: var(--warning) !important; }
+[data-sonner-toast][data-type="info"] { border-left-color: var(--info) !important; }
+
+/* Bildirimler (sonner): türe göre sol renk şeridi + belirgin başlık */
+[data-sonner-toast] { border-radius: var(--radius-md) !important; box-shadow: var(--shadow-pop) !important; padding: 12px 14px !important; }
+[data-sonner-toast][data-type="success"] { border-left: 4px solid var(--success) !important; }
+[data-sonner-toast][data-type="error"] { border-left: 4px solid var(--danger) !important; }
+[data-sonner-toast][data-type="warning"] { border-left: 4px solid var(--warning) !important; }
+[data-sonner-toast][data-type="info"] { border-left: 4px solid var(--info) !important; }
+[data-sonner-toast] [data-title] { font-weight: 600; }
+[data-sonner-toast] [data-icon] { width: 20px; height: 20px; }
+[data-sonner-toast] [data-icon] svg { width: 20px; height: 20px; }
+
+/* Okunaklılık: Inter + ayırt edici glifler (l, I) ve düzgün yazı işleme */
+body { font-weight: 430; font-feature-settings: "cv05", "cv08", "calt"; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; text-rendering: optimizeLegibility; }
+.tabular { font-feature-settings: "tnum", "cv05", "cv08"; }
+
+/* Kalınlık kademeleri Inter'de biraz ağırlaştırıldı (ince görünmesin) */
+.font-medium { font-weight: 530; }
+.font-semibold { font-weight: 630; }

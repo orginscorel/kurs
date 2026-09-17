@@ -1,0 +1,113 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# orginscorel/kurs — depo kökü .gitignore (kök = web uygulaması / kurs-app, desktop/ = masaüstü)
+# Bu dosya depoya ".gitignore" adıyla konur. desktop/.gitignore ayrıca masaüstü çıktılarını dışlar.
+# ─────────────────────────────────────────────────────────────────────────────
+
+# --- Ortam ve sırlar (ASLA depoya girmez)
+.env
+.env.*
+!.env.example
+*.env
+auth.json
+*.p12
+*.p8
+*.pem
+*.key
+*.cer
+*.crt
+*.keystore
+*.jks
+*.mobileprovision
+*.keychain-db
+id_rsa*
+id_ed25519*
+/storage/*.key
+
+# --- Bağımlılıklar
+/vendor/
+node_modules/
+
+# --- Laravel çalışma verisi (yapı dizinleri kendi .gitignore dosyalarıyla kalır)
+/storage/app/*
+!/storage/app/.gitignore
+!/storage/app/public/
+/storage/app/public/*
+!/storage/app/public/.gitignore
+!/storage/app/private/
+/storage/app/private/*
+!/storage/app/private/.gitignore
+/storage/framework/cache/*
+!/storage/framework/cache/.gitignore
+/storage/framework/sessions/*
+!/storage/framework/sessions/.gitignore
+/storage/framework/views/*
+!/storage/framework/views/.gitignore
+/storage/framework/testing/*
+/storage/framework/down
+/storage/framework/maintenance.php
+/storage/logs/*
+!/storage/logs/.gitignore
+/storage/pail
+/storage/fonts/
+/bootstrap/cache/*
+!/bootstrap/cache/.gitignore
+
+# --- Yedekler, veritabanı dökümleri, kişisel veri
+*.sql
+*.sql.gz
+*.sqlite
+*.sqlite-journal
+*.sqlite-wal
+*.sqlite-shm
+/database/*.sqlite
+backups/
+_backups*/
+*.bak
+*.orig
+*.swp
+demo-users.txt
+
+# --- Derleme çıktıları (web kökü ayrı klasörde; yine de güvence)
+/public/build/
+/public/hot
+/public/storage
+/public/fonts-manifest.dev.json
+tsconfig.tsbuildinfo
+*.tsbuildinfo
+
+# --- Test ve araç çıktıları
+/.phpunit.cache
+.phpunit.result.cache
+/coverage/
+/tests/_output/
+/playwright-report/
+/test-results/
+
+# --- Günlükler
+*.log
+error_log
+
+# --- IDE / işletim sistemi / yapay zekâ araçları
+/.idea
+/.vscode
+/.zed
+/.nova
+/.fleet
+/.cursor/
+/.codex
+.phpactor.json
+_ide_helper.php
+_ide_helper_models.php
+.phpstorm.meta.php
+Homestead.json
+Homestead.yaml
+.DS_Store
+Thumbs.db
+
+# --- Masaüstü (desktop/.gitignore'a ek güvence)
+/desktop/dist/
+/desktop/build/
+/desktop/src-tauri/target/
+/desktop/src-tauri/gen/schemas/
+/desktop/src-tauri/binaries/php-*
+/desktop/runtime/cacert.pem

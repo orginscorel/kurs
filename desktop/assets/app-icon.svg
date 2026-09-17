@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!-- macOS simge ızgarası: 824×824 gövde, 100 px kenar boşluğu -->
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#284a7a"/>
+      <stop offset="1" stop-color="#1f3b63"/>
+    </linearGradient>
+  </defs>
+  <rect x="100" y="100" width="824" height="824" rx="185" fill="url(#g)"/>
+  <g transform="translate(512 512) scale(12) translate(-32 -32)">
+    <path d="M14 23l18-9 18 9-18 9-18-9z" fill="#fff"/>
+    <path d="M22 28v9c0 3.5 4.5 7 10 7s10-3.5 10-7v-9" fill="none" stroke="#fff" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M50 23v13" stroke="#fff" stroke-width="3" stroke-linecap="round"/>
+    <circle cx="50" cy="38" r="2.4" fill="#fff"/>
+  </g>
+</svg>

@@ -1,0 +1,21 @@
+[Unit]
+Description=Erbaa Bilgi Yoklama Köprüsü (Local Device Gateway)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+# Kurulum dizinini kendi sunucunuza göre düzenleyin:
+WorkingDirectory=/opt/kurs-gateway
+ExecStart=/usr/bin/node /opt/kurs-gateway/src/index.js
+Restart=on-failure
+RestartSec=5
+User=kursgateway
+Group=kursgateway
+Environment=NODE_ENV=production
+
+# Kuyruk veritabanı ve loglar için yazma izni yeterli olsun.
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target

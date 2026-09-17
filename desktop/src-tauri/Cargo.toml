@@ -1,0 +1,48 @@
+[package]
+name = "erbaa-kurs"
+version = "0.1.0"
+description = "Erbaa Bilgi Eğitim masaüstü uygulaması"
+authors = ["Erbaa Bilgi Eğitim"]
+edition = "2021"
+rust-version = "1.85"
+publish = false
+
+[lib]
+# Tauri mobil (iOS/Android) için aynı çekirdek kitaplık; masaüstünde main.rs çağırır.
+name = "erbaa_kurs_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "=2.6.3", features = [] }
+
+[dependencies]
+tauri = { version = "=2.11.5", features = ["tray-icon", "image-png"] }
+tauri-plugin-log = "=2.9.1"
+tauri-plugin-notification = "=2.4.0"
+tauri-plugin-opener = "=2.5.5"
+tauri-plugin-deep-link = "=2.4.10"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+log = "0.4"
+tokio = { version = "1.47", features = ["process", "time", "io-util", "sync", "macros", "rt-multi-thread", "fs"] }
+reqwest = { version = "0.13", default-features = false, features = ["json", "native-tls", "system-proxy", "charset", "http2"] }
+keyring = { version = "3.6.3", features = ["apple-native", "windows-native"] }
+getrandom = "0.3"
+sha2 = "0.10"
+hex = "0.4"
+base64 = "0.22"
+url = "2"
+
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
+
+[target.'cfg(any(target_os = "macos", windows, target_os = "linux"))'.dependencies]
+tauri-plugin-single-instance = { version = "=2.4.4", features = ["deep-link"] }
+tauri-plugin-updater = "=2.11.0"
+tauri-plugin-autostart = "=2.5.1"
+
+[profile.release]
+codegen-units = 1
+lto = true
+opt-level = "s"
+strip = true

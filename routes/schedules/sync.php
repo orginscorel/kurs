@@ -1,0 +1,19 @@
+<?php
+
+use Illuminate\Support\Facades\Schedule;
+
+/*
+| Eşitleme (docs/SYNC.md).
+| Sunucu: DB::table ile yapılan olaysız yazmaları günlüğe alan süpürücü (hızlı kip dakikada bir, tam kip 30 dk'da bir),
+|         eski günlük/alındı budaması (gece).
+| Yerel düğüm: kurs:sync döngüsü (gönder/çek, geri çekilme) dakikada bir; komut kendi içinde aralığı yönetir.
+*/
+if (config('kurs.node') === 'local') {
+    Schedule::command('kurs:sync --loop=55')->everyMinute()->withoutOverlapping(10)->runInBackground();
+} else {
+    Schedule::command('kurs:sync-sweep')->everyMinute()->withoutOverlapping(5);
+    Schedule::command('kurs:sync-sweep --full')->everyThirtyMinutes()->withoutOverlapping(15);
+    Schedule::command('kurs:sync-prune')->dailyAt('04:10')->withoutOverlapping();
+    // Dosya dizini (sha256): cihazların indireceği/yükleyeceği fotoğraf ve belgeler
+    Schedule::command('kurs:sync-files --index')->everyTenMinutes()->withoutOverlapping(10);
+}

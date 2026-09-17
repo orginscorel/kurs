@@ -1,0 +1,25 @@
+[
+  {
+    "version": "0.1.0",
+    "date": "2026-09-17",
+    "title": "İlk masaüstü sürümü (macOS)",
+    "items": [
+      {
+        "type": "yeni",
+        "text": "Kurum bilgisayarı kipi: kurum verisi bilgisayarda tutulur, internet yokken çalışır, bağlantı gelince web ile eşitlenir"
+      },
+      {
+        "type": "yeni",
+        "text": "Çevrimiçi kip: öğretmen portalı ve yönetim ekranları uygulama penceresinde, bildirimler masaüstünde"
+      },
+      {
+        "type": "yeni",
+        "text": "Kurulum sihirbazı: sunucu adresi, eşleştirme kodu ve personel girişiyle adım adım ilk eşitleme"
+      },
+      {
+        "type": "yeni",
+        "text": "Otomatik güncelleme, menü çubuğu simgesinden \"Şimdi eşitle\", oturum açılınca başlatma"
+      }
+    ]
+  }
+]

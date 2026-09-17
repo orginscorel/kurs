@@ -1,0 +1,25 @@
+{
+  "name": "kurs-attendance-gateway",
+  "version": "1.0.0",
+  "description": "Erbaa Bilgi Eğitim — Yoklama modülü yerel donanım köprüsü (ZKTeco/RFID/QR terminalleri ↔ kurs-app API)",
+  "private": true,
+  "type": "commonjs",
+  "main": "src/index.js",
+  "bin": {
+    "kurs-gateway": "src/index.js"
+  },
+  "scripts": {
+    "start": "node --no-warnings src/index.js",
+    "simulate": "node --no-warnings src/index.js --simulate",
+    "install-windows-service": "node src/windows-service.js install",
+    "uninstall-windows-service": "node src/windows-service.js uninstall"
+  },
+  "engines": {
+    "node": ">=22.5"
+  },
+  "dependencies": {},
+  "optionalDependencies": {
+    "node-windows": "^1.0.0-beta.8"
+  },
+  "license": "UNLICENSED"
+}
