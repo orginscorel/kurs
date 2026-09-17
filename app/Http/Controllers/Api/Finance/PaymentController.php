@@ -30,7 +30,7 @@ class PaymentController extends FinanceController
     public function index(Request $request): JsonResponse
     {
         $query = $this->filtered($request);
-        $totals = (clone $query)->reorder()->select([])->selectRaw('
+        $totals = (clone $query)->setEagerLoads([])->reorder()->select([])->selectRaw('
             COUNT(*) AS count,
             COALESCE(SUM(CASE WHEN payments.voided_at IS NULL THEN payments.amount ELSE 0 END), 0) AS active_amount,
             SUM(payments.voided_at IS NULL) AS active_count,

@@ -41,7 +41,7 @@ class StudyController extends ApiController
 
     public function show(Request $request, StudySession $study): JsonResponse
     {
-        $study->load(['teacher:id,first_name,last_name,color', 'subject:id,name,color', 'classroom:id,name', 'students:id,student_no,full_name,photo_path', 'students.currentClassGroups:id,name']);
+        $study->load(['teacher:id,first_name,last_name,color', 'subject:id,name,color', 'classroom:id,name', 'students:id,student_no,full_name,phone,photo_path', 'students.currentClassGroups:id,name']);
         $sensitive = $request->user()->can('students.view_sensitive');
         $requester = $study->requested_by ? \App\Models\User::query()->find($study->requested_by, ['id', 'name']) : null;
         $approver = $study->approved_by ? \App\Models\User::query()->find($study->approved_by, ['id', 'name']) : null;

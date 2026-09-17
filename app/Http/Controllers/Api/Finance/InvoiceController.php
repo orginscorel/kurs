@@ -28,7 +28,7 @@ class InvoiceController extends FinanceController
     public function index(Request $request): JsonResponse
     {
         $query = $this->filtered($request);
-        $totals = (clone $query)->reorder()->select([])->selectRaw("
+        $totals = (clone $query)->setEagerLoads([])->reorder()->select([])->selectRaw("
             COUNT(*) AS count,
             SUM(invoices.status = 'draft') AS drafts,
             COALESCE(SUM(CASE WHEN invoices.status = 'issued' AND invoices.kind = 'sales' THEN invoices.payable_total ELSE 0 END), 0) AS issued_total,

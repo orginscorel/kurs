@@ -81,7 +81,7 @@ class GuidanceMeetingController extends ApiController
 
     public function show(Request $request, GuidanceMeeting $meeting): JsonResponse
     {
-        $meeting->load(['student:id,full_name,student_no', 'counselor:id,name']);
+        $meeting->load(['student:id,full_name,student_no,school_grade', 'counselor:id,name']);
 
         return response()->json(['data' => $this->row($meeting, $request->user(), full: true)]);
     }

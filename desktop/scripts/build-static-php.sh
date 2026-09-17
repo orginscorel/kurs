@@ -56,12 +56,14 @@ BIN="$WORK/buildroot/bin/php"
 
 echo "▶ Doğrulama"
 "$BIN" -v
-"$BIN" -m
+# Liste bir kez alınır: "php -m | grep -q" pipefail altında SIGPIPE ile yanlış "eksik" veriyordu
+modules="$("$BIN" -m)"
+printf '%s\n' "$modules"
 missing=0
 for ext in ${PHP_EXTENSIONS//,/ }; do
   name="$ext"
   [ "$ext" = "opcache" ] && name="Zend OPcache"
-  if ! "$BIN" -m | grep -qix "$name"; then
+  if ! grep -qix "$name" <<<"$modules"; then
     echo "EKSİK uzantı: $ext" >&2
     missing=1
   fi
@@ -72,7 +74,9 @@ done
 "$BIN" -r 'echo sodium_crypto_box_keypair() ? "sodium ok\n" : exit(1);'
 "$BIN" -r '$p = new PDO("sqlite::memory:"); echo "sqlite ", $p->query("select sqlite_version()")->fetchColumn(), PHP_EOL;'
 "$BIN" -r 'echo function_exists("imagewebp") && function_exists("imagejpeg") && function_exists("imagettftext") ? "gd ok\n" : exit(1);'
-otool -L "$BIN" | tee /dev/stderr | grep -vqE '/opt/homebrew|/usr/local/(opt|Cellar)' || { echo "Homebrew kitaplığına bağımlılık var (statik değil)" >&2; exit 1; }
+links="$(otool -L "$BIN")"
+printf '%s\n' "$links"
+if grep -qE '/opt/homebrew|/usr/local/(opt|Cellar)' <<<"$links"; then echo "Homebrew kitaplığına bağımlılık var (statik değil)" >&2; exit 1; fi
 lipo -info "$BIN"
 
 mkdir -p "$(dirname "$OUT")"

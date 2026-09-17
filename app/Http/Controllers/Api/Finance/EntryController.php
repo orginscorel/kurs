@@ -24,7 +24,7 @@ class EntryController extends FinanceController
     public function index(Request $request): JsonResponse
     {
         $query = $this->filtered($request);
-        $totals = (clone $query)->reorder()->select([])->selectRaw("
+        $totals = (clone $query)->setEagerLoads([])->reorder()->select([])->selectRaw("
             COALESCE(SUM(CASE WHEN finance_entries.voided_at IS NULL AND finance_entries.direction = 'income' THEN finance_entries.amount ELSE 0 END), 0) AS income,
             COALESCE(SUM(CASE WHEN finance_entries.voided_at IS NULL AND finance_entries.direction = 'expense' THEN finance_entries.amount ELSE 0 END), 0) AS expense,
             SUM(finance_entries.voided_at IS NOT NULL) AS voided_count, COUNT(*) AS count")->first();

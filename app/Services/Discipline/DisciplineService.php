@@ -466,14 +466,14 @@ class DisciplineService
         $today ??= CarbonImmutable::today();
         $completed = 0;
         $expired = 0;
-        DisciplineSanction::query()->where('status', 'active')->whereNotNull('ends_on')->where('ends_on', '<', $today->toDateString())
+        DisciplineSanction::query()->with('incident')->where('status', 'active')->whereNotNull('ends_on')->where('ends_on', '<', $today->toDateString())
             ->where(fn ($q) => $q->whereNull('expires_on')->orWhere('expires_on', '>=', $today->toDateString()))
             ->each(function (DisciplineSanction $s) use (&$completed) {
                 $s->forceFill(['status' => 'completed'])->save();
                 $this->event($s->incident, null, 'sanction_status', "{$s->sanction_no}: uzaklaştırma süresi bitti (tamamlandı).", ['sanction_id' => $s->id]);
                 $completed++;
             });
-        DisciplineSanction::query()->whereIn('status', ['active', 'completed'])->whereNotNull('expires_on')->where('expires_on', '<', $today->toDateString())
+        DisciplineSanction::query()->with('incident')->whereIn('status', ['active', 'completed'])->whereNotNull('expires_on')->where('expires_on', '<', $today->toDateString())
             ->each(function (DisciplineSanction $s) use (&$expired) {
                 $s->forceFill(['status' => 'expired'])->save();
                 $this->event($s->incident, null, 'sanction_status', "{$s->sanction_no}: süresi doldu, yaptırım düştü.", ['sanction_id' => $s->id]);

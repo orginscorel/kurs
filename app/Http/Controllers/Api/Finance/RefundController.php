@@ -34,7 +34,7 @@ class RefundController extends FinanceController
             $query->where('student_id', $s);
         }
         $this->applyDateRange($query, $request, 'refunded_at');
-        $totals = (clone $query)->reorder()->select([])->selectRaw('COUNT(*) AS c, COALESCE(SUM(CASE WHEN voided_at IS NULL THEN amount ELSE 0 END), 0) AS s')->first();
+        $totals = (clone $query)->setEagerLoads([])->reorder()->select([])->selectRaw('COUNT(*) AS c, COALESCE(SUM(CASE WHEN voided_at IS NULL THEN amount ELSE 0 END), 0) AS s')->first();
         $query->orderByDesc('refunded_at')->orderByDesc('id');
 
         return $this->paginated($query->paginate($this->perPage($request)), fn (Refund $r) => $this->row($r), [
