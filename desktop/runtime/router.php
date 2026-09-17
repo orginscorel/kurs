@@ -59,8 +59,16 @@ if ($uri === '/__desktop/boot') {
     if (! is_string($next) || ! str_starts_with($next, '/') || str_starts_with($next, '//')) {
         $next = '/';
     }
+    // 302 KULLANMA: pencere kurulum ekranından (tauri://) geldiği için WKWebView yönlendirme zincirini
+    // siteler arası sayar ve SameSite=Strict çerezi hedef isteğe eklemez → "Erişim yok". Yönlendirmeyi
+    // yerel sayfanın kendisi yapınca gezinme aynı siteden başlar ve çerez gönderilir.
     header('Cache-Control: no-store');
-    header('Location: '.$next, true, 302);
+    header('Content-Type: text/html; charset=utf-8');
+    header("Content-Security-Policy: default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'");
+    $js = json_encode($next, JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT);
+    echo '<!doctype html><meta charset="utf-8"><title>Açılıyor…</title>'
+        .'<body style="font-family:-apple-system,sans-serif;padding:40px;color:#5b6472">Açılıyor…'
+        .'<script>setTimeout(function(){location.replace('.$js.')},60)</script></body>';
 
     return true;
 }
@@ -68,7 +76,13 @@ if ($uri === '/__desktop/boot') {
 // 3) Jeton denetimi (statik dosyalar dahil)
 $presented = $_COOKIE['kurs_desktop'] ?? ($_SERVER['HTTP_X_KURS_DESKTOP'] ?? null);
 if (! $matches(is_string($presented) ? $presented : null)) {
-    return $deny(403, 'Bu yerel sunucu yalnız Erbaa Bilgi Eğitim uygulamasının penceresinden kullanılabilir.');
+    $denied = $deny(403, 'Bu yerel sunucu yalnız Erbaa Bilgi Eğitim uygulamasının penceresinden kullanılabilir.');
+    // Siteler arası başlatılmış bir sayfa gezinmesinde çerez eklenmemiş olabilir: bir kez aynı siteden yeniden dene
+    if (($_SERVER['HTTP_SEC_FETCH_MODE'] ?? '') === 'navigate' && ($_SERVER['HTTP_SEC_FETCH_SITE'] ?? '') !== 'same-origin') {
+        echo '<script>try{if(!sessionStorage.getItem("kd_retry")){sessionStorage.setItem("kd_retry","1");location.replace(location.href)}}catch(e){}</script>';
+    }
+
+    return $denied;
 }
 
 // 4) Statik dosyalar (build/, favicon…): yerleşik sunucu verir

@@ -1,5 +1,16 @@
 [
   {
+    "version": "0.1.1",
+    "date": "2026-09-17",
+    "title": "Açılış düzeltmesi",
+    "items": [
+      {
+        "type": "duzeltme",
+        "text": "Kurum bilgisayarı kipinde açılışta görülen \"Erişim yok\" hatası giderildi"
+      }
+    ]
+  },
+  {
     "version": "0.1.0",
     "date": "2026-09-17",
     "title": "İlk masaüstü sürümü (macOS)",
