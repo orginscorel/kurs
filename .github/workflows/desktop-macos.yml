@@ -98,14 +98,6 @@ jobs:
           cargo check --locked
           cargo clippy --no-deps -- -D warnings -A clippy::too_many_arguments || echo "::warning::clippy uyarıları var"
 
-      - name: Cargo.lock (ilk çalışmadan sonra depoya eklenmeli)
-        uses: actions/upload-artifact@v4
-        with:
-          name: cargo-lock
-          path: ${{ steps.dirs.outputs.desktop_dir }}/src-tauri/Cargo.lock
-          if-no-files-found: ignore
-          retention-days: 30
-
   # ------------------------------------------------------------------ 2) statik PHP (mimari başına, önbellekli)
   php:
     name: Statik PHP ${{ matrix.arch }}
@@ -143,12 +135,6 @@ jobs:
         run: |
           out/php-${{ matrix.arch }}-apple-darwin -v
           out/php-${{ matrix.arch }}-apple-darwin -r 'exit(extension_loaded("intl") && extension_loaded("pdo_sqlite") && extension_loaded("sodium") ? 0 : 1);'
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: php-${{ matrix.arch }}
-          path: out/php-${{ matrix.arch }}-apple-darwin
-          retention-days: 7
 
   # ------------------------------------------------------------------ 3) Laravel paketi (vendor --no-dev + derlenmiş ön yüz)
   laravel:
@@ -209,13 +195,15 @@ jobs:
         run: |
           # önceki adımın .env / vendor'u kopyaya girmez (betik hariç tutar)
           bash "${{ steps.dirs.outputs.desktop }}/scripts/bundle-laravel.sh"
-          tar -C "$OUT_DIR" -czf "${{ runner.temp }}/laravel.tar.gz" .
+          mkdir -p "$GITHUB_WORKSPACE/_bundle"
+          tar -C "$OUT_DIR" -czf "$GITHUB_WORKSPACE/_bundle/laravel.tar.gz" .
 
-      - uses: actions/upload-artifact@v4
+      # Artifact yerine önbellek: hesap artifact kotası dolunca yükleme reddediliyordu
+      - uses: actions/cache/save@v4
         with:
-          name: laravel-bundle
-          path: ${{ runner.temp }}/laravel.tar.gz
-          retention-days: 7
+          path: _bundle/laravel.tar.gz
+          key: laravel-bundle-${{ github.run_id }}-${{ github.run_attempt }}
+          enableCrossOsArchive: true
 
   # ------------------------------------------------------------------ 4) Tauri derleme + imza + notarization + yayın
   build:
@@ -247,9 +235,24 @@ jobs:
           workspaces: ${{ env.DESKTOP_DIR }}/src-tauri -> target
           key: universal
 
-      - uses: actions/download-artifact@v4
+      - uses: actions/cache/restore@v4
         with:
-          path: ${{ runner.temp }}/artifacts
+          path: _bundle/laravel.tar.gz
+          key: laravel-bundle-${{ github.run_id }}-${{ github.run_attempt }}
+          enableCrossOsArchive: true
+          fail-on-cache-miss: true
+
+      - uses: actions/cache/restore@v4
+        with:
+          path: out/php-aarch64-apple-darwin
+          key: static-php-aarch64-spc${{ env.SPC_VERSION }}-php${{ env.PHP_VERSION }}-${{ hashFiles(format('{0}/scripts/build-static-php.sh', env.DESKTOP_DIR)) }}
+          fail-on-cache-miss: true
+
+      - uses: actions/cache/restore@v4
+        with:
+          path: out/php-x86_64-apple-darwin
+          key: static-php-x86_64-spc${{ env.SPC_VERSION }}-php${{ env.PHP_VERSION }}-${{ hashFiles(format('{0}/scripts/build-static-php.sh', env.DESKTOP_DIR)) }}
+          fail-on-cache-miss: true
 
       - name: Gerekli sırlar
         env:
@@ -277,14 +280,14 @@ jobs:
       - name: Paket içeriğini yerleştir
         working-directory: ${{ env.DESKTOP_DIR }}
         run: |
-          A="${{ runner.temp }}/artifacts"
+          W="$GITHUB_WORKSPACE"
           # Laravel
           rm -rf build/laravel && mkdir -p build/laravel
-          tar -xzf "$A/laravel-bundle/laravel.tar.gz" -C build/laravel
+          tar -xzf "$W/_bundle/laravel.tar.gz" -C build/laravel
           # Statik PHP: universal ikili (Tauri universal hedefinde php-universal-apple-darwin arar)
           mkdir -p src-tauri/binaries
-          cp "$A/php-aarch64/php-aarch64-apple-darwin" src-tauri/binaries/
-          cp "$A/php-x86_64/php-x86_64-apple-darwin" src-tauri/binaries/
+          cp "$W/out/php-aarch64-apple-darwin" src-tauri/binaries/
+          cp "$W/out/php-x86_64-apple-darwin" src-tauri/binaries/
           lipo -create -output src-tauri/binaries/php-universal-apple-darwin \
             src-tauri/binaries/php-aarch64-apple-darwin src-tauri/binaries/php-x86_64-apple-darwin
           chmod 755 src-tauri/binaries/php-*
@@ -444,11 +447,19 @@ jobs:
             --archive "$D/ErbaaKurs_${VERSION}_universal.app.tar.gz" --sig "$D/ErbaaKurs_${VERSION}_universal.app.tar.gz.sig" --out "$D/latest.json"
           (cd "$D" && shasum -a 256 ./*.dmg ./*.tar.gz > SHA256SUMS.txt && cat SHA256SUMS.txt)
 
-      - uses: actions/upload-artifact@v4
-        with:
-          name: erbaa-kurs-macos-${{ env.VERSION }}${{ env.UNSIGNED == 'true' && '-imzasiz' || '' }}
-          path: ${{ steps.out.outputs.dir }}
-          retention-days: 14
+      # Artifact kotasına girmemek için deneme çıktıları taslak (draft) Release'e konur; taslaklar
+      # etiket oluşturmaz, yalnız depo yetkilileri görür, kurs:desktop-release-sync bunları atlar.
+      - name: Deneme çıktısı (taslak Release)
+        if: ${{ !(env.UNSIGNED != 'true' && (startsWith(github.ref, 'refs/tags/desktop-v') || inputs.publish)) }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="desktop-deneme-${GITHUB_RUN_NUMBER}"
+          D="${{ steps.out.outputs.dir }}"
+          gh release create "$TAG" "$D"/* --draft --prerelease --target "$GITHUB_SHA" \
+            --title "Deneme #${GITHUB_RUN_NUMBER} — macOS $VERSION$([ "$UNSIGNED" = true ] && echo ' (imzasız)')" \
+            --notes "Yayın dışı deneme derlemesi (çalışma ${GITHUB_RUN_ID})."
+          echo "Taslak: $TAG"
 
       - name: GitHub Release
         if: env.UNSIGNED != 'true' && (startsWith(github.ref, 'refs/tags/desktop-v') || inputs.publish)
