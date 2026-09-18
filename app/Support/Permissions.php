@@ -56,6 +56,7 @@ final class Permissions
             'academic' => ['label' => 'Akademik', 'items' => [
                 'academic.view' => 'Program, sınıf, ders ve derslikleri görme',
                 'academic.manage' => 'Program, sınıf, ders ve derslik yönetimi',
+                'classroom_layouts.manage' => '3D derslik tasarımı ve oturma düzeni düzenleme',
                 'schedule.view' => 'Ders programını görme',
                 'schedule.manage' => 'Ders programı düzenleme',
                 'study.view' => 'Etüt/birebir görme',
@@ -156,7 +157,7 @@ final class Permissions
             'yonetici' => ['label' => 'Yönetici', 'permissions' => array_values(array_diff(self::all(), ['system.health']))],
             'mudur' => ['label' => 'Müdür', 'permissions' => array_merge($viewAll, [
                 'students.create', 'students.update', 'students.export', 'students.bulk', 'students.credentials', 'students.impersonate', 'guardians.manage', 'guardians.credentials', 'guardians.impersonate', 'documents.view', 'documents.manage',
-                'teachers.manage', 'teachers.credentials', 'teachers.impersonate', 'employees.view', 'crm.view', 'crm.manage', 'enrollments.create', 'academic.manage', 'schedule.manage',
+                'teachers.manage', 'teachers.credentials', 'teachers.impersonate', 'employees.view', 'crm.view', 'crm.manage', 'enrollments.create', 'academic.manage', 'classroom_layouts.manage', 'schedule.manage',
                 'study.manage', 'homework.manage', 'exams.manage', 'exams.import', 'exams.publish', 'attendance.take', 'attendance.override',
                 'guidance.view', 'risk.view', 'finance.view', 'messages.view', 'messages.send', 'announcements.manage', 'reports.view',
                 'messages.campaign', 'messages.campaign_send', 'messages.consents',

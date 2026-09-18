@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { ArrowLeft, BookOpenCheck, CalendarDays, Plus, Star } from 'lucide-react'
+import { ArrowLeft, BookOpenCheck, CalendarDays, Plus, Star, Armchair } from 'lucide-react'
 import { ApiError } from '@/lib/api'
 import { date, time } from '@/lib/format'
 import { cn } from '@/lib/cn'
@@ -62,7 +62,10 @@ export default function TeacherClassDetail() {
             <h1 className="flex items-center gap-2 text-[20px] font-semibold tracking-[-0.02em] sm:text-[22px]">{g.name}{g.is_advisor && <Badge tone="accent"><Star className="size-3" /> Danışmanı</Badge>}</h1>
             <p className="text-[14px] text-ink-3">{[g.program, g.classroom, g.subjects.map((s) => s.name).join(', ')].filter(Boolean).join(' · ')}</p>
           </div>
-          {can('homework') && <ButtonLink to={`/ogretmen/odevler?yeni=1&sinif=${g.id}`} variant="primary" icon={<Plus className="size-4" />}>Bu sınıfa ödev ver</ButtonLink>}
+          <div className="flex flex-wrap gap-2">
+            <ButtonLink to={`/ogretmen/siniflar/${g.id}/oturma`} icon={<Armchair className="size-4" />}>Oturma düzeni</ButtonLink>
+            {can('homework') && <ButtonLink to={`/ogretmen/odevler?yeni=1&sinif=${g.id}`} variant="primary" icon={<Plus className="size-4" />}>Bu sınıfa ödev ver</ButtonLink>}
+          </div>
         </div>
       </div>
 

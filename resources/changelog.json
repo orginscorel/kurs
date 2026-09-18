@@ -1,5 +1,47 @@
 [
   {
+    "version": "1.14.0",
+    "date": "2026-09-18",
+    "title": "Sınıf oturma düzeni",
+    "items": [
+      {
+        "type": "yeni",
+        "text": "Sınıf sayfasında Oturma düzeni sekmesi: sınıfın dersliği 3D açılır, öğrencileri sürükleyerek ya da otomatik yerleştirin"
+      },
+      {
+        "type": "yeni",
+        "text": "Her sınıfın kendi oturma planı; aynı dersliği kullanan sınıflar birbirini etkilemez"
+      },
+      {
+        "type": "yeni",
+        "text": "Kapıya asılacak oturma planı çıktısı; öğretmenler kendi sınıflarının planını görebilir"
+      },
+      {
+        "type": "yeni",
+        "text": "Dersliğin düzeni yoksa hazır şablondan tek tıkla oluşturma"
+      }
+    ]
+  },
+  {
+    "version": "1.13.0",
+    "date": "2026-09-18",
+    "title": "3D Derslik Tasarımı",
+    "items": [
+      {
+        "type": "yeni",
+        "text": "3D Derslik Tasarımı: dersliği gerçek ölçüleriyle (L, U, kesik köşe dahil) çizin, masaları kütüphaneden sürükleyip yerleştirin"
+      },
+      {
+        "type": "yeni",
+        "text": "Öğrencileri sürükleyip masalara oturtun; masa durumları, akıllı yerleşim, 2D plan ve ölçüm aracı"
+      },
+      {
+        "type": "yeni",
+        "text": "Oturma düzeni sürümleri: her kayıt yeni sürüm, eskisine tek tıkla dönüş"
+      }
+    ]
+  },
+  {
     "version": "1.12.3",
     "date": "2026-09-18",
     "title": "Terminal köprüsü ve masaüstü eşitlemesi",

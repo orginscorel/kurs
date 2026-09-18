@@ -1,5 +1,24 @@
 [
   {
+    "version": "1.14.0",
+    "date": "2026-09-19",
+    "title": "3D derslik ve oturma düzeni",
+    "items": [
+      {
+        "type": "yeni",
+        "text": "3D Derslik Tasarımı: dersliği gerçek ölçüleriyle çizin, masaları sürükleyip yerleştirin"
+      },
+      {
+        "type": "yeni",
+        "text": "Sınıf sayfasında Oturma düzeni: öğrencileri sürükleyerek ya da otomatik yerleştirin, planı yazdırın"
+      },
+      {
+        "type": "iyilestirme",
+        "text": "Ön kayıt ve öğrenci listelerinde isim avatarları; web ile aynı sürüm (1.14.0)"
+      }
+    ]
+  },
+  {
     "version": "1.12.3",
     "date": "2026-09-18",
     "title": "Terminal köprüsü",

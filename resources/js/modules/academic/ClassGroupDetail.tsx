@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { lazy, Suspense, useMemo, useState } from 'react'
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { CalendarDays, ClipboardList, Pencil, Plus, Search, Trash2, UserMinus, Users } from 'lucide-react'
@@ -19,14 +19,24 @@ import { ClassGroupFormDrawer } from './ClassGroupFormDrawer'
 import { PersonText, PhoneText } from '@/components/ui/contact'
 import { WeekGrid } from './schedule/WeekGrid'
 
-type Tab = 'students' | 'schedule' | 'attendance' | 'exams'
+type Tab = 'students' | 'seating' | 'schedule' | 'attendance' | 'exams'
+
+// 3D oturma düzeni ayrı parçada (three.js yalnız bu sekme açılınca iner)
+const ClassSeatingPanel = lazy(() => import('@/modules/classroom-design/seating/ClassSeatingPanel'))
 
 export default function ClassGroupDetail() {
   const { id } = useParams()
   const can = useCan()
   const qc = useQueryClient()
   const navigate = useNavigate()
-  const [tab, setTab] = useState<Tab>('students')
+  const [params, setParams] = useSearchParams()
+  const [tab, setTabState] = useState<Tab>(params.get('sekme') === 'oturma' ? 'seating' : 'students')
+  const [seatingOpened, setSeatingOpened] = useState(tab === 'seating')
+  const setTab = (t: Tab) => {
+    setTabState(t)
+    if (t === 'seating') setSeatingOpened(true)
+    setParams((p) => { if (t === 'seating') p.set('sekme', 'oturma'); else p.delete('sekme'); return p }, { replace: true })
+  }
   const [editOpen, setEditOpen] = useState(false)
   const [addOpen, setAddOpen] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
@@ -81,7 +91,15 @@ export default function ClassGroupDetail() {
         <MiniStat label="Son deneme ortalaması" value={lastExam ? `${num(lastExam.avg_net, 2)} net` : '—'} sub={lastExam ? lastExam.name : 'Yayımlanmış sonuç yok'} />
       </div>
 
-      <Tabs value={tab} onChange={setTab} tabs={[{ value: 'students', label: 'Öğrenciler', count: g.students_count }, { value: 'schedule', label: 'Haftalık program', count: data.schedules.length }, { value: 'attendance', label: 'Yoklama özeti' }, { value: 'exams', label: 'Deneme sonuçları', count: data.exams.length || null }]} className="mb-4" />
+      <Tabs value={tab} onChange={setTab} tabs={[{ value: 'students', label: 'Öğrenciler', count: g.students_count }, { value: 'seating', label: 'Oturma düzeni' }, { value: 'schedule', label: 'Haftalık program', count: data.schedules.length }, { value: 'attendance', label: 'Yoklama özeti' }, { value: 'exams', label: 'Deneme sonuçları', count: data.exams.length || null }]} className="mb-4" />
+
+      {seatingOpened && (
+        <div className={tab === 'seating' ? '' : 'hidden'}>
+          <Suspense fallback={<Skeleton className="h-[560px]" />}>
+            <ClassSeatingPanel groupId={g.id} />
+          </Suspense>
+        </div>
+      )}
 
       {tab === 'students' && (
         <Panel title="Sınıf listesi" actions={manage && <Button size="sm" icon={<Plus className="size-3.5" />} onClick={() => setAddOpen(true)} disabled={g.students_count >= g.capacity}>Öğrenci ekle</Button>} flush>

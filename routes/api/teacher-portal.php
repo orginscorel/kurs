@@ -16,6 +16,7 @@ Route::middleware('portal.teacher')->prefix('teacher-portal')->group(function ()
     Route::get('schedule', [P::class, 'schedule']);
     Route::get('classes', [P::class, 'classes']);
     Route::get('classes/{group}', [P::class, 'classShow'])->whereNumber('group');
+    Route::get('classes/{group}/seating', [\App\Http\Controllers\Api\TeacherPortal\TeacherSeatingController::class, 'show'])->whereNumber('group');
     Route::get('students', [P::class, 'students']);
     Route::get('students/{student}', [P::class, 'studentShow'])->whereNumber('student');
     Route::get('observations', [P::class, 'observations']);

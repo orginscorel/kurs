@@ -16,6 +16,7 @@ const Homework = lazyPage(() => import('./pages/TeacherHomework'))
 const HomeworkDetail = lazyPage(() => import('./pages/TeacherHomeworkDetail'))
 const Classes = lazyPage(() => import('./pages/TeacherClasses'))
 const ClassDetail = lazyPage(() => import('./pages/TeacherClassDetail'))
+const Seating = lazyPage(() => import('./pages/TeacherSeating'))
 const Student = lazyPage(() => import('./pages/TeacherStudent'))
 const Observations = lazyPage(() => import('./pages/TeacherObservations'))
 const Requests = lazyPage(() => import('./pages/TeacherRequests'))
@@ -41,6 +42,7 @@ export default {
         { path: 'odevler/:id', element: page(<HomeworkDetail />) },
         { path: 'siniflar', element: page(<Classes />) },
         { path: 'siniflar/:id', element: page(<ClassDetail />) },
+        { path: 'siniflar/:id/oturma', element: page(<Seating />) },
         { path: 'ogrenci/:id', element: page(<Student />) },
         { path: 'gozlemler', element: page(<Observations />) },
         { path: 'olay-bildir', element: page(<Discipline />) },

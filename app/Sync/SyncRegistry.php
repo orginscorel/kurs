@@ -91,6 +91,11 @@ final class SyncRegistry
         'program_subject' => ['kind' => self::REFERENCE, 'branch' => 'via:program_id', 'key' => ['program_id', 'subject_id']],
         'program_subject_teacher' => ['kind' => self::PIVOT, 'key' => ['program_id', 'subject_id', 'teacher_id'], 'branch' => 'via:program_id'],
         'classrooms' => ['kind' => self::REFERENCE],
+        // 3D derslik tasarımı + oturma düzeni: iki yönlü (uuid). Öğrenci ataması data JSON'unda öğrenci UUID'si ile tutulur.
+        'classroom_layouts' => ['kind' => self::REFERENCE, 'since' => '2026-09-18'],
+        'classroom_layout_versions' => ['kind' => self::REFERENCE, 'since' => '2026-09-18'],
+        // Sınıf oturma planı (oda düzeninden ayrı): masa kimliği → öğrenci UUID
+        'class_seating_plans' => ['kind' => self::REFERENCE, 'since' => '2026-09-19'],
         'class_groups' => ['kind' => self::REFERENCE],
         'class_group_student' => ['kind' => self::REFERENCE, 'branch' => 'via:class_group_id', 'key' => ['class_group_id', 'student_id', 'joined_on']],
         'class_group_subject_hours' => ['kind' => self::REFERENCE, 'branch' => 'via:class_group_id'],

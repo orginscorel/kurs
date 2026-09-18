@@ -300,6 +300,13 @@ class TeacherPortalTest extends TestCase
         $this->assertSame(0, DB::table('student_observations')->count());
     }
 
+    public function test_foreign_class_seating_plan_returns_403(): void
+    {
+        Sanctum::actingAs($this->teacherUser);
+        // Oturma planı (salt okunur) yalnız öğretmenin kendi sınıfı için
+        $this->getJson('/api/v1/teacher-portal/classes/2/seating')->assertStatus(403);
+    }
+
     public function test_own_student_observation_is_saved_and_points_must_match_kind(): void
     {
         Sanctum::actingAs($this->teacherUser);

@@ -58,6 +58,10 @@ export default defineConfig({
             output: {
                 manualChunks(id: string) {
                     if (!id.includes('node_modules')) return undefined
+                    // 3D derslik tasarımı: three + @react-three (+ iç bağımlılıkları) ayrı parça — yalnız o rotada iner
+                    // ortak küçük bağımlılıklar ana vendor parçasında kalsın (3D parçası bunları içine çekmesin)
+                    if (/[\\/]node_modules[\\/]zustand[\\/]/.test(id) && !/traditional/.test(id) && !id.includes('@react-three')) return 'react'
+                    if (id.includes('@react-three') || /[\\/]node_modules[\\/](three|three-stdlib|three-mesh-bvh|troika-[^\\/]+|camera-controls|maath|meshline|stats-gl|its-fine|suspend-react|@monogrid|@use-gesture|hls\.js|detect-gpu|tunnel-rat)[\\/]/.test(id)) return 'three3d'
                     if (/[\\/](react|react-dom|react-router|react-router-dom|scheduler)[\\/]/.test(id)) return 'react'
                     if (/[\\/](recharts|d3-[^\\/]+|victory-vendor)[\\/]/.test(id)) return 'charts'
                     if (id.includes('@tanstack')) return 'query'

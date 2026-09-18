@@ -45,6 +45,8 @@ class AppServiceProvider extends ServiceProvider
             'subject' => \App\Models\Subject::class,
             'topic' => \App\Models\Topic::class,
             'classroom' => \App\Models\Classroom::class,
+            'classroom_layout' => \App\Models\ClassroomLayout::class,
+            'class_seating_plan' => \App\Models\ClassSeatingPlan::class,
             'lesson_schedule' => \App\Models\LessonSchedule::class,
             'study_session' => \App\Models\StudySession::class,
             'homework' => \App\Models\Homework::class,

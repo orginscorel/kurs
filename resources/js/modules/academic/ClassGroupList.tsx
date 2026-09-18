@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query'
-import { LayoutGrid, Plus, Search, X } from 'lucide-react'
+import { Armchair, LayoutGrid, Plus, Search, X } from 'lucide-react'
 import { api, type Paginated } from '@/lib/api'
 import { useCan } from '@/app/auth'
 import { useDebounced, useListState } from '@/hooks/useListState'
@@ -14,6 +14,8 @@ import { useAcademicOptions } from './hooks'
 import { ColorChip } from './ui'
 import type { ClassGroupRow } from './types'
 import { ClassGroupFormDrawer } from './ClassGroupFormDrawer'
+
+type SeatingOverview = { group_id: number; classroom: { id: number; name: string } | null; layout_id: number | null; thumbnail_url: string | null; seated: number }
 
 export default function ClassGroupList() {
   const can = useCan()
@@ -36,6 +38,14 @@ export default function ClassGroupList() {
     queryFn: () => api.get<Paginated<ClassGroupRow>>('/class-groups', list.query),
     placeholderData: keepPreviousData,
   })
+
+  // Oturma düzeni özeti (sınıf → derslik oda düzeninin küçük görseli + yerleşen öğrenci)
+  const seating = useQuery({
+    queryKey: ['class-seating-overview'],
+    queryFn: () => api.get<{ data: SeatingOverview[] }>('/class-seating/overview').then((r) => new Map(r.data.map((x) => [x.group_id, x]))),
+    staleTime: 60_000,
+  })
+  const seatingMap = seating.data
 
   const columns = useMemo<Column<ClassGroupRow>[]>(
     () => [
@@ -76,11 +86,28 @@ export default function ClassGroupList() {
             <p className={`tabular font-medium ${g.attendance_30 < 75 ? 'text-danger' : g.attendance_30 < 90 ? 'text-warning' : 'text-ink'}`}>%{g.attendance_30}</p>
           ),
       },
+      {
+        key: 'seating', priority: 3, header: 'Oturma düzeni', hideable: true,
+        cell: (g) => {
+          const s = seatingMap?.get(g.id)
+          return (
+            <Link to={`/siniflar/${g.id}?sekme=oturma`} onClick={(e) => e.stopPropagation()} className="group flex items-center gap-2 whitespace-nowrap" title="Oturma düzenini aç" data-testid={`seating-link-${g.id}`}>
+              <span className="grid h-9 w-14 shrink-0 place-items-center overflow-hidden rounded-[4px] bg-surface-2 ring-1 ring-line">
+                {s?.thumbnail_url ? <img src={s.thumbnail_url} alt="" loading="lazy" className="h-full w-full object-cover" /> : <Armchair className="size-4 text-ink-3" />}
+              </span>
+              <span className="text-[12.5px] leading-tight">
+                <span className="block text-primary group-hover:underline">{s?.layout_id ? 'Oturma düzeni' : 'Düzen yok'}</span>
+                {s?.classroom && <span className="block text-ink-3">{s.classroom.name}{s.layout_id ? ` · ${s.seated}/${g.students_count}` : ''}</span>}
+              </span>
+            </Link>
+          )
+        },
+      },
       { key: 'homeroom', priority: 4, header: 'Ana derslik', hideable: true, cell: (g) => <span className="text-ink-2 whitespace-nowrap">{g.homeroom ?? '—'}</span> },
       { key: 'advisor', priority: 4, header: 'Danışman öğretmen', hideable: true, cell: (g) => <span className="text-ink-2 whitespace-nowrap">{g.advisor ?? '—'}</span> },
       { key: 'active', priority: 2, header: 'Durum', cell: (g) => <Badge tone={g.is_active ? 'success' : 'neutral'} dot>{g.is_active ? 'Aktif' : 'Pasif'}</Badge> },
     ],
-    [],
+    [seatingMap],
   )
 
   return (
