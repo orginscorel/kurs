@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Tauri 2 bu dosyayı (tauri.conf.json ile aynı klasörde) otomatik olarak paketin Info.plist'iyle birleştirir.
+
+  NSLocalNetworkUsageDescription — macOS 15 (Sequoia) "Yerel Ağ" gizlilik izni.
+  Yoklama terminali (ör. 192.168.68.60:5005) kurumun yerel ağındadır. macOS, izin verilene kadar uygulamanın
+  VE onun alt süreçlerinin (gömülü `php`, sorumlu süreç = Erbaa Kurs) LAN adreslerine bağlanmasını sessizce
+  engeller ("No route to host" / zaman aşımı). Terminal.app'in izni ayrıdır; orada `nc` çalışması uygulamanın
+  bağlanabildiğini göstermez. Bu açıklama izin penceresinde kullanıcıya gösterilir.
+
+  NSBonjourServices bilinçli olarak YOK: Bonjour/mDNS kullanılmıyor, yalnız doğrudan IP:port bağlantısı.
+-->
+<plist version="1.0">
+<dict>
+    <key>NSLocalNetworkUsageDescription</key>
+    <string>Erbaa Kurs, kurumunuzun yerel ağındaki yoklama terminallerine (parmak izi / yüz tanıma cihazları) bağlanıp giriş-çıkış kayıtlarını almak için yerel ağ erişimine ihtiyaç duyar.</string>
+</dict>
+</plist>

@@ -73,6 +73,16 @@ return [
             'replace_placeholders' => true,
         ],
 
+        // Yoklama terminali köprüsü (soket sınaması, ham tanılama, sürücüler) — ayrı dosya.
+        // İletişim şifresi hiçbir kayıtta yer almaz.
+        'terminal' => [
+            'driver' => 'daily',
+            'path' => storage_path('logs/terminal.log'),
+            'level' => env('TERMINAL_LOG_LEVEL', 'info'),
+            'max_files' => 14,
+            'replace_placeholders' => true,
+        ],
+
         'monthly' => [
             'driver' => 'monthly',
             'path' => storage_path('logs/laravel.log'),

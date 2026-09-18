@@ -294,17 +294,18 @@ class SyncSchema
 
     /**
      * uuid'si boş satırları parça parça doldurur (kilitlenme olmasın diye küçük transaction'lar).
+     * $only verilirse yalnız o tablolar (sonradan eşitlemeye katılan tablonun migration'ı).
      *
      * @return array<string, int> tablo => doldurulan satır
      */
-    public function backfillUuids(int $chunk = 500, ?callable $progress = null): array
+    public function backfillUuids(int $chunk = 500, ?callable $progress = null, ?array $only = null): array
     {
         $out = [];
         if (DB::connection()->getDriverName() === 'sqlite') {
             $chunk = min($chunk, 300);   // SQLite 3.26: en fazla 999 bağlı değişken
         }
         foreach (SyncRegistry::withUuid() as $table => $def) {
-            if (! $this->hasUuid($table)) {
+            if (! $this->hasUuid($table) || ($only !== null && ! in_array($table, $only, true))) {
                 continue;
             }
             $count = 0;

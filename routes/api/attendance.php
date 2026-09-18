@@ -7,6 +7,7 @@ use App\Http\Controllers\Api\Attendance\DeviceDiscoveryController;
 use App\Http\Controllers\Api\Attendance\DeviceIdentityController;
 use App\Http\Controllers\Api\Attendance\LivePresenceController;
 use App\Http\Controllers\Api\Attendance\StudentQrController;
+use App\Http\Controllers\Api\Attendance\TerminalController;
 use App\Http\Controllers\Api\Attendance\ZkDeviceController;
 use Illuminate\Support\Facades\Route;
 
@@ -44,10 +45,10 @@ Route::prefix('attendance')->group(function () {
 
     Route::middleware('permission:devices.manage')->group(function () {
         Route::get('devices', [DeviceController::class, 'index']);
-        Route::post('devices', [DeviceController::class, 'store'])->middleware('throttle:writes');
-        Route::put('devices/{device}', [DeviceController::class, 'update'])->middleware('throttle:writes');
-        Route::delete('devices/{device}', [DeviceController::class, 'destroy'])->middleware('throttle:writes');
-        Route::post('devices/{device}/token', [DeviceController::class, 'issueToken'])->middleware('throttle:writes');
+        Route::post('devices', [DeviceController::class, 'store'])->middleware(['terminal.desktop', 'throttle:writes']);
+        Route::put('devices/{device}', [DeviceController::class, 'update'])->middleware(['terminal.desktop', 'throttle:writes']);
+        Route::delete('devices/{device}', [DeviceController::class, 'destroy'])->middleware(['terminal.desktop', 'throttle:writes']);
+        Route::post('devices/{device}/token', [DeviceController::class, 'issueToken'])->middleware(['terminal.desktop', 'throttle:writes']);
 
         /*
          | AĞDA CİHAZ BUL (docs/CIHAZ-KESIF.md) — elle IP/JSON yazmayı bitiren uçlar.
@@ -58,27 +59,44 @@ Route::prefix('attendance')->group(function () {
         Route::get('devices/protokoller', [DeviceDiscoveryController::class, 'protocols']);
         Route::get('devices/teshis', [DeviceDiscoveryController::class, 'diagnostics']);
         Route::get('devices/kesif/ortam', [DeviceDiscoveryController::class, 'environment']);
-        Route::post('devices/kesif/tara', [DeviceDiscoveryController::class, 'scan'])->middleware('throttle:writes');
-        Route::post('devices/kesif/dene', [DeviceDiscoveryController::class, 'probe'])->middleware('throttle:writes');
-        Route::post('devices/kesif/ekle', [DeviceDiscoveryController::class, 'register'])->middleware('throttle:writes');
+        Route::post('devices/kesif/tara', [DeviceDiscoveryController::class, 'scan'])->middleware(['terminal.desktop', 'throttle:writes']);
+        Route::post('devices/kesif/dene', [DeviceDiscoveryController::class, 'probe'])->middleware(['terminal.desktop', 'throttle:writes']);
+        Route::post('devices/kesif/ekle', [DeviceDiscoveryController::class, 'register'])->middleware(['terminal.desktop', 'throttle:writes']);
 
         // Biyometrik terminal köprüsü (ZKTeco / Perkotek YT-33) — docs/CIHAZ-KOPRUSU.md
         Route::prefix('zk')->group(function () {
-            Route::post('test', [ZkDeviceController::class, 'test'])->middleware('throttle:writes');
-            Route::post('cihazlar/{device}/baglanti', [ZkDeviceController::class, 'saveConnection'])->middleware('throttle:writes');
-            Route::post('cihazlar/{device}/test', [ZkDeviceController::class, 'test'])->middleware('throttle:writes');
-            Route::post('cihazlar/{device}/cek', [ZkDeviceController::class, 'pullNow'])->middleware('throttle:writes');
+            // Yazma/cihaza bağlanma uçları yalnız masaüstünde (terminal.desktop); okuma uçları web'de de açık
+            Route::post('test', [ZkDeviceController::class, 'test'])->middleware(['terminal.desktop', 'throttle:writes']);
+            Route::post('cihazlar/{device}/baglanti', [ZkDeviceController::class, 'saveConnection'])->middleware(['terminal.desktop', 'throttle:writes']);
+            Route::post('cihazlar/{device}/test', [ZkDeviceController::class, 'test'])->middleware(['terminal.desktop', 'throttle:writes']);
+            Route::post('cihazlar/{device}/cek', [ZkDeviceController::class, 'pullNow'])->middleware(['terminal.desktop', 'throttle:writes']);
             Route::get('cihazlar/{device}/durum', [ZkDeviceController::class, 'status']);
-            Route::get('cihazlar/{device}/kullanicilar', [ZkDeviceController::class, 'users']);
+            Route::get('cihazlar/{device}/kullanicilar', [ZkDeviceController::class, 'users'])->middleware('terminal.desktop');
             Route::get('eslemeler', [ZkDeviceController::class, 'mappings']);
-            Route::post('eslemeler', [ZkDeviceController::class, 'storeMapping'])->middleware('throttle:writes');
-            Route::delete('eslemeler/{identity}', [ZkDeviceController::class, 'destroyMapping'])->middleware('throttle:writes');
+            Route::post('eslemeler', [ZkDeviceController::class, 'storeMapping'])->middleware(['terminal.desktop', 'throttle:writes']);
+            Route::delete('eslemeler/{identity}', [ZkDeviceController::class, 'destroyMapping'])->middleware(['terminal.desktop', 'throttle:writes']);
             Route::get('bekleyenler', [ZkDeviceController::class, 'pending']);
         });
 
+        /*
+         | TERMİNAL KÖPRÜSÜ (sürücü bağımsız: ZKTeco / Perkotek YT33-FK / Genel TCP) — docs/CIHAZ-KOPRUSU.md
+         | Ayar, iki aşamalı test, ham TCP tanılaması ve teşhis YALNIZ masaüstünde (terminal.desktop).
+         | Sunucu özel ağ adreslerine asla bağlanmaya çalışmaz; web yalnız sır içermeyen durumu okur.
+         */
+        Route::prefix('terminal')->group(function () {
+            Route::get('suruculer', [TerminalController::class, 'drivers']);
+            Route::get('cihazlar/{device}', [TerminalController::class, 'show']);
+            Route::post('cihazlar/{device}/ayar', [TerminalController::class, 'save'])->middleware(['terminal.desktop', 'throttle:writes']);
+            Route::post('cihazlar/{device}/test', [TerminalController::class, 'test'])->middleware(['terminal.desktop', 'throttle:writes']);
+            Route::post('test', [TerminalController::class, 'test'])->middleware(['terminal.desktop', 'throttle:writes']);
+            Route::post('ham-tani', [TerminalController::class, 'rawDiagnostic'])->middleware(['terminal.desktop', 'throttle:writes']);
+            Route::get('ham-tani/{id}/indir', [TerminalController::class, 'downloadDiagnostic'])->middleware('terminal.desktop')->where('id', '[0-9a-f]{12}');
+            Route::get('teshis', [TerminalController::class, 'diagnostics'])->middleware('terminal.desktop');
+        });
+
         Route::get('identities', [DeviceIdentityController::class, 'index']);
-        Route::post('identities', [DeviceIdentityController::class, 'store'])->middleware('throttle:writes');
-        Route::delete('identities/{identity}', [DeviceIdentityController::class, 'destroy'])->middleware('throttle:writes');
-        Route::post('identities/import', [DeviceIdentityController::class, 'import'])->middleware('throttle:writes');
+        Route::post('identities', [DeviceIdentityController::class, 'store'])->middleware(['terminal.desktop:identity', 'throttle:writes']);
+        Route::delete('identities/{identity}', [DeviceIdentityController::class, 'destroy'])->middleware(['terminal.desktop:identity', 'throttle:writes']);
+        Route::post('identities/import', [DeviceIdentityController::class, 'import'])->middleware(['terminal.desktop:identity', 'throttle:writes']);
     });
 });

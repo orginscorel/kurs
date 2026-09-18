@@ -64,6 +64,8 @@ class DeviceDiscoveryApiTest extends TestCase
             'user_type' => 'staff', 'password' => 'Parola123!', 'is_active' => true,
         ]);
         $this->teacher->assignRole('ogretmen');
+        // Terminal yazma/bağlantı uçları yalnız masaüstünde çalışır (EnsureTerminalDesktop); bu testler masaüstü düğümünü sınar
+        config(['kurs.node' => 'local']);
     }
 
     protected function tearDown(): void

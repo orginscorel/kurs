@@ -10,6 +10,7 @@ use App\Sync\SyncContext;
 use App\Sync\SyncNumbers;
 use App\Sync\SyncRegistry;
 use App\Sync\SyncSchema;
+use App\Sync\SyncTable;
 use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Cache\Lock;
 use Illuminate\Support\Collection;
@@ -147,6 +148,10 @@ class LocalSyncEngine
         $this->state->put('server_cursor', (int) $manifest['cursor']);
         $this->state->put('pushed_up_to', (int) (DB::table('sync_changes')->max('id') ?? 0));
         $this->state->put('snapshot_done_at', now()->toIso8601String());
+        // Tam görüntü sonradan katılan tabloları da kapsadı: ayrıca çekilmesin
+        $this->state->put(self::LATE_KEY, json_encode(array_values(array_map(
+            fn (SyncTable $t) => self::lateKey($t), array_filter(SyncRegistry::synced(), fn (SyncTable $t) => $t->since !== null),
+        ))));
         $this->afterApply(array_column($manifest['tables'], 'table'));
         // Kurulum HENÜZ ÇEVRİMİÇİYKEN numara bloğunu al: cihaz ilk günden çevrimdışı öğrenci kaydı açabilsin.
         $this->refillBlocksSafely();
@@ -188,6 +193,9 @@ class LocalSyncEngine
             $out['push'] = $this->pushAll();
             // Reddedilenleri yeniden dene (açılış / geri çekilme süresi dolan / elle istenen / zincir): RejectedRetry
             $out['retry'] = $this->retryRejected((int) ($out['push']['accepted'] ?? 0));
+            // Eşitlemeye sonradan katılan tablolar (ör. devices, app_notifications): bir kez tam çekilir (çekmeden önce:
+            // yeni gelen değişiklikler bu satırlara başvurabilir)
+            $out['late'] = $this->lateTables();
             $out['pull'] = $this->pullAll();
             // Numara bloğu ikincildir (yalnız yeni öğrenci numarası içindir): hatası turu düşürmez.
             $out['blocks'] = $this->refillBlocksSafely();
@@ -202,6 +210,9 @@ class LocalSyncEngine
             }
             // Açık oturum raporu + bekleyen uzaktan kapatmalar (en fazla dakikada bir; hatası turu düşürmez)
             $out['sessions'] = app(SessionReporter::class)->runSafely();
+            // Biyometrik terminal durumu (web: "Son durum: … üzerinden") + masaüstünde okunan bildirimler (hatası turu düşürmez)
+            $out['terminals'] = app(TerminalStatusReporter::class)->runSafely();
+            $out['notification_reads'] = app(NotificationReadReporter::class)->runSafely();
             // Gönderme ve çekme bitti: tur başarılıdır. Durum yoklaması yalnız gösterge bilgisidir;
             // hatası (ör. bu sırada bağlantının kopması) başarılı turu geri almasın.
             $status = [];
@@ -235,6 +246,129 @@ class LocalSyncEngine
         }
 
         return $out;
+    }
+
+    /** sync_state: sonradan katılan tablolardan tam çekilmiş olanlar ("tablo@since" listesi) */
+    public const LATE_KEY = 'late_tables_done';
+
+    private const LATE_TRIED_KEY = 'late_tables_tried_at';
+
+    public static function lateKey(SyncTable $t): string
+    {
+        return $t->table.'@'.$t->since;
+    }
+
+    /**
+     * Eşitlemeye SONRADAN katılan tablolar (kayıt defterinde 'since'): eşleşmiş kurulum bunların mevcut satırlarını
+     * değişiklik günlüğünden alamaz (satırlar tabloyu eşitlenen yapan sürümden önce yazıldı; eski sürüm bu tablonun
+     * değişikliklerini atlamış da olabilir). Her tablo için BİR KEZ:
+     *  1) (yukarı da giden tablolarda) yalnız bu kurulumda duran satırlar — sunucuya sorulur (sync/rows), sunucuda
+     *     olmayanlar "eklendi" olarak kuyruğa yazılır ve hemen gönderilir. Sunucudan inmiş satır tekrar gönderilmez.
+     *  2) sunucudaki satırlar anlık görüntü sayfalarıyla çekilir; yerelde henüz gönderilmemiş alanlar ezilmez.
+     * Hata turu DÜŞÜRMEZ: sunucu tabloyu tanımıyorsa (eski sürüm), yetki yoksa ya da bağlantı koptuysa işaretlenmez,
+     * 10 dakika sonra yeniden denenir.
+     *
+     * @return array{tables: list<string>, rows: int, orphans: int, skipped?: list<string>, waiting?: list<string>}
+     */
+    public function lateTables(bool $force = false): array
+    {
+        $done = (array) json_decode((string) $this->state->get(self::LATE_KEY, '[]'), true);
+        $todo = array_filter(SyncRegistry::synced(), fn (SyncTable $t) => $t->since !== null && $t->isPullable() && ! $t->isPivot()
+            && $this->schema->tableExists($t->table) && $this->schema->hasUuid($t->table) && ! in_array(self::lateKey($t), $done, true));
+        $out = ['tables' => [], 'rows' => 0, 'orphans' => 0];
+        if ($todo === []) {
+            return $out;
+        }
+        $tried = (int) $this->state->get(self::LATE_TRIED_KEY, '0');
+        if (! $force && $tried > 0 && time() - $tried < 600) {
+            return $out + ['waiting' => array_keys($todo)];
+        }
+        $this->state->put(self::LATE_TRIED_KEY, (string) time());
+        foreach ($todo as $table => $def) {
+            try {
+                $out['orphans'] += $def->isPushable() ? $this->queueLocalOnlyRows($def) : 0;
+                $out['rows'] += $this->pullWholeTable($def);
+            } catch (\Throwable $e) {
+                Log::info('Sonradan katılan tablo eşitlenemedi (sonra yeniden denenecek)', ['table' => $table, 'e' => $e->getMessage()]);
+                $out['skipped'][] = $table;
+
+                continue;
+            }
+            $done[] = self::lateKey($def);
+            $this->state->put(self::LATE_KEY, json_encode(array_values(array_unique($done))));
+            $out['tables'][] = $table;
+        }
+        if (($out['skipped'] ?? []) === []) {
+            $this->state->put(self::LATE_TRIED_KEY, null);
+        }
+        if ($out['orphans'] > 0) {
+            $out['push'] = $this->pushAll();
+        }
+        if ($out['tables'] !== []) {
+            $this->afterApply($out['tables']);
+        }
+
+        return $out;
+    }
+
+    /** Yalnız bu kurulumda duran (sunucunun tanımadığı) satırları "eklendi" olarak kuyruğa yazar. */
+    private function queueLocalOnlyRows(SyncTable $def): int
+    {
+        $queued = 0;
+        DB::table($def->table)->whereNotNull('uuid')->orderBy('id')->chunk(300, function ($rows) use ($def, &$queued) {
+            $byUuid = [];
+            foreach ($rows as $r) {
+                $byUuid[(string) $r->uuid] = (array) $r;
+            }
+            $known = [];
+            foreach ($this->client->rows($def->table, array_keys($byUuid))['rows'] ?? [] as $r) {
+                if (($r['fields'] ?? null) !== null) {
+                    $known[(string) $r['row']] = true;
+                }
+            }
+            $recorder = app(\App\Sync\ChangeRecorder::class);
+            $branches = app(\App\Sync\BranchResolver::class);
+            foreach ($byUuid as $uuid => $row) {
+                if (isset($known[$uuid]) || \App\Sync\SyncFilters::allows($def, $row) === false) {
+                    continue;
+                }
+                $pending = DB::table('sync_changes')->where('table_name', $def->table)->where('row_uuid', $uuid)
+                    ->whereIn('op', ['insert', 'upsert'])->exists();
+                if ($pending) {
+                    continue;   // zaten kuyrukta / gönderilmiş / reddedilip yeniden denenecek (ör. migration'ın yazdığı)
+                }
+                $recorder->write($def->table, $uuid, 'insert', $this->codec->encode($def->table, $row), $branches->resolve($def, $row), ['source' => 'local']);
+                $queued++;
+            }
+        });
+
+        return $queued;
+    }
+
+    /** Sunucudaki tüm satırları anlık görüntü sayfalarıyla çeker (normal çekme kuralıyla uygular). */
+    private function pullWholeTable(SyncTable $def): int
+    {
+        $table = $def->table;
+        $after = 0;
+        $count = 0;
+        $limit = (int) config('sync.snapshot_limit', 1000);
+        do {
+            $page = $this->client->snapshotPage($table, $after, $limit);
+            DB::transaction(function () use ($page, $table, &$count) {
+                $this->deferForeignKeys();
+                foreach ($page['rows'] ?? [] as $r) {
+                    $change = ['table' => $table, 'row' => $r['row'], 'op' => 'upsert', 'fields' => $r['fields']];
+                    if ($this->applier->apply($change) === 'deferred') {
+                        DB::table('sync_deferred')->insert(['seq' => 0, 'change' => json_encode($change, JSON_UNESCAPED_UNICODE),
+                            'attempts' => 0, 'created_at' => now(), 'updated_at' => now()]);
+                    }
+                    $count++;
+                }
+            });
+            $after = (int) ($page['next'] ?? 0);
+        } while (! empty($page['next']));
+
+        return $count;
     }
 
     public const LOCK_NAME = 'kurs:sync:cycle';

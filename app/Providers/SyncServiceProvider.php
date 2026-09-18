@@ -42,6 +42,8 @@ class SyncServiceProvider extends ServiceProvider
         $this->app->scoped(RowCodec::class);
         $this->app->scoped(ChangeRecorder::class);
         $this->app->scoped(BranchResolver::class);
+        // Terminal durum raporu genişletme noktası: terminal katmanı kendi sağlayıcısını bağlar (bind'i ezer)
+        $this->app->bindIf(\App\Sync\Contracts\TerminalStatusProvider::class, \App\Sync\Local\NullTerminalStatusProvider::class);
 
         $local = config('kurs.node') === 'local';
 

@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\Attendance;
 use App\Http\Controllers\Api\ApiController;
 use App\Models\Device;
 use App\Services\Attendance\DeviceService;
+use App\Sync\Server\TerminalStatusService;
 use App\Support\BranchContext;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -25,16 +26,21 @@ class DeviceController extends ApiController
             ->selectRaw('device_id, MAX(occurred_at) AS last_event_at, COUNT(*) AS event_count')
             ->groupBy('device_id')->get()->keyBy('device_id');
 
-        return response()->json(['data' => $devices->map(function (Device $d) use ($lastEvents) {
+        // Masaüstü köprüsünün son durum raporu (web: "… üzerinden, 2 dk önce · bağlı"; IP/şifre asla dönmez)
+        $bridges = TerminalStatusService::statusFor($devices->pluck('id'));
+
+        return response()->json(['data' => $devices->map(function (Device $d) use ($lastEvents, $bridges) {
             $le = $lastEvents[$d->id] ?? null;
 
             return [
                 'id' => $d->id, 'name' => $d->name, 'kind' => $d->kind, 'location' => $d->location, 'direction' => $d->direction,
                 'serial_no' => $d->serial_no, 'is_active' => $d->is_active, 'is_online' => $d->isOnline(),
                 'last_seen_at' => $d->last_seen_at, 'firmware' => $d->firmware, 'api_token_prefix' => $d->api_token_prefix,
-                'has_token' => $d->api_token_hash !== '', 'last_event_at' => $le->last_event_at ?? null, 'event_count' => (int) ($le->event_count ?? 0),
+                // Eşitlemeyle gelen kayıtta bu düğümün eski köprü jetonu yoktur (özet düğüme özel, önek boş)
+                'has_token' => (string) $d->api_token_prefix !== '', 'last_event_at' => $le->last_event_at ?? null, 'event_count' => (int) ($le->event_count ?? 0),
+                'bridge' => $bridges[$d->id] ?? null,
             ];
-        })]);
+        }), 'node' => config('kurs.node', 'server'), 'terminal_writes' => config('kurs.node') === 'local']);
     }
 
     public function store(Request $request): JsonResponse

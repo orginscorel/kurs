@@ -6,7 +6,7 @@ use Illuminate\Support\Facades\DB;
 
 /**
  * Kayıt defterindeki satır süzgeçleri: yalnız personel kullanıcıları (öğrenci/veli portal hesapları
- * ve parola özetleri cihaza inmez) ve onların rol atamaları.
+ * ve parola özetleri cihaza inmez), onların rol atamaları ve bildirimleri (staff_owned).
  */
 final class SyncFilters
 {
@@ -24,6 +24,7 @@ final class SyncFilters
             'staff_users' => in_array($attrs['user_type'] ?? 'staff', self::STAFF_TYPES, true),
             'staff_model' => ($attrs['model_type'] ?? null) === 'user' && self::isStaffUser((int) ($attrs['model_id'] ?? 0)),
             'public_settings' => ! in_array($attrs['group'] ?? null, self::PRIVATE_SETTING_GROUPS, true),
+            'staff_owned' => self::isStaffUser((int) ($attrs['user_id'] ?? 0)),
             default => true,
         };
     }
@@ -36,6 +37,7 @@ final class SyncFilters
             'staff_model' => $query->where('model_type', 'user')
                 ->whereIn('model_id', DB::table('users')->whereIn('user_type', self::STAFF_TYPES)->select('id')),
             'public_settings' => $query->whereNotIn('group', self::PRIVATE_SETTING_GROUPS),
+            'staff_owned' => $query->whereIn($def->table.'.user_id', DB::table('users')->whereIn('user_type', self::STAFF_TYPES)->select('id')),
             default => null,
         };
     }

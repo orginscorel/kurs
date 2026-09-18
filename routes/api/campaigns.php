@@ -23,16 +23,16 @@ Route::middleware('permission:messages.campaign|messages.campaign_send')->group(
 Route::middleware(['permission:messages.campaign', 'throttle:writes'])->group(function () {
     Route::post('campaigns/preview', [CampaignController::class, 'preview']);
     Route::post('campaigns/parse-manual', [CampaignController::class, 'parseManual']);
-    Route::post('campaigns', [CampaignController::class, 'store']);
-    Route::put('campaigns/{campaign}', [CampaignController::class, 'update'])->whereNumber('campaign');
-    Route::delete('campaigns/{campaign}', [CampaignController::class, 'destroy'])->whereNumber('campaign');
-    Route::post('campaigns/{campaign}/duplicate', [CampaignController::class, 'duplicate'])->whereNumber('campaign');
+    Route::post('campaigns', [CampaignController::class, 'store'])->middleware('web.only');
+    Route::put('campaigns/{campaign}', [CampaignController::class, 'update'])->whereNumber('campaign')->middleware('web.only');
+    Route::delete('campaigns/{campaign}', [CampaignController::class, 'destroy'])->whereNumber('campaign')->middleware('web.only');
+    Route::post('campaigns/{campaign}/duplicate', [CampaignController::class, 'duplicate'])->whereNumber('campaign')->middleware('web.only');
 });
 
 Route::middleware(['permission:messages.campaign_send', 'throttle:writes'])->group(function () {
-    Route::post('campaigns/{campaign}/approve', [CampaignController::class, 'approve'])->whereNumber('campaign');
-    Route::post('campaigns/{campaign}/cancel', [CampaignController::class, 'cancel'])->whereNumber('campaign');
-    Route::post('campaigns/{campaign}/retry', [CampaignController::class, 'retry'])->whereNumber('campaign');
+    Route::post('campaigns/{campaign}/approve', [CampaignController::class, 'approve'])->whereNumber('campaign')->middleware('web.only');
+    Route::post('campaigns/{campaign}/cancel', [CampaignController::class, 'cancel'])->whereNumber('campaign')->middleware('web.only');
+    Route::post('campaigns/{campaign}/retry', [CampaignController::class, 'retry'])->whereNumber('campaign')->middleware('web.only');
 });
 
 // ------------------------------------------------------------ İleti izinleri (İYS) + ret listesi
@@ -40,19 +40,19 @@ Route::middleware('permission:messages.consents')->group(function () {
     Route::get('message-consents', [ConsentController::class, 'index']);
     Route::post('message-consents', [ConsentController::class, 'store'])->middleware('throttle:writes');
     Route::get('message-suppressions', [ConsentController::class, 'suppressions']);
-    Route::post('message-suppressions', [ConsentController::class, 'addSuppression'])->middleware('throttle:writes');
-    Route::delete('message-suppressions/{suppression}', [ConsentController::class, 'removeSuppression']);
+    Route::post('message-suppressions', [ConsentController::class, 'addSuppression'])->middleware('throttle:writes')->middleware('web.only');
+    Route::delete('message-suppressions/{suppression}', [ConsentController::class, 'removeSuppression'])->middleware('web.only');
 });
 
 // ------------------------------------------------------------ Mesaj kanalları (SMS sağlayıcı, SMTP)
 Route::middleware('permission:integrations.manage|integrations.sms|integrations.email')->prefix('messaging-channels')->group(function () {
     Route::get('/', [MessagingChannelController::class, 'index']);
-    Route::put('{kind}', [MessagingChannelController::class, 'update'])->whereIn('kind', ['sms', 'email'])->middleware('throttle:writes');
-    Route::post('{kind}/test', [MessagingChannelController::class, 'test'])->whereIn('kind', ['sms', 'email'])->middleware('throttle:writes');
-    Route::post('{kind}/disable', [MessagingChannelController::class, 'disable'])->whereIn('kind', ['sms', 'email']);
+    Route::put('{kind}', [MessagingChannelController::class, 'update'])->whereIn('kind', ['sms', 'email'])->middleware('throttle:writes')->middleware('web.only');
+    Route::post('{kind}/test', [MessagingChannelController::class, 'test'])->whereIn('kind', ['sms', 'email'])->middleware('throttle:writes')->middleware('web.only');
+    Route::post('{kind}/disable', [MessagingChannelController::class, 'disable'])->whereIn('kind', ['sms', 'email'])->middleware('web.only');
     Route::get('sms/balance', [MessagingChannelController::class, 'balance']);
     Route::get('sms/originators', [MessagingChannelController::class, 'originators']);
-    Route::post('email/test-message', [MessagingChannelController::class, 'testMessage'])->middleware('throttle:writes');
+    Route::post('email/test-message', [MessagingChannelController::class, 'testMessage'])->middleware('throttle:writes')->middleware('web.only');
 });
 
 // ------------------------------------------------------------ Rapor Merkezi › İletişim (reports.view VE messages.view)

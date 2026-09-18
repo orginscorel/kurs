@@ -166,6 +166,18 @@ class SyncClient
             ->post('sync/files', ['disk' => $disk, 'path' => $path, 'sha256' => $sha256]), 'Dosya yükleme');
     }
 
+    /** Biyometrik terminallerin bu kurulumdaki son durumu (web ekranı "Son durum: … üzerinden"). */
+    public function terminalStatus(array $devices): array
+    {
+        return $this->call(fn (PendingRequest $h) => $h->timeout(15)->post('sync/terminal-status', ['devices' => $devices]), 'Terminal durumu');
+    }
+
+    /** Masaüstünde okunan (sunucudan inmiş) bildirimler → sunucuda da okundu. */
+    public function notificationReads(array $reads): array
+    {
+        return $this->call(fn (PendingRequest $h) => $h->timeout(15)->post('sync/notification-reads', ['reads' => $reads]), 'Bildirim okundu bilgisi');
+    }
+
     /** Çevrimiçi parola değişikliği (kuyruğa alınmaz). */
     public function changePassword(string $userUuid, string $current, string $new): array
     {

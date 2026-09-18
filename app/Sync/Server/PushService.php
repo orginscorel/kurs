@@ -525,6 +525,8 @@ class PushService
     {
         $class = ModelMap::classFor($def->table);
         $decoded['uuid'] = $uuid;
+        // Eşitlenmeyen zorunlu sütunlar (ör. devices.api_token_hash) sunucuda yeni değer alır
+        $decoded = $def->withFill($decoded);
 
         return (int) $this->context->applying(function () use ($class, $def, $decoded) {
             if ($class) {
@@ -545,6 +547,7 @@ class PushService
 
     private function insertRaw(SyncTable $def, string $uuid, array $decoded): int
     {
+        $decoded = $def->withFill($decoded);
         $decoded['uuid'] = $uuid;
         $cols = $this->schema->columns($def->table);
         $decoded = array_intersect_key($decoded, array_flip($cols));

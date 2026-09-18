@@ -12,7 +12,7 @@ import { Button } from '@/components/ui/Button'
 import { Field, Input, Select } from '@/components/ui/form'
 import { ConfirmDialog, Drawer, Menu, Modal } from '@/components/ui/overlay'
 import { StudentSearch, type StudentHit } from './LivePresence'
-import ZkBridge from './ZkBridge'
+import TerminalBridge from './TerminalBridge'
 import { DEVICE_KIND_LABEL, IDENTITY_KIND_LABEL, type DeviceKind, type DeviceRow, type IdentityRow } from './types'
 
 const KIND_ICON: Record<DeviceKind, ReactNode> = {
@@ -273,7 +273,7 @@ export default function Devices() {
           { value: 'bridge', label: 'Terminal Köprüsü' },
         ]}
       />
-      {tab === 'devices' ? <DevicesTab /> : tab === 'identities' ? <IdentitiesTab /> : <ZkBridge />}
+      {tab === 'devices' ? <DevicesTab /> : tab === 'identities' ? <IdentitiesTab /> : <TerminalBridge />}
     </div>
   )
 }

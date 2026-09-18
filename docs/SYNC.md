@@ -294,3 +294,31 @@ jobs:
   Yeni dosya sütunu → `App\Sync\Files\FileSources`.
 * Testler: `tests/Unit/SyncInfrastructureTest.php`, `tests/Unit/SyncGapsTest.php`. Uçtan uca betikler:
   `/home/oritoriu/_backups_kurs/esitleme-eksikler-20260917/araclar/`.
+
+## 10. Masaüstünde eksik kalan bölümler (1.12.3)
+
+* **Terminaller (`devices`) REFERENCE**, doğal anahtar `[branch_id, serial_no]`. Yazma YALNIZ masaüstünde: web'deki
+  ekleme/düzenleme/silme/jeton/keşif/bağlantı testi/çekme/eşleştirme uçları sunucuda **409 `terminal_desktop_only`**
+  (`EnsureTerminalDesktop`, rota ara katmanı `terminal.desktop`; QR kimliği `terminal.desktop:identity` ile web'de serbest).
+  Düğüme özel sütunlar (`exclude`): api_token_hash/prefix, last_seen_at, last_ip, zk_cursor_*, zk_last_*, adms_stamp.
+  Boş bırakılamayan hariç sütun alıcıda `fill` değeri alır (`api_token_hash` → rastgele 64 hane). İletişim şifresi
+  kurum veri anahtarıyla şifreli metin olarak taşınır, yalnız `devices.manage` ile iner; web yanıtında IP/şifre DÖNMEZ.
+* **Eşlemeler (`device_identities`) REFERENCE**, anahtar `[branch_id, kind, identifier]` (önceden yalnız aşağı yönlüydü:
+  Mac'te yapılan eşleme web'e çıkmıyordu).
+* **Terminal durum raporu:** yerel `TerminalStatusReporter` (turda en fazla dakikada bir) → `POST sync/terminal-status`
+  → `sync_terminal_reports` (SYSTEM). Sunucu `devices.last_seen_at`'i yalnız ileri taşır (otomatik yoklama köprüyü canlı
+  görür; günlüğe girmez). Web: `GET attendance/devices` → `data[].bridge = {via, reported_at, last_seen_at, last_pull_at,
+  status, error, record_count, connected, details}`. Ek teşhis alanları: `App\Sync\Contracts\TerminalStatusProvider`.
+* **Bildirimler (`app_notifications`) SERVER**, süzgeç `staff_owned` (yalnız personelin), şube `via:user_id`. Masaüstünde
+  "okundu" → kuyruk (`sync_state.notification_reads_pending`) → `POST sync/notification-reads`. Yerelde üretilen (uuid'siz)
+  bildirim yerelde kalır. Neden satır olarak yukarı değil: sunucu aynı işlemi (komut/kanca) yeniden yürütürken bildirimi
+  kendisi üretir → çift bildirim olurdu.
+* **Sonradan katılan tablolar (`since`):** eşleşmiş kurulum `LocalSyncEngine::lateTables` ile her birini BİR KEZ çeker;
+  yalnız bu kurulumda duran satırlar sunucuya sorulup (`sync/rows`) gönderilir. Durum `sync_state.late_tables_done`.
+  Hata turu düşürmez, 10 dk sonra yeniden dener. Yeni tabloyu sonradan eşitlemeye alırken `since` verin.
+* **Yalnız web bölümleri:** ön yüz `lib/webOnly.ts` (liste) → masaüstünde "… web'den yönetilir" + "Web'de aç" ve menüde
+  "web" rozeti; arka uç `web.only` ara katmanı (`EnsureWebNode`) yerelde mesaj gönderimi, şablon, otomasyon, kampanya,
+  ret listesi, entegrasyon/mesaj kanalı ve webhook yazmalarını 409 `web_only` ile reddeder (sessizce kaybolmasın).
+* Migration `2026_09_18_990100_sync_devices_and_notifications` (yalnız ekleme): devices.uuid, app_notifications.uuid +
+  updated_at, `sync_terminal_reports`. Yerelde o ana kadar yalnız Mac'te duran terminaller "eklendi" olarak kuyruğa yazılır.
+* Testler: `tests/Unit/SyncDesktopGapsTest.php`.

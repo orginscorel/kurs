@@ -1,5 +1,36 @@
 [
   {
+    "version": "1.12.3",
+    "date": "2026-09-18",
+    "title": "Terminal köprüsü ve masaüstü eşitlemesi",
+    "items": [
+      {
+        "type": "duzeltme",
+        "text": "Perkotek YT33 gibi terminallere Mac'ten bağlanılamıyordu; uygulama artık macOS Yerel Ağ iznini istiyor"
+      },
+      {
+        "type": "yeni",
+        "text": "Terminal bağlantı testi iki aşamalı (ağ/TCP ve cihaz protokolü); hatalar gerçek nedeni söylüyor"
+      },
+      {
+        "type": "yeni",
+        "text": "Terminal Teşhis ekranı: köprü IP, TCP durumu, protokol durumu, ham TCP tanılama (HEX/ASCII)"
+      },
+      {
+        "type": "yeni",
+        "text": "Terminal sürücüleri: ZKTeco, Perkotek YT33 (FK Dynamic Face), Genel TCP"
+      },
+      {
+        "type": "iyilestirme",
+        "text": "Terminal ayarları masaüstünde yönetiliyor; web'de salt okunur durum"
+      },
+      {
+        "type": "iyilestirme",
+        "text": "Bildirimler masaüstünde de görünüyor; yalnız web'de çalışan bölümler Web'de aç düğmesi gösteriyor"
+      }
+    ]
+  },
+  {
     "version": "1.12.2",
     "date": "2026-09-18",
     "title": "Oturum yönetimi ve daha küçük güncellemeler",

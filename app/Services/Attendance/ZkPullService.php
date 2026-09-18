@@ -36,6 +36,14 @@ class ZkPullService
      */
     public function pull(Device $device, bool $full = false, ?ZkTerminal $terminal = null): array
     {
+        // ZK paketleri yalnız ZK sürücüsü seçilmiş cihaza gönderilir (Perkotek YT33/FK farklı protokoldür).
+        if ($terminal === null && $device->protocol !== null && $device->protocol !== 'zk') {
+            throw new BusinessRuleException(
+                "\"{$device->name}\" cihazının sürücüsü ZKTeco değil; ZKTeco kayıt çekme bu cihaza uygulanmaz.",
+                'terminal_driver_mismatch', ['device_id' => $device->id, 'protocol' => $device->protocol],
+            );
+        }
+
         $lock = Cache::lock('zk-pull:'.$device->id, 600);
 
         if (! $lock->get()) {

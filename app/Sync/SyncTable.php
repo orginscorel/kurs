@@ -12,6 +12,10 @@ final class SyncTable
      * @param list<string> $exclude
      * @param array<string, string> $sensitive sütun => gereken yetki
      * @param array<string, string|null> $fk sütun => tablo | 'morph:<tip sütunu>' | null (referans değil)
+     * @param array<string, mixed> $fill eşitlenmeyen (exclude) ama boş bırakılamayan sütunlara alıcı düğümde
+     *                                   yeni satır eklenirken verilecek değer; '@random64' = rastgele 64 hane (tekil sütunlar)
+     * @param string|null $since tablo eşitlemeye SONRADAN katıldıysa işaret (ör. '2026-09-18'): eşleşmiş yerel
+     *                           kurulum bu tabloyu bir kez ayrıca anlık görüntüyle çeker (LocalSyncEngine::lateTables)
      */
     public function __construct(
         public readonly string $table,
@@ -25,6 +29,8 @@ final class SyncTable
         public readonly ?string $filter = null,
         public readonly string $direction = 'both',
         public readonly ?string $reason = null,
+        public readonly array $fill = [],
+        public readonly ?string $since = null,
     ) {}
 
     public static function fromArray(string $table, array $def): self
@@ -45,6 +51,8 @@ final class SyncTable
                 default => 'both',
             },
             reason: $def['reason'] ?? null,
+            fill: $def['fill'] ?? [],
+            since: $def['since'] ?? null,
         );
     }
 
@@ -89,5 +97,23 @@ final class SyncTable
     public function excludes(string $column): bool
     {
         return in_array($column, $this->exclude, true);
+    }
+
+    /**
+     * Yeni satır eklenirken eşitlenmeyen zorunlu sütunların düğüme özel değerleri (tel üzerinde hiç gelmezler).
+     *
+     * @param array<string, mixed> $row
+     * @return array<string, mixed>
+     */
+    public function withFill(array $row): array
+    {
+        foreach ($this->fill as $column => $value) {
+            if (array_key_exists($column, $row) && $row[$column] !== null) {
+                continue;
+            }
+            $row[$column] = $value === '@random64' ? bin2hex(random_bytes(32)) : $value;
+        }
+
+        return $row;
     }
 }

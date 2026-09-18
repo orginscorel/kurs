@@ -27,7 +27,9 @@ namespace App\Sync;
  * Ayrıca: 'exclude' = hiç taşınmayan sütunlar (sayaç/bakiye/sır), 'sensitive' = yalnız yetkiyle inen sütunlar,
  * 'permission' = cihaz kullanıcısında bu yetki yoksa tablo hiç inmez, 'branch' = şube kapsamı çözümü,
  * 'fk' = şemada yabancı anahtar olarak tanımlı olmayan referans sütunları (sütun => tablo | null = referans değil),
- * 'filter' = kayıt sırasında süzgeç (ör. yalnız personel kullanıcıları).
+ * 'filter' = kayıt sırasında süzgeç (ör. yalnız personel kullanıcıları),
+ * 'fill' = hariç sütun boş bırakılamıyorsa alıcı düğümde yeni satıra verilecek değer ('@random64' = rastgele),
+ * 'since' = tablo eşitlemeye sonradan katıldı: eşleşmiş kurulumlar bu tabloyu bir kez ayrıca anlık görüntüyle çeker.
  */
 final class SyncRegistry
 {
@@ -111,8 +113,19 @@ final class SyncRegistry
         'attendances' => ['kind' => self::KEYED, 'key' => ['lesson_session_id', 'student_id'], 'permission' => 'attendance.view'],
         'attendance_events' => ['kind' => self::APPEND, 'key' => ['idempotency_key'], 'fk' => ['person_id' => 'morph:person_type'], 'permission' => 'attendance.view'],
         'daily_presences' => ['kind' => self::KEYED, 'key' => ['student_id', 'date'], 'permission' => 'attendance.view'],
-        'devices' => ['kind' => self::LOCAL, 'reason' => 'Donanım cihazı API jeton özeti içerir; köprü sunucuya bağlanır.'],
-        'device_identities' => ['kind' => self::SERVER, 'fk' => ['person_id' => 'morph:person_type']],
+        // Terminal kaydı + LAN bağlantı bilgisi: YALNIZ masaüstünde yazılır (web uçları 409 — EnsureTerminalDesktop), web'e
+        // salt okunur çıkar, birden çok Mac aynı kaydı görsün diye aşağı da iner. Düğüme özel sütunlar taşınmaz: eski köprü API jetonu özeti, çekme imleci ve son çekme durumu (Mac üretir,
+        // web'e ayrı "terminal durumu raporu" ile çıkar: sync/terminal-status → sync_terminal_reports), ADMS damgası. İletişim şifresi kurum veri
+        // anahtarıyla şifreli (App\Casts\DataEncrypted) → şifreli metin olduğu gibi taşınır, yalnız devices.manage ile iner.
+        'devices' => ['kind' => self::REFERENCE, 'since' => '2026-09-18', 'key' => ['branch_id', 'serial_no'],
+            'exclude' => ['api_token_hash', 'api_token_prefix', 'last_seen_at', 'last_ip', 'zk_cursor_at', 'zk_cursor_key',
+                'zk_last_pull_at', 'zk_last_status', 'zk_last_error', 'zk_last_record_count', 'adms_stamp'],
+            'fill' => ['api_token_hash' => '@random64', 'api_token_prefix' => ''],
+            'sensitive' => ['zk_comm_key_encrypted' => 'devices.manage']],
+        // Parmak izi / kart no ↔ öğrenci eşlemesi: terminalle birlikte masaüstünde yönetilir, web'e (salt okunur) çıkar;
+        // birden çok Mac aynı eşlemeyi görsün diye aşağı da iner. Aynı kimlik iki yerde ayrı eklenirse anahtarla birleşir.
+        'device_identities' => ['kind' => self::REFERENCE, 'since' => '2026-09-18', 'key' => ['branch_id', 'kind', 'identifier'],
+            'fk' => ['person_id' => 'morph:person_type']],
 
         // ------------------------------------------------------------------ sınav
         'exam_types' => ['kind' => self::SERVER, 'key' => ['branch_id', 'code']],
@@ -197,7 +210,10 @@ final class SyncRegistry
         'push_tokens' => ['kind' => self::LOCAL, 'reason' => 'Mobil bildirim jetonları.'],
         'calendar_feeds' => ['kind' => self::LOCAL, 'reason' => 'iCal jeton özetleri.'],
         'announcement_reads' => ['kind' => self::LOCAL, 'reason' => 'Portal okundu bilgisi (portal yalnız sunucuda).'],
-        'app_notifications' => ['kind' => self::LOCAL, 'reason' => 'Kullanıcı bildirimleri düğüme özel.'],
+        // Personel bildirimleri sunucudan iner (zil + Bildirimler sayfası masaüstünde de dolu, çevrimdışıyken son liste).
+        // Masaüstünde okundu işareti satır olarak itilmez; ayrı rapor (sync/notification-reads) sunucuya taşır.
+        // Yerelde üretilen bildirim (uuid'siz) yerelde kalır: sunucu aynı işlemi yeniden yürütürken kendisi üretir.
+        'app_notifications' => ['kind' => self::SERVER, 'since' => '2026-09-18', 'filter' => 'staff_owned', 'branch' => 'via:user_id'],
         'activity_feed' => ['kind' => self::LOCAL, 'reason' => 'Canlı akış her düğümde servislerce yeniden üretilir.'],
         'import_jobs' => ['kind' => self::LOCAL, 'reason' => 'Excel içe aktarma dosyası düğüme özel.'],
         'backup_runs' => ['kind' => self::LOCAL, 'reason' => 'Yedek yalnız sunucuda.'],

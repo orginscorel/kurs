@@ -16,6 +16,9 @@ return [
     // 'tcp' önerilir. Bazı eski aygıt yazılımları yalnız 'udp' konuşur.
     'transport' => env('ZK_TRANSPORT', 'tcp') === 'udp' ? 'udp' : 'tcp',
 
+    // Düğüme özel terminal durumu (son test, köprü IP'si, ham tanılamalar) — eşitlenmez.
+    'state_path' => env('TERMINAL_STATE_PATH', storage_path('app/terminal/state.json')),
+
     // Zaman aşımları (saniye). Hiçbir çağrı süresiz beklemez.
     'connect_timeout' => (float) env('ZK_CONNECT_TIMEOUT', 3),
     'read_timeout' => (float) env('ZK_READ_TIMEOUT', 10),

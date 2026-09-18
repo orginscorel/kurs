@@ -61,6 +61,8 @@ class ZkDeviceApiTest extends TestCase
             'branch_id' => $this->branch->id, 'name' => 'Ana Giriş', 'kind' => 'fingerprint', 'direction' => 'both',
             'api_token_hash' => str_repeat('b', 64), 'api_token_prefix' => 'dev_api00001', 'is_active' => true,
         ]);
+        // Terminal yazma/bağlantı uçları yalnız masaüstünde çalışır (EnsureTerminalDesktop); bu testler masaüstü düğümünü sınar
+        config(['kurs.node' => 'local']);
     }
 
     private function asAdmin(): void
@@ -105,11 +107,13 @@ class ZkDeviceApiTest extends TestCase
 
     public function test_endpoints_require_devices_manage_permission(): void
     {
+        config(['kurs.node' => 'server']);   // personel hesabı yerelde açılamaz (sunucu-otoriteli)
         $teacher = User::query()->create([
             'branch_id' => $this->branch->id, 'name' => 'Öğretmen', 'username' => 'ogretmen1',
             'user_type' => 'staff', 'password' => 'Parola123!', 'is_active' => true,
         ]);
         $teacher->assignRole('ogretmen');
+        config(['kurs.node' => 'local']);
 
         Sanctum::actingAs($teacher);
 

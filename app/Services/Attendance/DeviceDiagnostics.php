@@ -100,7 +100,7 @@ class DeviceDiagnostics
         }
 
         // 1) Kurulum tamamlanmamış
-        if ($protocol === 'zk' && ! $device->zk_ip) {
+        if (in_array($protocol, ['zk', 'perkotek_fk', 'generic_tcp'], true) && ! $device->zk_ip) {
             return [
                 'durum' => 'kurulmadi',
                 'metin' => 'IP adresi girilmemiş',
@@ -122,6 +122,18 @@ class DeviceDiagnostics
                 'metin' => 'Bu marka için bağlantı katmanı henüz yazılmadı',
                 'cozum' => 'Cihaz kaydı duruyor ama kayıt çekilemez. ZKTeco/Perkotek uyumlu bir terminal ya da ADMS destekli model kullanın.',
             ];
+        }
+
+        if ($protocol === 'perkotek_fk') {
+            return [
+                'durum' => 'uyari',
+                'metin' => 'Perkotek YT33 / FK protokolü henüz doğrulanmadı',
+                'cozum' => 'Ağ bağlantısı Terminal Köprüsü › "Bağlantıyı test et" ile sınanabilir; kayıt çekme protokol doğrulanınca etkinleşecek.',
+            ];
+        }
+
+        if ($protocol === 'generic_tcp') {
+            return ['durum' => 'uyari', 'metin' => 'Genel TCP sürücüsü: yalnız ağ testi', 'cozum' => 'Cihaza uygun sürücüyü seçin.'];
         }
 
         // 2) Son denemede hata
@@ -179,9 +191,9 @@ class DeviceDiagnostics
 
         return match ($code) {
             'kimlik' => 'Cihazın iletişim şifresi yanlış. Cihaz menüsü: Comm (İletişim) > İletişim Şifresi. Oradaki sayıyı cihaz kartındaki "İletişim şifresi" alanına yazın; şifre kapalıysa cihazda 0 yapın.',
-            'baglanti' => 'Cihaza ulaşılamıyor. Sırayla kontrol edin: (1) cihazın fişi takılı ve ekranı açık mı, (2) ağ kablosu/wifi bağlı mı, (3) cihazdaki IP hâlâ aynı mı (Comm > Ethernet; DHCP kapalı olmalı), (4) bu bilgisayar cihazla aynı ağda mı — misafir ağı olmaz, (5) cihazın Windows programı açıksa kapatın, cihaz tek bağlantı kabul eder.',
+            'baglanti' => 'Soket açılamadı. Sırayla kontrol edin: (1) cihazın fişi takılı ve ekranı açık mı, (2) ağ kablosu/wifi bağlı mı, (3) cihazdaki IP hâlâ aynı mı (DHCP kapalı, sabit IP), (4) bu bilgisayar cihazla aynı ağda mı — misafir ağı olmaz, (5) Mac\'te: Sistem Ayarları › Gizlilik ve Güvenlik › Yerel Ağ › Erbaa Kurs açık mı, (6) cihazın kendi programı açıksa kapatın, cihaz tek bağlantı kabul edebilir.',
             'zaman_asimi' => 'Cihaz yanıt vermedi. O anda biri parmak okutuyor ya da başka bir program cihaza bağlı olabilir. Cihazın kendi programını kapatıp birkaç saniye sonra tekrar deneyin.',
-            'protokol' => 'Cihaz beklenmeyen bir yanıt verdi. Cihaz kartında bağlantı türünü TCP yerine UDP yapıp tekrar deneyin; portun 4370 olduğunu doğrulayın (Comm > PC Bağlantısı).',
+            'protokol' => 'TCP bağlandı fakat cihaz protokolü beklenen yanıtı vermedi. Seçili sürücünün cihazla uyumlu olduğunu doğrulayın (ör. Perkotek YT33 / FK Dynamic Face cihazları ZKTeco protokolü konuşmaz); ZKTeco cihazda bağlantı türünü UDP yapıp tekrar deneyin.',
             default => $protocol === 'adms'
                 ? 'Cihaz kendi kayıtlarını gönderemedi. Comm > ADMS ayarlarındaki sunucu adresi ve port hâlâ doğru mu? Cihazı yeniden başlatın.'
                 : 'Cihaz kartından "Bağlantıyı test et" düğmesine basın; çıkan mesaj ne yapılacağını yazar.',

@@ -14,6 +14,8 @@ import { VendorInfo } from '@/components/app/VendorInfo'
 import { CommandPalette } from './CommandPalette'
 import { NotificationCenter } from './NotificationCenter'
 import { SyncStatus } from './SyncStatus'
+import { WebOnlyNotice } from './WebOnlyNotice'
+import { webOnlyFor } from '@/lib/webOnly'
 
 /** Sistem → Açık → Koyu sırasıyla döner; "Sistem" bilgisayarın ayarını izler ve anında yanıt verir. */
 const THEME_ORDER: ThemeMode[] = ['system', 'light', 'dark']
@@ -60,6 +62,8 @@ export function AppShell({ children }: { children: ReactNode }) {
   const [mobileOpen, setMobileOpen] = useState(false)
   const [paletteOpen, setPaletteOpen] = useState(false)
   const location = useLocation()
+  // Masaüstünde yalnız web bölümleri: boş liste yerine açık durum + "Web'de aç" (lib/webOnly.ts)
+  const webOnly = webOnlyFor(location.pathname)
   const groups = useVisibleNavigation()
   const active = activeGroupFor(location.pathname, groups)
 
@@ -110,7 +114,9 @@ export function AppShell({ children }: { children: ReactNode }) {
           {/* Sayfa geçişi: yol değişince içerik yumuşak girer (hareket azaltılmışsa CSS'te durur) */}
           <div key={location.pathname} className="page-enter">
             {active?.group.key === 'settings' ? (
-              <SettingsLayout group={active.group} activeTo={active.item.to}>{children}</SettingsLayout>
+              <SettingsLayout group={active.group} activeTo={active.item.to}>{webOnly ? <WebOnlyNotice {...webOnly} path={location.pathname + location.search} /> : children}</SettingsLayout>
+            ) : webOnly ? (
+              <WebOnlyNotice {...webOnly} path={location.pathname + location.search} />
             ) : (
               children
             )}
@@ -150,7 +156,7 @@ function SettingsLayout({ group, activeTo, children }: { group: NavGroup; active
             {categories.map(([category, items]) => (
               <optgroup key={category} label={category}>
                 {items.map((item) => (
-                  <option key={item.to} value={item.to}>{item.label}</option>
+                  <option key={item.to} value={item.to}>{item.label}{webOnlyFor(item.to) ? ' (web)' : ''}</option>
                 ))}
               </optgroup>
             ))}
@@ -173,6 +179,7 @@ function SettingsLayout({ group, activeTo, children }: { group: NavGroup; active
                       )}
                     >
                       {item.label}
+                      {webOnlyFor(item.to) && <WebTag />}
                     </Link>
                   )
                 })}
@@ -272,6 +279,7 @@ function Sidebar({
                   >
                     {itemActive && <span className="absolute -left-[11px] top-1.5 bottom-1.5 w-[2px] rounded-full bg-ink" />}
                     <span className="truncate">{item.label}</span>
+                    {webOnlyFor(item.to) && <WebTag />}
                   </Link>
                 </li>
               )
@@ -400,5 +408,17 @@ function Topbar({ onMenu, onSearch }: { onMenu: () => void; onSearch: () => void
         />
       </div>
     </header>
+  )
+}
+
+/** Menüde "yalnız web" işareti (masaüstü uygulamasında) */
+function WebTag() {
+  return (
+    <span
+      title="Bu bölüm web'den yönetilir"
+      className="ml-1.5 shrink-0 rounded-[4px] border border-line px-1 text-[10px] font-medium uppercase leading-[15px] tracking-wide text-ink-3"
+    >
+      web
+    </span>
   )
 }

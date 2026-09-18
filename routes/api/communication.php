@@ -12,15 +12,15 @@ Route::middleware('permission:messages.view')->group(function () {
     Route::get('messages', [MessageController::class, 'index']);
 });
 Route::post('messages/preview', [MessageController::class, 'preview'])->middleware('permission:messages.send');
-Route::post('messages/send', [MessageController::class, 'send'])->middleware(['permission:messages.send', 'throttle:writes']);
-Route::post('messages/{message}/retry', [MessageController::class, 'retry'])->middleware(['permission:messages.send', 'throttle:writes']);
+Route::post('messages/send', [MessageController::class, 'send'])->middleware(['permission:messages.send', 'throttle:writes'])->middleware('web.only');
+Route::post('messages/{message}/retry', [MessageController::class, 'retry'])->middleware(['permission:messages.send', 'throttle:writes'])->middleware('web.only');
 
 // ------------------------------------------------------------ Mesaj şablonları
 Route::middleware('permission:templates.manage')->group(function () {
     Route::get('message-templates', [TemplateController::class, 'index']);
-    Route::post('message-templates', [TemplateController::class, 'store'])->middleware('throttle:writes');
-    Route::put('message-templates/{template}', [TemplateController::class, 'update'])->middleware('throttle:writes');
-    Route::delete('message-templates/{template}', [TemplateController::class, 'destroy']);
+    Route::post('message-templates', [TemplateController::class, 'store'])->middleware('throttle:writes')->middleware('web.only');
+    Route::put('message-templates/{template}', [TemplateController::class, 'update'])->middleware('throttle:writes')->middleware('web.only');
+    Route::delete('message-templates/{template}', [TemplateController::class, 'destroy'])->middleware('web.only');
     Route::post('message-templates/preview', [TemplateController::class, 'preview']);
 });
 
@@ -37,11 +37,11 @@ Route::middleware('permission:automations.manage')->group(function () {
     Route::post('automations/describe', [AutomationController::class, 'describe']);
     Route::get('automations', [AutomationController::class, 'index']);
     Route::get('automations/recommended', [AutomationController::class, 'recommended']);
-    Route::post('automations/recommended/enable', [AutomationController::class, 'enableRecommended'])->middleware('throttle:writes');
-    Route::post('automations', [AutomationController::class, 'store'])->middleware('throttle:writes');
-    Route::put('automations/{automation}', [AutomationController::class, 'update'])->middleware('throttle:writes');
-    Route::post('automations/{automation}/toggle', [AutomationController::class, 'toggle']);
-    Route::delete('automations/{automation}', [AutomationController::class, 'destroy']);
+    Route::post('automations/recommended/enable', [AutomationController::class, 'enableRecommended'])->middleware('throttle:writes')->middleware('web.only');
+    Route::post('automations', [AutomationController::class, 'store'])->middleware('throttle:writes')->middleware('web.only');
+    Route::put('automations/{automation}', [AutomationController::class, 'update'])->middleware('throttle:writes')->middleware('web.only');
+    Route::post('automations/{automation}/toggle', [AutomationController::class, 'toggle'])->middleware('web.only');
+    Route::delete('automations/{automation}', [AutomationController::class, 'destroy'])->middleware('web.only');
     Route::get('automations/{automation}/runs', [AutomationController::class, 'runs']);
 });
 

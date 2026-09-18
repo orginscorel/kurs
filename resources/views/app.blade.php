@@ -6,6 +6,10 @@
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <meta name="robots" content="noindex, nofollow">
     <meta name="kurs-node" content="{{ config('kurs.node') }}">
+    @if (config('kurs.node') === 'local')
+    {{-- Masaüstü: "Web'de aç" düğmeleri kurum adresini sistem tarayıcısında açar --}}
+    <meta name="kurs-server-url" content="{{ rescue(fn () => app(\App\Sync\Local\SyncClient::class)->serverUrl(), '', false) }}">
+    @endif
     <meta name="theme-color" content="#4b3fe3">
     <title>Erbaa Bilgi Eğitim</title>
     <link rel="icon" href="/favicon.svg" type="image/svg+xml">

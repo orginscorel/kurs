@@ -113,7 +113,8 @@ class LocalApplier
                 return 'deferred';
             }
             $decoded['uuid'] = $uuid;
-            $id = (int) DB::table($table)->insertGetId($decoded);
+            // Eşitlenmeyen zorunlu sütunlar (ör. devices.api_token_hash) bu düğümde yeni değer alır
+            $id = (int) DB::table($table)->insertGetId($def->withFill($decoded));
         }
         $this->codec->remember($table, $id, $uuid);
         if (! $this->snapshotMode) {

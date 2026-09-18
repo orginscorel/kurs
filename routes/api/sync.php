@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\Sync\LocalStatusController;
 use App\Http\Controllers\Api\Sync\SyncAdminController;
 use App\Http\Controllers\Api\Sync\SyncDeviceController;
 use App\Http\Controllers\Api\Sync\SyncFileController;
+use App\Http\Controllers\Api\Sync\SyncReportController;
 use App\Http\Controllers\Api\Sync\SyncSessionController;
 use App\Http\Middleware\StartSessionUnlessBearer;
 use Illuminate\Session\Middleware\StartSession;
@@ -36,6 +37,9 @@ Route::prefix('sync')->group(function () {
             Route::post('sessions', [SyncSessionController::class, 'report']);
             Route::get('user-sessions', [SyncSessionController::class, 'userSessions']);
             Route::post('user-sessions/revoke', [SyncSessionController::class, 'revoke'])->middleware('throttle:30,1');
+            // Küçük durum raporları: terminal köprüsünün son durumu (web ekranında "… üzerinden") + masaüstünde okunan bildirimler
+            Route::post('terminal-status', [SyncReportController::class, 'terminalStatus']);
+            Route::post('notification-reads', [SyncReportController::class, 'notificationReads']);
         });
 
     // Yönetim: Bağlı cihazlar + Eşitleme çakışmaları

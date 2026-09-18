@@ -43,6 +43,8 @@ return Application::configure(basePath: dirname(__DIR__))
             'role' => \Spatie\Permission\Middleware\RoleMiddleware::class,
             'active' => \App\Http\Middleware\EnsureUserIsActive::class,
             'device' => \App\Http\Middleware\AuthenticateDevice::class,
+            'terminal.desktop' => \App\Http\Middleware\EnsureTerminalDesktop::class,
+            'web.only' => \App\Http\Middleware\EnsureWebNode::class,
             'staff' => \App\Http\Middleware\EnsureStaffUser::class,
             'portal.student' => \App\Http\Middleware\EnsurePortalStudent::class,
             'portal.teacher' => \App\Http\Middleware\EnsurePortalTeacher::class,

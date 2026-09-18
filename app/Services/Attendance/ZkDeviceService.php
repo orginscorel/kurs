@@ -81,6 +81,14 @@ class ZkDeviceService
             );
         }
 
+        // ZK paketleri YALNIZ ZK sürücüsü seçilmiş cihaza gider (ör. Perkotek YT33 / FK farklı protokol konuşur).
+        if ($device->protocol !== null && $device->protocol !== 'zk') {
+            throw new BusinessRuleException(
+                "\"{$device->name}\" cihazının sürücüsü ZKTeco değil; bu işlem ZKTeco protokolüne özeldir. Terminal Köprüsü ekranındaki sürücü seçimini kullanın.",
+                'terminal_driver_mismatch', ['device_id' => $device->id, 'protocol' => $device->protocol],
+            );
+        }
+
         return ZkConnectionSettings::fromDevice($device);
     }
 

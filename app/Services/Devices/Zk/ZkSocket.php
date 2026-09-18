@@ -4,6 +4,8 @@ namespace App\Services\Devices\Zk;
 
 use App\Services\Devices\Zk\Exceptions\ZkConnectionException;
 use App\Services\Devices\Zk\Exceptions\ZkTimeoutException;
+use App\Services\Devices\Network\SocketFailure;
+use App\Services\Devices\Network\TcpProbe;
 
 /**
  * SOKET KATMANI — tek sorumluluk: bayt gönder / bayt al, her zaman zaman aşımıyla.
@@ -16,6 +18,9 @@ use App\Services\Devices\Zk\Exceptions\ZkTimeoutException;
  */
 class ZkSocket
 {
+    /** Yalnız bu (ZKTeco) sürücünün notu; genel soket metinleri hiçbir porta/markaya atıf yapmaz. */
+    private const DRIVER_NOTE = 'Not: bu ZKTeco sürücüsüdür (ZKTeco fabrika portu 4370). Cihazınız ZKTeco protokolü konuşmuyorsa (ör. Perkotek YT33 / FK Dynamic Face) Terminal Köprüsü › Sürücü alanından doğru sürücüyü seçin.';
+
     /** @var resource|null */
     private $stream = null;
 
@@ -36,17 +41,31 @@ class ZkSocket
     {
         $transport = $transport === 'udp' ? 'udp' : 'tcp';
         $target = "{$transport}://{$host}:{$port}";
-        $errNo = 0;
-        $errStr = '';
 
-        $stream = @stream_socket_client($target, $errNo, $errStr, max(0.2, $connectTimeout), STREAM_CLIENT_CONNECT);
+        if ($transport === 'tcp') {
+            // Soket aşaması ortak sınamadan geçer: errno → Türkçe neden, macOS Yerel Ağ izni ipucu, yerel IP.
+            [$stream, $probe] = app(TcpProbe::class)->open($host, $port, max(0.2, $connectTimeout));
 
-        if ($stream === false) {
-            throw new ZkConnectionException(
-                "Cihaza bağlanılamadı ({$host}:{$port}/{$transport}).",
-                'Cihazın açık ve aynı yerel ağda olduğundan emin olun. Cihaz menüsü: Comm > Ethernet (IP adresi) ve Comm > PC Bağlantısı (port 4370). Mac ile cihaz aynı wifi/ağda mı? Güvenlik duvarı 4370 portunu engelliyor olabilir.',
-                ['hata_no' => $errNo, 'hata' => $errStr, 'hedef' => $target],
-            );
+            if ($stream === null) {
+                throw new ZkConnectionException(
+                    'Cihaza bağlanılamadı: '.$probe->message.'.',
+                    $probe->hint.' '.self::DRIVER_NOTE,
+                    ['hata_no' => $probe->errno, 'hata' => $probe->errstr, 'hedef' => $target, 'neden' => $probe->failure?->value, 'macos_yerel_ag_izni_olasi' => $probe->macLocalNetworkSuspect],
+                );
+            }
+        } else {
+            $errNo = 0;
+            $errStr = '';
+            $stream = @stream_socket_client($target, $errNo, $errStr, max(0.2, $connectTimeout), STREAM_CLIENT_CONNECT);
+
+            if ($stream === false) {
+                $failure = SocketFailure::classify((int) $errNo, (string) $errStr);
+                throw new ZkConnectionException(
+                    'Cihaza bağlanılamadı: '.$failure->title()." ({$host}:{$port}/udp).",
+                    $failure->hint($host, $port, false).' '.self::DRIVER_NOTE,
+                    ['hata_no' => $errNo, 'hata' => $errStr, 'hedef' => $target, 'neden' => $failure->value],
+                );
+            }
         }
 
         stream_set_blocking($stream, true);

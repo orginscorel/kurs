@@ -1,5 +1,24 @@
 [
   {
+    "version": "1.12.3",
+    "date": "2026-09-18",
+    "title": "Terminal köprüsü",
+    "items": [
+      {
+        "type": "duzeltme",
+        "text": "Yerel ağdaki terminallere (ör. Perkotek YT33) bağlanılamıyordu; uygulama artık macOS Yerel Ağ iznini istiyor"
+      },
+      {
+        "type": "yeni",
+        "text": "Terminal bağlantı testi iki aşamalı; Terminal Teşhis ekranında ham TCP tanılama"
+      },
+      {
+        "type": "yeni",
+        "text": "Terminal ayarları ve eşleştirmeler bu Mac'te yönetiliyor, web ile eşitleniyor; bildirimler Mac'te de görünüyor"
+      }
+    ]
+  },
+  {
     "version": "1.12.2",
     "date": "2026-09-18",
     "title": "Daha küçük güncellemeler ve oturum yönetimi",

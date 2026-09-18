@@ -144,3 +144,20 @@ bir HTTP sunucusuna `POST /iclock/cdata` ile kayıt gönderir. Bu durumda köpr�
 (cihaz → bize). Planlanan uçlar: `GET /iclock/cdata` (el sıkışma), `POST /iclock/cdata`
 (attlog satırları), `GET /iclock/getrequest` (komut kuyruğu). Bu sürümde **uygulanmadı**;
 `devices.protocol` sütunu `'zk'` / `'adms'` ayrımını şimdiden taşıyabilir.
+
+## Sürücüler ve iki aşamalı test (1.12.3)
+
+* Sürücü cihaz kaydında (`devices.protocol`): `zk` (ZKTeco, fabrika portu 4370) · `perkotek_fk`
+  (Perkotek YT33 / FK "Dynamic Face", genelde TCP 5005) · `generic_tcp` (yalnız ağ testi) · `adms`.
+  Arayüz: `App\Services\Devices\Drivers\TerminalDriver` (testNetwork, connect, identifyDevice, fetchUsers,
+  fetchAttendanceLogs, parsePush). Doğrulanmamış protokol → `DriverStatus::ProtocolNotImplemented`; sahte veri yok.
+* **Perkotek YT33 / FK protokolü kod tabanında SDK/belge olmadığı için UYDURULMADI**; cihaza ZK paketi gönderilmez
+  (`ZkDeviceService::settingsFor` / `ZkPullService::pull` sürücü uyuşmazlığında `terminal_driver_mismatch`).
+* Test: AŞAMA 1 `TcpProbe` (hiç bayt göndermeden soket; süre, yerel kaynak IP = köprü IP'si, errno → `SocketFailure`
+  Türkçe neden), AŞAMA 2 sürücünün `identifyDevice`'ı. Soket açıldıysa metin asla "Cihaza bağlanılamadı" değildir.
+* Ham TCP tanılaması (`POST attendance/terminal/ham-tani`): varsayılan yalnız dinler; isteğe bağlı kullanıcı HEX'i.
+  Son 50 kayıt ve cihaz durumu düğüme özel `storage/app/terminal/state.json` dosyasında (eşitlenmez).
+* Günlük: `storage/logs/terminal-*.log` (kanal `terminal`); iletişim şifresi hiçbir günlükte yok.
+* **macOS Yerel Ağ izni:** masaüstü paketinin Info.plist'inde `NSLocalNetworkUsageDescription` (src-tauri/Info.plist).
+  İzin yoksa gömülü php'nin LAN bağlantısı "No route to host"/zaman aşımı ile düşer; Terminal.app'teki `nc` başarısı
+  uygulamanın iznini göstermez. Ayar: Sistem Ayarları › Gizlilik ve Güvenlik › Yerel Ağ › Erbaa Kurs.
