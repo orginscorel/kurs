@@ -96,6 +96,8 @@ pub fn build_env(paths: &Paths, secrets: &LocalSecrets, extra: &[(&str, String)]
         ("VIEW_COMPILED_PATH", s(&paths.storage().join("framework/views"))),
         ("KURS_PUBLIC_PATH", s(&paths.public())),
         ("KURS_NODE", "local".into()),
+        // Eşitleme turlarını Laravel zamanlayıcısı değil bu uygulama yürütür (runtime.rs › sync_worker)
+        ("KURS_SYNC_DRIVER", "desktop".into()),
         ("KURS_DESKTOP", "1".into()),
         ("KURS_DESKTOP_VERSION", env!("CARGO_PKG_VERSION").into()),
         ("DB_CONNECTION", "sqlite".into()),

@@ -142,6 +142,7 @@ pub fn run() {
             commands::desktop_info,
             commands::desktop_notify,
             commands::desktop_badge,
+            commands::desktop_sync_now,
             commands::open_downloaded_path,
             commands::reveal_downloaded_path,
         ])

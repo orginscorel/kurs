@@ -24,7 +24,14 @@ type LocalStatus = {
   server_url?: string | null
   device_code?: string | null
   next_attempt_at?: string | null
+  last_error_detail?: string | null
+  last_attempt_at?: string | null
 }
+
+/** Masaüstü köprüsü (src-tauri/src/bridge.js): "Şimdi eşitle" doğrudan uygulamanın eşitleme görevine gider. */
+type DesktopSyncOutcome = { status: string; title: string; message: string; sent: number }
+type DesktopBridge = { syncNow?: () => Promise<DesktopSyncOutcome> }
+const desktopBridge = (): DesktopBridge | undefined => (window as unknown as { kursDesktop?: DesktopBridge }).kursDesktop
 
 export function SyncStatus() {
   if (!isLocalNode()) return null
@@ -43,9 +50,20 @@ function SyncStatusInner() {
     refetchInterval: 10_000,
     refetchIntervalInBackground: false,
   })
+  const [result, setResult] = useState<{ tone: 'ok' | 'warn'; text: string } | null>(null)
   const syncNow = useMutation({
-    mutationFn: () => api.post<LocalStatus>('/sync/local-sync-now'),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['sync', 'local-status'] }),
+    mutationFn: async (): Promise<DesktopSyncOutcome | null> => {
+      const bridge = desktopBridge()
+      if (bridge?.syncNow) return bridge.syncNow()
+      await api.post<LocalStatus>('/sync/local-sync-now')
+      return null
+    },
+    onMutate: () => setResult(null),
+    onSuccess: (o) => {
+      setResult(o ? { tone: o.status === 'ok' ? 'ok' : 'warn', text: o.message } : { tone: 'ok', text: 'Eşitleme istendi; birkaç saniye içinde başlar.' })
+      qc.invalidateQueries({ queryKey: ['sync', 'local-status'] })
+    },
+    onError: () => setResult({ tone: 'warn', text: 'Eşitleme başlatılamadı. Menüden Eşitleme › Şimdi eşitle ile yeniden deneyin.' }),
   })
 
   // "2 dk önce" metni tazelensin
@@ -71,8 +89,10 @@ function SyncStatusInner() {
       case 'syncing':
         return { icon: <RefreshCw className="size-3.5 animate-spin" />, label: 'Eşitleniyor', tone: 'text-info bg-info-soft ring-info/25' }
       case 'offline':
-      case 'stale':
         return { icon: <CloudOff className="size-3.5" />, label: 'Çevrimdışı', tone: 'text-warning bg-warning-soft ring-warning/30' }
+      case 'stale':
+        // Son deneme 5 dk'dan eski: eşitleme turu çalışmıyor (bayat "çevrimdışı" gösterme)
+        return { icon: <RefreshCw className="size-3.5" />, label: 'Eşitleme bekliyor — Şimdi eşitle', tone: 'text-warning bg-warning-soft ring-warning/30' }
       case 'error':
         return { icon: <AlertTriangle className="size-3.5" />, label: 'Eşitleme hatası', tone: 'text-danger bg-danger-soft ring-danger/25' }
       case 'revoked':
@@ -134,13 +154,29 @@ function SyncStatusInner() {
               </>
             )}
           </dl>
-          {data.last_error && phase !== 'idle' && <p className="mt-2 rounded-[var(--radius-sm)] bg-surface-2 p-2 text-[12px] text-ink-2 ring-1 ring-line">{data.last_error}</p>}
+          {data.last_error && phase !== 'idle' && (
+            <div className="mt-2 rounded-[var(--radius-sm)] bg-surface-2 p-2 text-[12px] text-ink-2 ring-1 ring-line">
+              <p>{data.last_error}</p>
+              {(data.last_error_detail || data.last_attempt_at) && (
+                <details className="mt-1 text-ink-3">
+                  <summary className="cursor-pointer select-none">Ayrıntılar</summary>
+                  {data.last_error_detail && <p className="mt-1 break-words font-mono text-[11px]">{data.last_error_detail}</p>}
+                  {data.last_attempt_at && <p className="mt-1">Son deneme: {relative(data.last_attempt_at)} · {dateTime(data.last_attempt_at)}</p>}
+                </details>
+              )}
+            </div>
+          )}
           <p className="mt-2 text-[12px] leading-relaxed text-ink-3">
             İnternet yokken çalışmaya devam edebilirsiniz; bağlantı gelince değişiklikler otomatik gönderilir. Mesaj gönderimi ve fatura yalnız web'de yapılır.
           </p>
           <Button className="mt-3 w-full" size="sm" variant="primary" icon={<RefreshCw className="size-3.5" />} loading={syncNow.isPending} onClick={() => syncNow.mutate()} disabled={!data.paired}>
             Şimdi eşitle
           </Button>
+          {result && (
+            <p role="status" className={cn('mt-2 text-[12px]', result.tone === 'ok' ? 'text-success' : 'text-warning')}>
+              {result.text}
+            </p>
+          )}
         </div>
       )}
     </div>

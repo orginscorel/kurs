@@ -121,7 +121,48 @@
     // --- Güncelleme şeridi ve indirme kartı
     startUpdateBanner()
     startDownloadCard()
+    if (info.mode === 'local') startSyncToast()
   }).catch(function () { /* izinsiz köken */ })
+
+  // ------------------------------------------------------------------ "Şimdi eşitle" sonucu (yerel kip)
+  // Menü/tepsi/üst çubuktan tetiklenen eşitlemenin sonucu burada görünür: "Şimdi eşitle" asla sessiz kalmaz.
+  // Üst çubuk (SyncStatus.tsx) `window.kursDesktop.syncNow()` ile doğrudan Rust görevine sinyal gönderir.
+  function startSyncToast() {
+    try {
+      Object.defineProperty(window, 'kursDesktop', {
+        value: Object.freeze({ syncNow: function () { return invoke('desktop_sync_now') } }),
+        configurable: false,
+      })
+    } catch (e) { /* yok say */ }
+    var host = null
+    var box = null
+    var timer = 0
+    function ensure() {
+      if (host && host.isConnected) return
+      host = document.createElement('kurs-sync-toast')
+      var root = host.attachShadow({ mode: 'closed' })
+      root.innerHTML = '<style>' + TOKENS +
+        '.t{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);z-index:2147483646;max-width:min(460px,calc(100vw - 32px));' +
+        'background:var(--bg);color:var(--fg);border:1px solid var(--line);border-left:4px solid var(--accent);border-radius:3px;' +
+        'box-shadow:0 8px 24px rgb(0 0 0/.14);padding:10px 14px;font:13px/1.45 var(--ff)}' +
+        '.t[data-s="ok"]{border-left-color:var(--ok)}.t[data-s="offline"],.t[data-s="error"],.t[data-s="revoked"]{border-left-color:var(--danger)}' +
+        '.h{font-weight:600;margin-bottom:2px}.m{color:var(--muted)}@media (prefers-color-scheme:dark){:host{--bg:#1b2533;--fg:#e8eef6;--muted:#a9b6c6;--line:#2c3a4d}}</style>' +
+        '<div class="t" role="status" aria-live="polite"><div class="h"></div><div class="m"></div></div>'
+      box = root.querySelector('.t')
+      ;(document.body || document.documentElement).appendChild(host)
+    }
+    function show(o) {
+      if (!o || typeof o !== 'object') return
+      ensure()
+      box.setAttribute('data-s', String(o.status || ''))
+      box.querySelector('.h').textContent = String(o.title || 'Eşitleme')
+      box.querySelector('.m').textContent = o.status === 'started' ? '' : String(o.message || '')
+      host.hidden = false
+      clearTimeout(timer)
+      if (o.status !== 'started') timer = setTimeout(function () { if (host) host.hidden = true }, o.status === 'ok' ? 5000 : 12000)
+    }
+    listen('sync://result', show).catch(noop)
+  }
 
   // ------------------------------------------------------------------ güncelleme şeridi (shadow DOM)
 
@@ -307,7 +348,7 @@
         } else {
           ttl = 'Güncelleme indiriliyor'
           pct = state.pct == null ? '' : '%' + state.pct
-          sub = 'Bitince uygulama kendiliğinden yeniden başlar.'
+          sub = state.detail || 'Bitince uygulama kendiliğinden yeniden başlar.'
         }
       } else if (k === 'error') {
         ttl = 'Güncelleme tamamlanamadı'
@@ -376,11 +417,33 @@
     listen('update://dismissed', function () {
       if (!state || state.kind === 'available') hide()
     }).catch(noop)
+    // İndirme hızı: son ~3 sn'lik kayan pencere (anlık dalgalanmayı yumuşatır)
+    var samples = []
+    function mb(bytes) { return (bytes / 1048576).toLocaleString('tr-TR', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) }
+    function eta(sec) {
+      if (!isFinite(sec) || sec <= 0) return ''
+      if (sec < 60) return 'yaklaşık ' + Math.max(1, Math.round(sec)) + ' sn kaldı'
+      return 'yaklaşık ' + Math.round(sec / 60) + ' dk kaldı'
+    }
     listen('update://progress', function (p) {
       if (!p) return
       var phase = p.phase || 'downloading'
       var pct = phase === 'downloading' && p.total ? Math.max(0, Math.min(100, Math.round((p.downloaded / p.total) * 100))) : null
-      show({ kind: 'working', phase: phase, pct: pct })
+      var detail = ''
+      if (phase === 'downloading') {
+        var now = Date.now()
+        samples.push([now, p.downloaded || 0])
+        while (samples.length > 2 && now - samples[0][0] > 3000) samples.shift()
+        var dt = (now - samples[0][0]) / 1000
+        var rate = dt > 0.4 ? ((p.downloaded || 0) - samples[0][1]) / dt : 0
+        var parts = [mb(p.downloaded || 0) + (p.total ? ' / ' + mb(p.total) : '') + ' MB']
+        if (rate > 0) parts.push(mb(rate) + ' MB/sn')
+        if (rate > 0 && p.total) { var e = eta((p.total - p.downloaded) / rate); if (e) parts.push(e) }
+        detail = parts.join(' · ')
+      } else {
+        samples = []
+      }
+      show({ kind: 'working', phase: phase, pct: pct, detail: detail })
     }).catch(noop)
 
     // Sayfa yeniden yüklendiyse ya da başka bir sayfaya geçildiyse şeridi geri getir (bu çağrı da bir ack'tir).

@@ -140,6 +140,13 @@ class PushService
         }
 
         [$decoded, $missing] = $this->codec->decode($table, $fields);
+        // Cihazın SQLite şeması bazı zorunlu metin sütunlarında NULL'a izin veriyor (ör. leads.phone);
+        // sunucu bunları boş metne çevirir — aksi hâlde kayıt "veritabanı kurallarına uymadı" diye reddediliyordu.
+        foreach ($this->schema->notNullTextColumns($table) as $col) {
+            if (array_key_exists($col, $decoded) && $decoded[$col] === null) {
+                $decoded[$col] = '';
+            }
+        }
         if ($missing !== []) {
             throw new SyncReject('Bağlı kayıt sunucuda bulunamadı ('.$missing[0]['table'].').', 'missing_reference');
         }

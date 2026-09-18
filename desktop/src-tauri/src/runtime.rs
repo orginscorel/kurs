@@ -14,15 +14,105 @@ use std::collections::VecDeque;
 use std::fs::OpenOptions;
 use std::net::TcpListener;
 use std::process::Stdio;
+use std::sync::atomic::{AtomicBool, AtomicI32, AtomicU64, Ordering};
 use std::sync::Arc;
-use std::time::{Duration, Instant};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use tauri::{AppHandle, Emitter, Manager, Runtime};
-use tokio::sync::{watch, Mutex};
+use tokio::sync::{oneshot, watch, Mutex, Notify};
 
 const SERVER_WORKERS: &str = "4";
 const HEALTH_TIMEOUT: Duration = Duration::from_secs(40);
 const MAX_RESTARTS: usize = 5;
 const RESTART_WINDOW: Duration = Duration::from_secs(300);
+/// Eşitleme turu aralığı (zamanlayıcıdan bağımsız, bu uygulamanın kendi görevi)
+const SYNC_INTERVAL: Duration = Duration::from_secs(30);
+/// Tek tur üst sınırı: aşılırsa süreç grubu öldürülür (ölü TCP bağlantısında asılı kalma)
+const SYNC_TIMEOUT: Duration = Duration::from_secs(150);
+/// Duvar saati tekdüze saatten bu kadar ileri kaydıysa makine uyumuştur (macOS'ta Instant uykuda ilerlemez)
+const WAKE_GAP_SECS: u64 = 120;
+/// Zamanlayıcının başlattığı ve hâlâ yaşayan süreç grubu bu yaştan büyükse asılı sayılır
+const STUCK_GROUP_AGE: Duration = Duration::from_secs(600);
+
+type Groups = Arc<std::sync::Mutex<VecDeque<(i32, Instant)>>>;
+
+/// "Şimdi eşitle" ve menü için tur sonucu (kullanıcıya gösterilir).
+#[derive(Clone, Serialize, Debug)]
+pub struct SyncOutcome {
+    /// ok | running | offline | error | revoked | unpaired | needs_snapshot | backoff | unavailable
+    pub status: String,
+    pub title: String,
+    pub message: String,
+    pub sent: u64,
+}
+
+impl SyncOutcome {
+    fn new(status: &str, title: &str, message: impl Into<String>, sent: u64) -> Self {
+        Self { status: status.into(), title: title.into(), message: message.into(), sent }
+    }
+
+    /// `kurs:sync --json` çıktısından kullanıcı metni.
+    pub fn from_json(v: &serde_json::Value, ok_exit: bool) -> Self {
+        let status = v.get("status").and_then(|s| s.as_str()).unwrap_or(if ok_exit { "ok" } else { "error" });
+        let text = |k: &str| v.get(k).and_then(|s| s.as_str()).unwrap_or("").trim().to_string();
+        let sent = v.pointer("/push/accepted").and_then(|n| n.as_u64()).unwrap_or(0);
+        match status {
+            "ok" => {
+                let msg = if sent > 0 { format!("Eşitlendi · {sent} değişiklik gönderildi") } else { "Eşitlendi · gönderilecek değişiklik yoktu".into() };
+                Self::new("ok", "Eşitlendi", msg, sent)
+            }
+            "running" => Self::new("running", "Eşitleme sürüyor", "Eşitleme zaten sürüyor, birazdan tamamlanır.", 0),
+            "offline" => {
+                let why = if text("detail").is_empty() { text("message") } else { text("detail") };
+                let why = if why.is_empty() { "internet bağlantısı yok ya da sunucu yanıt vermiyor".into() } else { why };
+                Self::new("offline", "Sunucuya ulaşılamadı", format!("Sunucuya ulaşılamadı: {why}. Değişiklikler bekletiliyor."), 0)
+            }
+            "revoked" => Self::new("revoked", "Cihaz erişimi iptal", "Bu cihazın eşitleme erişimi iptal edilmiş. Kurum yöneticinize başvurun.", 0),
+            "unpaired" => Self::new("unpaired", "Eşleştirilmedi", "Bu cihaz kurum sunucusuyla eşleştirilmemiş.", 0),
+            "needs_snapshot" => Self::new("needs_snapshot", "Kurulum tamamlanmadı", "İlk veri indirmesi tamamlanmamış.", 0),
+            "backoff" => Self::new("backoff", "Eşitleme bekliyor", "Eşitleme kısa süre sonra yeniden denenecek.", 0),
+            other => {
+                let m = text("message");
+                Self::new(other, "Eşitleme tamamlanamadı", if m.is_empty() { "Eşitleme tamamlanamadı; ayrıntı günlüklerde.".to_string() } else { format!("Eşitleme tamamlanamadı: {m}") }, 0)
+            }
+        }
+    }
+}
+
+/// Eşitleme görevinin denetimi: "hemen tur at" sinyali, bekleyen istekler, bekçi zaman damgası.
+#[derive(Default)]
+pub struct SyncCtl {
+    kick: Notify,
+    force: AtomicBool,
+    waiters: std::sync::Mutex<Vec<oneshot::Sender<SyncOutcome>>>,
+    /// Şu an çalışan `kurs:sync` sürecinin grubu (0 = yok)
+    running_pgid: AtomicI32,
+    /// Görevin son canlılık damgası (unix sn) — bekçi bununla asılı görevi yeniden kurar
+    heartbeat: AtomicU64,
+}
+
+impl SyncCtl {
+    fn request(&self, force: bool) -> oneshot::Receiver<SyncOutcome> {
+        let (tx, rx) = oneshot::channel();
+        if let Ok(mut w) = self.waiters.lock() {
+            w.push(tx);
+        }
+        if force {
+            self.force.store(true, Ordering::SeqCst);
+        }
+        self.kick.notify_one();
+        rx
+    }
+    fn deliver(&self, outcome: &SyncOutcome) {
+        let waiters: Vec<_> = self.waiters.lock().map(|mut w| w.drain(..).collect()).unwrap_or_default();
+        for w in waiters {
+            let _ = w.send(outcome.clone());
+        }
+    }
+}
+
+fn unix_now() -> u64 {
+    SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0)
+}
 
 #[derive(Clone, Serialize)]
 pub struct RuntimeStatus {
@@ -56,8 +146,9 @@ struct Handle {
     info: RunningInfo,
     shutdown: watch::Sender<bool>,
     tasks: Vec<tauri::async_runtime::JoinHandle<()>>,
-    /// Zamanlayıcının başlattığı süreç grupları (arka plandaki `kurs:sync` dahil) — kapanışta sonlandırılır
-    groups: Arc<std::sync::Mutex<VecDeque<(i32, Instant)>>>,
+    /// Zamanlayıcının başlattığı süreç grupları — kapanışta ve uyanmada sonlandırılır
+    groups: Groups,
+    sync: Arc<SyncCtl>,
 }
 
 #[derive(Default)]
@@ -170,10 +261,15 @@ impl LocalRuntime {
             }
         }
 
+        // Ölü süreçlerden (⌘Q, güncelleme, çökme, uyku) kalan zamanlayıcı muteksleri ve tur kilidi: açılışta canlı
+        // sahipleri olamaz. Kalırsa ilgili iş 10 dakikaya kadar SESSİZCE atlanır (1.12.0 uyku sonrası olay).
+        reset_locks(paths, &base_env).await;
+
         let token = secrets::new_session_token()?;
         let token_hash = secrets::sha256_hex(&token);
         let (shutdown_tx, shutdown_rx) = watch::channel(false);
-        let groups: Arc<std::sync::Mutex<VecDeque<(i32, Instant)>>> = Arc::default();
+        let groups: Groups = Arc::default();
+        let sync = Arc::new(SyncCtl::default());
 
         // Sunucu (port çakışmasına karşı 3 deneme)
         let mut last_err = String::new();
@@ -207,10 +303,10 @@ impl LocalRuntime {
                 child,
                 shutdown_rx.clone(),
             )),
-            tauri::async_runtime::spawn(scheduler(paths.clone(), sec_clone(&sec), port, shutdown_rx, groups.clone())),
+            tauri::async_runtime::spawn(watchdog(paths.clone(), sec_clone(&sec), port, shutdown_rx, groups.clone(), sync.clone())),
         ];
 
-        *guard = Some(Handle { info: info.clone(), shutdown: shutdown_tx, tasks, groups });
+        *guard = Some(Handle { info: info.clone(), shutdown: shutdown_tx, tasks, groups, sync });
         emit_status(app, "ready", "Hazır");
         Ok(info)
     }
@@ -226,7 +322,11 @@ impl LocalRuntime {
         }
         #[cfg(unix)]
         {
-            let groups: Vec<i32> = h.groups.lock().map(|g| g.iter().map(|(p, _)| *p).collect()).unwrap_or_default();
+            let mut groups: Vec<i32> = h.groups.lock().map(|g| g.iter().map(|(p, _)| *p).collect()).unwrap_or_default();
+            let sp = h.sync.running_pgid.load(Ordering::SeqCst);
+            if sp > 0 {
+                groups.push(sp);
+            }
             for pg in &groups {
                 signal_group(*pg, libc::SIGTERM);
             }
@@ -251,20 +351,27 @@ impl LocalRuntime {
                         signal_group(*pg, libc::SIGKILL);
                     }
                 }
+                #[cfg(unix)]
+                signal_group(h.sync.running_pgid.load(Ordering::SeqCst), libc::SIGKILL);
             }
         }
     }
 
-    /// "Şimdi eşitle": zamanlayıcıyı beklemeden tek tur.
-    pub async fn sync_now(&self, paths: &Paths) -> Result<String, String> {
-        let sec = secrets::load_local()?;
-        let env = php::build_env(paths, &sec, &[]);
-        let out = php::artisan(paths, &env, &["kurs:sync", "--force", "--json"], None, Duration::from_secs(300)).await?;
-        let status = serde_json::from_str::<serde_json::Value>(&out.stdout)
-            .ok()
-            .and_then(|v| v.get("status").and_then(|s| s.as_str()).map(str::to_string))
-            .unwrap_or_else(|| if out.ok { "ok".into() } else { "error".into() });
-        Ok(status)
+    /// "Şimdi eşitle": eşitleme görevine "hemen tur at" sinyali; sonucu (kullanıcı metniyle) döner.
+    /// Görev bir tur yürütüyorsa o bitince zorlanmış yeni bir tur atılır. Hiçbir durumda sessiz kalmaz.
+    pub async fn sync_now(&self, paths: &Paths) -> SyncOutcome {
+        let ctl = self.inner.lock().await.as_ref().map(|h| h.sync.clone());
+        let Some(ctl) = ctl else {
+            return SyncOutcome::new("unavailable", "Eşitleme kullanılamıyor", "Yerel sunucu çalışmıyor; uygulamayı yeniden açın.", 0);
+        };
+        let rx = ctl.request(true);
+        match tokio::time::timeout(SYNC_TIMEOUT * 2 + Duration::from_secs(10), rx).await {
+            Ok(Ok(o)) => o,
+            _ => {
+                log::warn!("Şimdi eşitle: görev yanıt vermedi ({})", paths.data.display());
+                SyncOutcome::new("error", "Eşitleme yanıt vermedi", "Eşitleme görevi zamanında yanıt vermedi; arka planda yeniden kuruluyor. Birazdan yeniden deneyin.", 0)
+            }
+        }
     }
 
     /// Gönderilmemiş yerel değişiklik sayısı (sıfırlama öncesi uyarı için).
@@ -428,15 +535,167 @@ fn spawn_placeholder() -> Option<tokio::process::Child> {
     tokio::process::Command::new("/usr/bin/true").spawn().ok()
 }
 
-/// Dakikada bir `artisan schedule:run` (yerelde yalnız eşitleme zamanlayıcısı yüklüdür).
-async fn scheduler(
-    paths: Paths,
-    sec: LocalSecrets,
-    port: u16,
-    mut shutdown: watch::Receiver<bool>,
-    groups: Arc<std::sync::Mutex<VecDeque<(i32, Instant)>>>,
-) {
-    use std::time::{SystemTime, UNIX_EPOCH};
+/// Açılış/uyanma temizliği: `kurs:sync --reset-locks` (ölü sahipli tur kilidi + `schedule:clear-cache`).
+async fn reset_locks(paths: &Paths, env: &[(String, String)]) {
+    match php::artisan(paths, env, &["kurs:sync", "--reset-locks", "--json"], None, Duration::from_secs(60)).await {
+        Ok(o) if o.ok => log::info!("Eşitleme kilitleri temizlendi: {}", o.stdout.split_whitespace().collect::<Vec<_>>().join(" ")),
+        Ok(o) => log::warn!("Kilit temizliği başarısız: {}", o.tail()),
+        Err(e) => log::warn!("Kilit temizliği başarısız: {e}"),
+    }
+}
+
+/// Zamanlayıcının başlattığı süreç gruplarını sonlandırır (`all`: hepsi — uyanma; değilse yalnız asılı kalanlar).
+fn kill_groups(groups: &Groups, all: bool) -> usize {
+    let mut n = 0;
+    if let Ok(mut g) = groups.lock() {
+        let now = Instant::now();
+        g.retain(|(pg, t)| {
+            let stuck = all || now.duration_since(*t) > STUCK_GROUP_AGE;
+            #[cfg(unix)]
+            {
+                // SAFETY: yalnız kendi başlattığımız gruba 0 sinyali (yaşıyor mu?)
+                let alive = *pg > 0 && unsafe { libc::killpg(*pg, 0) } == 0;
+                if !alive {
+                    return false;
+                }
+                if stuck {
+                    signal_group(*pg, libc::SIGKILL);
+                    n += 1;
+                    return false;
+                }
+            }
+            #[cfg(not(unix))]
+            let _ = (pg, stuck);
+            true
+        });
+    }
+    n
+}
+
+/// Bekçi: zamanlayıcıyı ve eşitleme görevini ayakta tutar. Biri paniklerse / biterse ya da eşitleme görevi
+/// 10 dakikadır canlılık damgası vermezse yeniden kurulur. Uyanma algılanınca temizlik + hemen tur.
+async fn watchdog(paths: Paths, sec: LocalSecrets, port: u16, mut shutdown: watch::Receiver<bool>, groups: Groups, sync: Arc<SyncCtl>) {
+    let rx = shutdown.clone();
+    let spawn_sched = || tauri::async_runtime::spawn(scheduler(paths.clone(), sec_clone(&sec), port, rx.clone(), groups.clone()));
+    let spawn_sync = || tauri::async_runtime::spawn(sync_worker(paths.clone(), sec_clone(&sec), port, rx.clone(), groups.clone(), sync.clone()));
+    let mut sched = spawn_sched();
+    let mut worker = spawn_sync();
+    let mut wall = unix_now();
+    let mut mono = Instant::now();
+    loop {
+        tokio::select! {
+            _ = shutdown.changed() => {
+                let _ = tokio::time::timeout(Duration::from_secs(6), async { let _ = (&mut sched).await; let _ = (&mut worker).await; }).await;
+                return;
+            }
+            _ = tokio::time::sleep(Duration::from_secs(10)) => {}
+        }
+        if *shutdown.borrow() {
+            return;
+        }
+        // Uyku algısı: macOS'ta tokio/Instant uykuda ilerlemez, duvar saati ilerler
+        let (w, m) = (unix_now(), Instant::now());
+        let gap = w.saturating_sub(wall).saturating_sub(m.duration_since(mono).as_secs());
+        wall = w;
+        mono = m;
+        if gap > WAKE_GAP_SECS {
+            log::warn!("Uyanma algılandı (~{gap} sn askıda): asılı PHP süreçleri sonlandırılıyor, eşitleme hemen deneniyor");
+            let killed = kill_groups(&groups, true);
+            #[cfg(unix)]
+            {
+                let sp = sync.running_pgid.swap(0, Ordering::SeqCst);
+                if sp > 0 {
+                    signal_group(sp, libc::SIGKILL);
+                }
+            }
+            log::info!("Uyanma: {killed} zamanlayıcı grubu sonlandırıldı");
+            let env = php::build_env(&paths, &sec, &[]);
+            reset_locks(&paths, &env).await;
+            sync.force.store(true, Ordering::SeqCst);
+            sync.heartbeat.store(unix_now(), Ordering::SeqCst);
+            sync.kick.notify_one();
+        } else {
+            kill_groups(&groups, false);
+        }
+        if sched.inner().is_finished() {
+            log::error!("Zamanlayıcı görevi durmuş; yeniden kuruluyor");
+            sched = spawn_sched();
+        }
+        let hb = sync.heartbeat.load(Ordering::SeqCst);
+        let hung = hb > 0 && unix_now().saturating_sub(hb) > 600;
+        if worker.inner().is_finished() || hung {
+            log::error!("Eşitleme görevi {}; yeniden kuruluyor", if hung { "10 dakikadır yanıt vermiyor" } else { "durmuş" });
+            worker.abort();
+            #[cfg(unix)]
+            signal_group(sync.running_pgid.swap(0, Ordering::SeqCst), libc::SIGKILL);
+            sync.heartbeat.store(unix_now(), Ordering::SeqCst);
+            worker = spawn_sync();
+            sync.kick.notify_one();
+        }
+    }
+}
+
+/// Eşitleme görevi: 30 sn'de bir `kurs:sync` TEK TUR (Laravel zamanlayıcısının muteksine bağlı değil).
+/// Biri sürerken yenisi başlamaz; tur 150 sn'yi aşarsa süreç grubu öldürülür. "Şimdi eşitle" sinyaliyle hemen.
+async fn sync_worker(paths: Paths, sec: LocalSecrets, port: u16, mut shutdown: watch::Receiver<bool>, _groups: Groups, ctl: Arc<SyncCtl>) {
+    let env = php::build_env(&paths, &sec, &[("APP_URL", format!("http://127.0.0.1:{port}"))]);
+    let mut wait = Duration::from_secs(4);
+    loop {
+        ctl.heartbeat.store(unix_now(), Ordering::SeqCst);
+        tokio::select! {
+            _ = shutdown.changed() => return,
+            _ = tokio::time::sleep(wait) => {}
+            _ = ctl.kick.notified() => {}
+        }
+        if *shutdown.borrow() {
+            return;
+        }
+        ctl.heartbeat.store(unix_now(), Ordering::SeqCst);
+        let force = ctl.force.swap(false, Ordering::SeqCst);
+        let outcome = run_sync_once(&paths, &env, force, &ctl).await;
+        if force || outcome.status != "backoff" {
+            log::info!("Eşitleme turu{}: {} — {}", if force { " (zorla)" } else { "" }, outcome.status, outcome.message);
+        }
+        ctl.deliver(&outcome);
+        wait = SYNC_INTERVAL;
+    }
+}
+
+async fn run_sync_once(paths: &Paths, env: &[(String, String)], force: bool, ctl: &SyncCtl) -> SyncOutcome {
+    let mut cmd = php::base_command(paths, env);
+    cmd.arg(paths.artisan()).args(["kurs:sync", "--json", "--no-ansi"]);
+    if force {
+        cmd.arg("--force");
+    }
+    cmd.stdin(Stdio::null()).stdout(Stdio::piped()).stderr(log_file(&paths.scheduler_log()));
+    let child = match cmd.spawn() {
+        Ok(c) => c,
+        Err(e) => return SyncOutcome::new("error", "Eşitleme başlatılamadı", format!("PHP başlatılamadı: {e}"), 0),
+    };
+    let pgid = child.id().map(|p| p as i32).unwrap_or(0);
+    ctl.running_pgid.store(pgid, Ordering::SeqCst);
+    let res = tokio::time::timeout(SYNC_TIMEOUT, child.wait_with_output()).await;
+    ctl.running_pgid.store(0, Ordering::SeqCst);
+    match res {
+        Ok(Ok(out)) => {
+            let text = String::from_utf8_lossy(&out.stdout);
+            match serde_json::from_str::<serde_json::Value>(text.trim()) {
+                Ok(v) => SyncOutcome::from_json(&v, out.status.success()),
+                Err(_) => SyncOutcome::new("error", "Eşitleme tamamlanamadı", "Eşitleme komutu beklenmedik çıktı verdi; ayrıntı günlüklerde.", 0),
+            }
+        }
+        Ok(Err(e)) => SyncOutcome::new("error", "Eşitleme tamamlanamadı", format!("PHP süreci okunamadı: {e}"), 0),
+        Err(_) => {
+            #[cfg(unix)]
+            signal_group(pgid, libc::SIGKILL);
+            log::warn!("kurs:sync {} sn'de bitmedi; süreç grubu sonlandırıldı", SYNC_TIMEOUT.as_secs());
+            SyncOutcome::new("offline", "Sunucuya ulaşılamadı", "Sunucuya ulaşılamadı: bağlantı zaman aşımına uğradı. Değişiklikler bekletiliyor.", 0)
+        }
+    }
+}
+
+/// Dakikada bir `artisan schedule:run` (yerel düğümde eşitleme dışındaki yerel işler, ör. cihaz çekme).
+async fn scheduler(paths: Paths, sec: LocalSecrets, port: u16, mut shutdown: watch::Receiver<bool>, groups: Groups) {
     let env = php::build_env(&paths, &sec, &[("APP_URL", format!("http://127.0.0.1:{port}"))]);
     // İlk tur 3 sn sonra (açılışta hemen eşitlesin), sonra dakika başlarında
     let mut wait = Duration::from_secs(3);
@@ -456,10 +715,9 @@ async fn scheduler(
             Ok(mut child) => {
                 if let Some(pid) = child.id() {
                     if let Ok(mut g) = groups.lock() {
-                        let now = Instant::now();
-                        g.push_back((pid as i32, now));
-                        // 3 dk'dan eski gruplar (arka plan kurs:sync --loop=55 bitmiştir)
-                        while g.front().is_some_and(|(_, t)| now.duration_since(*t) > Duration::from_secs(180)) {
+                        // Gruplar bitene dek listede kalır (bekçi ölüleri ayıklar, asılı kalanları sonlandırır)
+                        g.push_back((pid as i32, Instant::now()));
+                        while g.len() > 64 {
                             g.pop_front();
                         }
                     }

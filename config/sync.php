@@ -45,4 +45,7 @@ return [
     // Sunucuya hiç ulaşılamıyorken (çevrimdışı) sabit yeniden deneme aralığı: bağlantı gelince kuyruk
     // dakikalarca beklemesin. Denemenin maliyeti yok (bağlantı zaten anında reddediliyor).
     'offline_retry_seconds' => (int) env('SYNC_OFFLINE_RETRY', 20),
+    // Tek eşitleme turunun kilidi (sn). Sahibi ölürse (uyku, kapanış) en geç bu süre sonra kendiliğinden düşer;
+    // --force ve --reset-locks ölü sahibin kilidini hemen devralır.
+    'cycle_lock_seconds' => (int) env('SYNC_CYCLE_LOCK', 180),
 ];

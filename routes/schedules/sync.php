@@ -9,7 +9,12 @@ use Illuminate\Support\Facades\Schedule;
 | Yerel düğüm: kurs:sync döngüsü (gönder/çek, geri çekilme) dakikada bir; komut kendi içinde aralığı yönetir.
 */
 if (config('kurs.node') === 'local') {
-    Schedule::command('kurs:sync --loop=55')->everyMinute()->withoutOverlapping(10)->runInBackground();
+    // Masaüstü paketi (KURS_SYNC_DRIVER=desktop) eşitleme turlarını KENDİSİ yönetir (src-tauri/src/runtime.rs › sync_worker):
+    // runInBackground'lı olayın muteksi ancak schedule:finish ile silinir; uygulama kapanınca/uyuyunca zincir ölür,
+    // muteks 10 dk kalır ve eşitleme sessizce atlanır (1.12.0 olayı). Masaüstü dışı yerel düğümde eski döngü sürer.
+    if (env('KURS_SYNC_DRIVER') !== 'desktop') {
+        Schedule::command('kurs:sync --loop=55')->everyMinute()->withoutOverlapping(2)->runInBackground();
+    }
 } else {
     Schedule::command('kurs:sync-sweep')->everyMinute()->withoutOverlapping(5);
     Schedule::command('kurs:sync-sweep --full')->everyThirtyMinutes()->withoutOverlapping(15);

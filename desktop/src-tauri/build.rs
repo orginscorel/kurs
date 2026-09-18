@@ -21,6 +21,7 @@ fn main() {
             "desktop_info",
             "desktop_notify",
             "desktop_badge",
+            "desktop_sync_now",
             "open_downloaded_path",
             "reveal_downloaded_path",
         ])),

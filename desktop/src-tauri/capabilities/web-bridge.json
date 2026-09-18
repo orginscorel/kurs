@@ -16,6 +16,7 @@
     "allow-desktop-info",
     "allow-desktop-notify",
     "allow-desktop-badge",
+    "allow-desktop-sync-now",
     "allow-update-info",
     "allow-update-install",
     "allow-update-later",

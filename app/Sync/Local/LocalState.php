@@ -86,12 +86,19 @@ class LocalState
         if ($phase === 'syncing' && isset($file['updated_at']) && strtotime($file['updated_at']) < time() - 300) {
             $phase = 'stale';
         }
+        // Son deneme 5 dk'dan eskiyse "çevrimdışı/hata" bayattır (tur hiç çalışmıyor): "Eşitleme bekliyor" göster
+        $lastAttempt = $file['last_attempt_at'] ?? ($file['updated_at'] ?? null);
+        if (in_array($phase, ['offline', 'error'], true) && $lastAttempt && strtotime($lastAttempt) < now()->getTimestamp() - 300) {
+            $phase = 'stale';
+        }
 
         return [
             'phase' => $paired ? $phase : 'unpaired',
             'paired' => $paired,
             'last_success_at' => $last,
             'last_error' => $file['last_error'] ?? null,
+            'last_error_detail' => $file['last_error_detail'] ?? null,
+            'last_attempt_at' => $file['last_attempt_at'] ?? null,
             'pending' => $this->pendingCount(),
             'rejected' => $this->rejectedCount(),
             'open_conflicts' => isset($file['open_conflicts']) ? (int) $file['open_conflicts'] : null,

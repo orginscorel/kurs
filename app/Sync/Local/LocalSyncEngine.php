@@ -171,11 +171,11 @@ class LocalSyncEngine
             return ['status' => 'needs_snapshot'];
         }
 
-        $lock = Cache::lock('kurs:sync:cycle', 600);
-        if (! $lock->get()) {
+        $lock = $this->acquireCycleLock($force);
+        if (! $lock) {
             return ['status' => 'running'];
         }
-        $this->state->writeFile(['phase' => 'syncing']);
+        $this->state->writeFile(['phase' => 'syncing', 'last_attempt_at' => now()->toIso8601String()]);
         $out = ['status' => 'ok'];
         try {
             $out['sweep'] = $this->sweeper->sweep();
@@ -207,21 +207,85 @@ class LocalSyncEngine
             $this->state->put('sync_requested_at', null);
             $this->state->put('failures', 0);
             $this->state->writeFile([
-                'phase' => 'idle', 'last_error' => null, 'next_attempt_at' => null,
+                'phase' => 'idle', 'last_error' => null, 'last_error_detail' => null, 'next_attempt_at' => null,
                 'open_conflicts' => $status['open_conflicts'] ?? null, 'server_cursor' => $this->state->serverCursor(),
             ]);
         } catch (SyncHttpException $e) {
             $out = ['status' => $e->isRevoked() ? 'revoked' : ($e->isOffline() ? 'offline' : 'error'), 'message' => $e->getMessage()];
-            $this->fail($e->isRevoked() ? 'revoked' : ($e->isOffline() ? 'offline' : 'error'), $e->getMessage());
+            if ($e->detail !== '') {
+                $out['detail'] = $e->detail;
+            }
+            $this->fail($e->isRevoked() ? 'revoked' : ($e->isOffline() ? 'offline' : 'error'), $e->getMessage(), $e->detail);
         } catch (\Throwable $e) {
             Log::error('Yerel eşitleme hatası', ['e' => $e->getMessage(), 'at' => $e->getFile().':'.$e->getLine()]);
             $out = ['status' => 'error', 'message' => $e->getMessage()];
             $this->fail('error', $e->getMessage());
         } finally {
             $lock->release();
+            Cache::forget(self::LOCK_HOLDER);
         }
 
         return $out;
+    }
+
+    public const LOCK_NAME = 'kurs:sync:cycle';
+
+    public const LOCK_HOLDER = 'kurs:sync:cycle:holder';
+
+    /**
+     * Tur kilidi. Sahibinin PID'i ayrıca yazılır: süreç öldüyse (uyku sonrası sonlandırma, uygulama kapanışı)
+     * `--force` kilidi süresinin dolmasını beklemeden devralır. Canlı bir sahip varsa kilide dokunulmaz.
+     */
+    private function acquireCycleLock(bool $force): ?\Illuminate\Contracts\Cache\Lock
+    {
+        $seconds = max(30, (int) config('sync.cycle_lock_seconds', 180));
+        $lock = Cache::lock(self::LOCK_NAME, $seconds);
+        if (! $lock->get()) {
+            if (! $force || ! self::holderIsDead()) {
+                return null;
+            }
+            Log::warning('Eşitleme kilidi ölü süreçten devralındı', ['holder' => Cache::get(self::LOCK_HOLDER)]);
+            $lock->forceRelease();
+            if (! $lock->get()) {
+                return null;
+            }
+        }
+        Cache::put(self::LOCK_HOLDER, ['pid' => getmypid(), 'at' => time()], $seconds);
+
+        return $lock;
+    }
+
+    /** Kilit sahibi süreç artık yok mu? (PID bilinmiyorsa ya da denetlenemiyorsa: hayır) */
+    public static function holderIsDead(): bool
+    {
+        $holder = Cache::get(self::LOCK_HOLDER);
+        $pid = is_array($holder) ? (int) ($holder['pid'] ?? 0) : 0;
+        if ($pid <= 0) {
+            return true; // sahip kaydı yok → eski sürümden ya da yarıda kalmış süreçten kalmış kilit
+        }
+        if ($pid === getmypid()) {
+            return false;
+        }
+        if (function_exists('posix_kill')) {
+            return ! @posix_kill($pid, 0) && (! function_exists('posix_get_last_error') || posix_get_last_error() === 3); // ESRCH
+        }
+        if (is_dir('/proc')) {
+            return ! is_dir('/proc/'.$pid);
+        }
+
+        return false;
+    }
+
+    /** Açılışta / uyanmada: canlı sahibi olmayan tur kilidini kaldırır. */
+    public function releaseStaleLock(): bool
+    {
+        if (! self::holderIsDead()) {
+            return false;
+        }
+        Cache::lock(self::LOCK_NAME)->forceRelease();
+        Cache::forget(self::LOCK_HOLDER);
+
+        return true;
     }
 
     /** Sunucudaki kurum veri anahtarı değiştiyse (ya da sonradan tanımlandıysa) mühürlü paketle yenile. */
@@ -257,7 +321,7 @@ class LocalSyncEngine
         $this->state->put('data_key_fp', \App\Support\Sensitive::dataKeyFingerprint());
     }
 
-    private function fail(string $phase, string $message): void
+    private function fail(string $phase, string $message, string $detail = ''): void
     {
         $failures = (int) $this->state->get('failures', '0') + 1;
         $this->state->put('failures', $failures);
@@ -268,7 +332,7 @@ class LocalSyncEngine
             : min((int) config('sync.max_backoff_seconds', 600), (int) (15 * (2 ** min(10, $failures - 1))));
         $this->state->put('sync_requested_at', null);
         $this->state->writeFile([
-            'phase' => $phase, 'last_error' => mb_substr($message, 0, 300),
+            'phase' => $phase, 'last_error' => mb_substr($message, 0, 300), 'last_error_detail' => $detail !== '' ? mb_substr($detail, 0, 300) : null,
             'next_attempt_at' => now()->addSeconds($delay)->toIso8601String(), 'failures' => $failures,
         ]);
     }

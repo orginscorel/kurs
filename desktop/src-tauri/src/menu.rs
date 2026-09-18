@@ -6,7 +6,6 @@ use tauri::menu::{AboutMetadata, CheckMenuItem, Menu, MenuEvent, MenuItem, Prede
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri::{AppHandle, Manager, Runtime};
 use tauri_plugin_autostart::ManagerExt as AutostartExt;
-use tauri_plugin_notification::NotificationExt;
 
 pub const TRAY_ID: &str = "kurs-tray";
 
@@ -130,10 +129,6 @@ pub fn install<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<()> {
     Ok(())
 }
 
-fn notify<R: Runtime>(app: &AppHandle<R>, title: &str, body: &str) {
-    let _ = app.notification().builder().title(title).body(body).show();
-}
-
 fn handle<R: Runtime>(app: &AppHandle<R>, event: MenuEvent) {
     match event.id().as_ref() {
         "show" => window::focus_main(app),
@@ -179,20 +174,7 @@ fn handle<R: Runtime>(app: &AppHandle<R>, event: MenuEvent) {
         "setup" => window::show_setup(app, "screen=setup"),
         "sync-now" => {
             let app = app.clone();
-            tauri::async_runtime::spawn(async move {
-                let ctx = app.state::<AppCtx>();
-                let mode = ctx.settings.read().map(|s| s.mode.clone()).unwrap_or_default();
-                if mode != Mode::Local || ctx.runtime.running().await.is_none() {
-                    notify(&app, "Eşitleme", "Eşitleme yalnız yerel kurulumda kullanılır.");
-                    return;
-                }
-                match ctx.runtime.sync_now(&ctx.paths).await {
-                    Ok(s) if s == "ok" => notify(&app, "Eşitlendi", "Yerel veriler web ile eşitlendi."),
-                    Ok(s) if s == "offline" => notify(&app, "Çevrimdışı", "Sunucuya ulaşılamadı; değişiklikler bekletiliyor."),
-                    Ok(s) => notify(&app, "Eşitleme tamamlanamadı", &format!("Durum: {s}. Ayrıntı için üst çubuktaki göstergeye bakın.")),
-                    Err(e) => notify(&app, "Eşitleme başarısız", &e),
-                }
-            });
+            tauri::async_runtime::spawn(async move { crate::commands::run_sync_now(&app, true).await });
         }
         _ => {}
     }

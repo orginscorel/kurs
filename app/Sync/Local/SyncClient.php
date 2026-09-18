@@ -76,9 +76,18 @@ class SyncClient
         try {
             return $this->decode($fn($this->http()), $what);
         } catch (ConnectionException $e) {
-            \Illuminate\Support\Facades\Log::info('Eşitleme sunucusuna ulaşılamadı', ['what' => $what, 'error' => $e->getMessage()]);
-            throw new SyncHttpException('Sunucuya ulaşılamıyor. İnternet bağlantısı yok ya da sunucu yanıt vermiyor; değişiklikler bekletiliyor.', 0, 'offline');
+            \Illuminate\Support\Facades\Log::warning('Eşitleme sunucusuna ulaşılamadı', ['what' => $what, 'error' => $e->getMessage()]);
+            throw new SyncHttpException('Sunucuya ulaşılamıyor. İnternet bağlantısı yok ya da sunucu yanıt vermiyor; değişiklikler bekletiliyor.', 0, 'offline', self::shortDetail($e->getMessage()));
         }
+    }
+
+    /** "cURL error 6: Could not resolve host: x (see https://curl.haxx.se/…) for https://…" → "cURL error 6: Could not resolve host: x" */
+    public static function shortDetail(string $message): string
+    {
+        $m = preg_replace('~\s*\(see https?://[^)]*\)~i', '', $message) ?? $message;
+        $m = preg_replace('~\s+for\s+https?://\S+\s*$~i', '', $m) ?? $m;
+
+        return mb_substr(trim($m), 0, 200);
     }
 
     public function ping(): array
@@ -136,9 +145,10 @@ class SyncClient
     {
         try {
             $r = $this->http()->timeout(300)->sink($target)->get('sync/files/'.$sha256);
-        } catch (ConnectionException) {
+        } catch (ConnectionException $e) {
             @unlink($target);
-            throw new SyncHttpException('Sunucuya ulaşılamıyor; dosya indirmesi bekletiliyor.', 0, 'offline');
+            \Illuminate\Support\Facades\Log::warning('Eşitleme sunucusuna ulaşılamadı', ['what' => 'Dosya indirme', 'error' => $e->getMessage()]);
+            throw new SyncHttpException('Sunucuya ulaşılamıyor; dosya indirmesi bekletiliyor.', 0, 'offline', self::shortDetail($e->getMessage()));
         }
         if ($r->failed()) {
             // hata gövdesi de hedefe yazılmış olabilir: JSON mesajını oradan oku

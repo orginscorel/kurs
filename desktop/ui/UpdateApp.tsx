@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { api, errorText, listen, type UpdateInfo, type UpdateProgress } from './api'
 import { Alert, Button, Icon, ProgressBar, Spinner } from './components'
 import { parseNotes, type ChangelogEntry } from './changelog'
@@ -45,12 +45,20 @@ export function UpdateApp() {
   const [info, setInfo] = useState<UpdateInfo | null>(null)
   const [loaded, setLoaded] = useState(false)
   const [progress, setProgress] = useState<UpdateProgress | null>(null)
+  const samples = useRef<[number, number][]>([])
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
   useEffect(() => {
     let off: (() => void) | undefined
-    void listen<UpdateProgress>('update://progress', setProgress).then((u) => { off = u })
+    void listen<UpdateProgress>('update://progress', (p) => {
+      if (p.phase === 'downloading') {
+        const now = Date.now()
+        samples.current.push([now, p.downloaded])
+        while (samples.current.length > 2 && now - samples.current[0]![0] > 3000) samples.current.shift()
+      }
+      setProgress(p)
+    }).then((u) => { off = u })
     void api.updateInfo().then((i) => { setInfo(i); setLoaded(true) }).catch((e) => { setError(errorText(e)); setLoaded(true) })
     return () => off?.()
   }, [])
@@ -81,6 +89,7 @@ export function UpdateApp() {
 
   const entries = parseNotes(info.notes, info.current_version)
   const pct = progress?.total ? (progress.downloaded / progress.total) * 100 : null
+  const detail = progress?.phase === 'downloading' ? speedText(progress, samples.current) : ''
 
   return (
     <div className="update">
@@ -103,7 +112,7 @@ export function UpdateApp() {
         {progress && (
           <div style={{ flex: 1, minWidth: 0 }}>
             <div className="muted">
-              {progress.phase === 'downloading' ? `İndiriliyor${pct != null ? ` · %${Math.round(pct)}` : '…'}` : progress.phase === 'installing' ? 'Kuruluyor…' : 'Yeniden başlatılıyor…'}
+              {progress.phase === 'downloading' ? `İndiriliyor${pct != null ? ` · %${Math.round(pct)}` : '…'}${detail ? ` · ${detail}` : ''}` : progress.phase === 'installing' ? 'Kuruluyor…' : 'Yeniden başlatılıyor…'}
             </div>
             <ProgressBar value={pct ?? (progress.phase === 'downloading' ? 5 : 100)} />
           </div>
@@ -113,4 +122,24 @@ export function UpdateApp() {
       </footer>
     </div>
   )
+}
+
+const mb = (b: number) => (b / 1048576).toLocaleString('tr-TR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })
+
+/** "34,2 / 73,5 MB · 2,4 MB/sn · yaklaşık 16 sn kaldı" — son ~3 sn'lik kayan pencereyle */
+function speedText(p: UpdateProgress, samples: [number, number][]): string {
+  const parts = [`${mb(p.downloaded)}${p.total ? ` / ${mb(p.total)}` : ''} MB`]
+  const first = samples[0]
+  const last = samples[samples.length - 1]
+  if (first && last && last[0] - first[0] > 400) {
+    const rate = (last[1] - first[1]) / ((last[0] - first[0]) / 1000)
+    if (rate > 0) {
+      parts.push(`${mb(rate)} MB/sn`)
+      if (p.total) {
+        const sec = (p.total - p.downloaded) / rate
+        if (isFinite(sec) && sec > 0) parts.push(sec < 60 ? `yaklaşık ${Math.max(1, Math.round(sec))} sn kaldı` : `yaklaşık ${Math.round(sec / 60)} dk kaldı`)
+      }
+    }
+  }
+  return parts.join(' · ')
 }

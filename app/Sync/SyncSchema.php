@@ -92,6 +92,36 @@ class SyncSchema
         return in_array($table, $this->info()['tables'], true);
     }
 
+    /** @var array<string, list<string>> */
+    private array $notNullText = [];
+
+    /**
+     * Boş bırakılamayan ve varsayılanı olmayan METİN sütunları. Yerel düğümün SQLite şeması bu sütunlarda
+     * NULL'a izin verebildiği için cihazdan NULL gelebilir; sunucu bunları boş metne çevirir (bkz. PushService).
+     *
+     * @return list<string>
+     */
+    public function notNullTextColumns(string $table): array
+    {
+        if (! isset($this->notNullText[$table])) {
+            $cols = [];
+            try {
+                foreach (Schema::getColumns($table) as $c) {
+                    $type = strtolower((string) ($c['type_name'] ?? ''));
+                    if (! ($c['nullable'] ?? true) && ($c['default'] ?? null) === null
+                        && in_array($type, ['varchar', 'char', 'text', 'tinytext', 'mediumtext', 'longtext', 'string'], true)) {
+                        $cols[] = (string) $c['name'];
+                    }
+                }
+            } catch (\Throwable) {
+                $cols = [];
+            }
+            $this->notNullText[$table] = $cols;
+        }
+
+        return $this->notNullText[$table];
+    }
+
     /** @return list<string> */
     public function columns(string $table): array
     {

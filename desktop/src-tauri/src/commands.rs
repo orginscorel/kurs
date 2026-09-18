@@ -211,6 +211,39 @@ pub fn request_quit<R: Runtime>(app: AppHandle<R>) {
     });
 }
 
+/// "Şimdi eşitle" (menü, tepsi, üst çubuk): sonucu HER ZAMAN gösterir — ana penceredeki karta
+/// (`sync://result`, src/bridge.js) ve menüden gelindiyse macOS bildirimi olarak da. Önce "Eşitleniyor…" yayınlanır.
+pub async fn run_sync_now<R: Runtime>(app: &AppHandle<R>, from_menu: bool) -> crate::runtime::SyncOutcome {
+    use tauri::Emitter;
+    let ctx = app.state::<AppCtx>();
+    let local = ctx.settings.read().map(|s| s.mode == Mode::Local).unwrap_or(false);
+    let outcome = if !local {
+        crate::runtime::SyncOutcome {
+            status: "unavailable".into(),
+            title: "Eşitleme".into(),
+            message: "Eşitleme yalnız yerel kurulumda (kurum bilgisayarı) kullanılır.".into(),
+            sent: 0,
+        }
+    } else {
+        let _ = app.emit(
+            "sync://result",
+            crate::runtime::SyncOutcome { status: "started".into(), title: "Eşitleniyor".into(), message: "Eşitleniyor…".into(), sent: 0 },
+        );
+        ctx.runtime.sync_now(&ctx.paths).await
+    };
+    let _ = app.emit("sync://result", outcome.clone());
+    if from_menu {
+        let _ = app.notification().builder().title(&outcome.title).body(&outcome.message).show();
+    }
+    outcome
+}
+
+/// Üst çubuktaki "Şimdi eşitle" (SyncStatus.tsx → bridge.js `window.kursDesktop.syncNow()`).
+#[tauri::command]
+pub async fn desktop_sync_now<R: Runtime>(app: AppHandle<R>) -> crate::runtime::SyncOutcome {
+    run_sync_now(&app, false).await
+}
+
 #[tauri::command]
 pub fn quit_app<R: Runtime>(app: AppHandle<R>) {
     request_quit(app);
