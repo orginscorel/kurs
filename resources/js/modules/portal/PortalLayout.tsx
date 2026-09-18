@@ -12,6 +12,7 @@ import { useAuth, type Me } from '@/app/auth'
 import { BrandMark } from '@/app/AuthGate'
 import { Avatar } from '@/components/ui/feedback'
 import { NotificationCenter } from '@/components/layout/NotificationCenter'
+import { VendorInfo } from '@/components/app/VendorInfo'
 
 /**
  * ÖĞRENCİ/VELİ ve ÖĞRETMEN PORTALLARININ ORTAK KABUĞU.
@@ -363,7 +364,8 @@ export function PortalLayout(props: Props) {
         </div>
 
         <main id="portal-main" tabIndex={-1} className="mx-auto w-full min-w-0 max-w-[1200px] flex-1 px-4 pt-4 pb-[calc(env(safe-area-inset-bottom)+96px)] outline-none sm:px-6 md:pt-6 md:pb-14 lg:px-8">
-          {children}
+          <div key={location.pathname} className="page-enter">{children}</div>
+          <VendorInfo compact className="mt-8 opacity-80" />
         </main>
       </div>
 

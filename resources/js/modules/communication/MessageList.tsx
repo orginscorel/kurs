@@ -47,8 +47,8 @@ export default function MessageList() {
         </div>
       ),
     },
-    { key: 'channel', header: 'Kanal', cell: (m) => <Badge tone="neutral">{CHANNEL_LABEL[m.channel] ?? m.channel}</Badge> },
-    { key: 'template', header: 'Kullanılan şablon', hideable: true, cell: (m) => <span className="text-ink-2 font-mono text-[12.5px]">{m.template_key ?? '—'}</span> },
+    { key: 'channel', priority: 3, header: 'Kanal', cell: (m) => <Badge tone="neutral">{CHANNEL_LABEL[m.channel] ?? m.channel}</Badge> },
+    { key: 'template', priority: 4, header: 'Kullanılan şablon', hideable: true, cell: (m) => <span className="text-ink-2 font-mono text-[12.5px]">{m.template_key ?? '—'}</span> },
     {
       key: 'status', header: 'Durum', cell: (m) => (
         <div>
@@ -57,7 +57,7 @@ export default function MessageList() {
         </div>
       ),
     },
-    { key: 'created_at', header: 'Oluşturulma zamanı', sortKey: 'created_at', cell: (m) => <span className="text-ink-2 tabular">{dateTime(m.created_at)}</span> },
+    { key: 'created_at', priority: 2, header: 'Oluşturulma zamanı', sortKey: 'created_at', cell: (m) => <span className="text-ink-2 tabular">{dateTime(m.created_at)}</span> },
     {
       key: 'actions', header: '', align: 'right', cell: (m) =>
         m.status === 'failed' && can('messages.send') ? (

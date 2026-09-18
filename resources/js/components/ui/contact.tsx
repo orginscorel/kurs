@@ -26,14 +26,14 @@ export function PhoneText({ value, whatsapp, className, muted }: { value?: strin
   if (value.includes('•')) {
     return (
       <span className={cn('inline-flex items-center gap-1.5 whitespace-nowrap', muted ? 'text-[12.5px] text-ink-3' : 'text-ink-2', className)}>
-        <Phone className="size-3.5 shrink-0 text-ink-3" aria-hidden />
+        <Phone className="size-3.5 shrink-0 text-success" aria-hidden />
         <span className="tabular">{value}</span>
       </span>
     )
   }
   return (
     <span className={cn('inline-flex items-center gap-1.5 whitespace-nowrap', muted ? 'text-[12.5px] text-ink-3' : 'text-ink-2', className)}>
-      <Phone className="size-3.5 shrink-0 text-ink-3" aria-hidden />
+      <Phone className="size-3.5 shrink-0 text-success" aria-hidden />
       <a href={`tel:${value}`} onClick={(e) => e.stopPropagation()} className="tabular hover:text-ink hover:underline">{formatPhone(value)}</a>
       {whatsapp && (
         <a href={waHref(value)} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()} title="WhatsApp" aria-label="WhatsApp" className="text-success hover:brightness-90">

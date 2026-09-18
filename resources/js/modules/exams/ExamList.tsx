@@ -48,7 +48,7 @@ export default function ExamList() {
         header: 'Deneme',
         sortKey: 'name',
         cell: (e) => (
-          <div className="min-w-[220px]">
+          <div className="min-w-0">
             <p className="font-medium text-ink truncate">{e.name}</p>
             <p className="text-[12.5px] text-ink-3">
               {e.publisher ? `Yayınevi: ${e.publisher}` : 'Kurum denemesi'} · {e.scope === 'national' ? 'Türkiye geneli' : 'Kurum içi'} · Kitapçık: {e.booklets.join(', ')}
@@ -56,7 +56,7 @@ export default function ExamList() {
           </div>
         ),
       },
-      { key: 'type', header: 'Sınav türü', cell: (e) => <Badge tone="primary">{e.type?.code.replace('_', ' ') ?? '—'}</Badge> },
+      { key: 'type', priority: 3, header: 'Sınav türü', cell: (e) => <Badge tone="primary">{e.type?.code.replace('_', ' ') ?? '—'}</Badge> },
       { key: 'date', header: 'Sınav tarihi', sortKey: 'exam_date', cell: (e) => <span className="tabular text-ink-2 whitespace-nowrap">{date(e.exam_date)}</span> },
       { key: 'term', header: 'Eğitim dönemi', hideable: true, defaultHidden: true, cell: (e) => <span className="text-ink-2 whitespace-nowrap">{e.term ?? '—'}</span> },
       {
@@ -71,7 +71,7 @@ export default function ExamList() {
         ),
       },
       {
-        key: 'key',
+        key: 'key', priority: 4,
         header: 'Cevap anahtarı',
         hideable: true,
         cell: (e) =>
@@ -84,7 +84,7 @@ export default function ExamList() {
           ),
       },
       {
-        key: 'participants',
+        key: 'participants', priority: 3,
         header: 'Sonucu girilen',
         sortKey: 'participant_count',
         align: 'right',
@@ -99,7 +99,7 @@ export default function ExamList() {
         ),
       },
       { key: 'avg', header: 'Ortalama net', sortKey: 'avg_net', align: 'right', cell: (e) => <span className="tabular font-medium">{e.avg_net !== null ? net(e.avg_net) : '—'}</span> },
-      { key: 'max', header: 'En yüksek net', align: 'right', hideable: true, cell: (e) => <span className="tabular text-ink-2">{e.max_net !== null && e.max_net !== undefined ? net(e.max_net) : '—'}</span> },
+      { key: 'max', priority: 4, header: 'En yüksek net', align: 'right', hideable: true, cell: (e) => <span className="tabular text-ink-2">{e.max_net !== null && e.max_net !== undefined ? net(e.max_net) : '—'}</span> },
     ],
     [],
   )
@@ -150,7 +150,7 @@ export default function ExamList() {
                 { value: 'draft', label: `Taslak ${counts.draft ?? ''}` },
                 { value: 'upcoming', label: 'Yaklaşan' },
               ]}
-              className="overflow-x-auto max-w-full"
+              className="max-w-full"
             />
             <Select value={list.filters.exam_type_id ?? ''} onChange={(e) => list.update({ filters: { exam_type_id: e.target.value } })} placeholder="Tüm sınav türleri" aria-label="Sınav türü" className="w-full sm:w-[180px]" options={(options.data?.types ?? []).map((t) => ({ value: t.id, label: t.name }))} />
           </div>

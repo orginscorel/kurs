@@ -16,6 +16,8 @@ class Device extends Model
         'branch_id', 'name', 'kind', 'location', 'direction', 'serial_no', 'api_token_hash', 'api_token_prefix', 'firmware', 'is_active',
         // Biyometrik terminal köprüsü (docs/CIHAZ-KOPRUSU.md) — yalnız köprüyü çalıştıran düğümde anlamlı
         'protocol', 'zk_ip', 'zk_port', 'zk_transport',
+        // Ağ keşfi / künye (docs/CIHAZ-KESIF.md)
+        'device_model', 'vendor', 'discovered_at',
     ];
 
     protected $hidden = ['api_token_hash', 'zk_comm_key_encrypted'];
@@ -26,6 +28,7 @@ class Device extends Model
         'zk_comm_key_encrypted' => DataEncrypted::class,
         'zk_cursor_at' => 'datetime',
         'zk_last_pull_at' => 'datetime',
+        'discovered_at' => 'datetime',
     ];
 
     /** Cihazın iletişim şifresi (comm key). Veritabanında şifreli durur, hiçbir yanıtta dönmez. */
@@ -43,6 +46,12 @@ class Device extends Model
     public function supportsZkBridge(): bool
     {
         return $this->protocol === 'zk' && ! empty($this->zk_ip);
+    }
+
+    /** ADMS (iclock): cihaz kendisi gönderiyor; kimlik seri numarasıdır. */
+    public function supportsAdms(): bool
+    {
+        return $this->protocol === 'adms' && ! empty($this->serial_no);
     }
 
     /** Yeni jeton üretir; düz metin yalnızca bir kez döner, veritabanında özeti kalır. */

@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { CircleCheck, Info, OctagonAlert, TriangleAlert } from 'lucide-react'
+import { Check, Info, Lightbulb, Megaphone, OctagonAlert, TriangleAlert } from 'lucide-react'
 import { cn } from '@/lib/cn'
 import { initials } from '@/lib/format'
 
@@ -10,12 +10,12 @@ export type Tone = 'neutral' | 'primary' | 'success' | 'warning' | 'danger' | 'i
  */
 const toneClass: Record<Tone, string> = {
   neutral: 'bg-surface-2 text-ink-2 border-line-strong',
-  primary: 'bg-primary-soft text-primary-ink border-primary/25',
-  success: 'bg-success-soft text-success border-success/25',
-  warning: 'bg-warning-soft text-warning border-warning/30',
-  danger: 'bg-danger-soft text-danger border-danger/25',
-  info: 'bg-info-soft text-info border-info/25',
-  accent: 'bg-accent-soft text-accent border-accent/25',
+  primary: 'bg-primary-soft text-primary-ink border-primary/35',
+  success: 'bg-success-soft text-success border-success/35',
+  warning: 'bg-warning-soft text-warning border-warning/40',
+  danger: 'bg-danger-soft text-danger border-danger/35',
+  info: 'bg-info-soft text-info border-info/35',
+  accent: 'bg-accent-soft text-accent border-accent/35',
 }
 
 const dotClass: Record<Tone, string> = {
@@ -40,8 +40,8 @@ const barClass: Record<Tone, string> = {
 
 export function Badge({ tone = 'neutral', dot, children, className }: { tone?: Tone; dot?: boolean; children: ReactNode; className?: string }) {
   return (
-    <span className={cn('inline-flex items-center gap-1.5 h-[22px] px-1.5 rounded-[3px] border text-[12px] font-medium leading-none tracking-[0.01em] whitespace-nowrap', toneClass[tone], className)}>
-      {dot && <span className={cn('h-2.5 w-[3px] rounded-[1px]', dotClass[tone])} />}
+    <span className={cn('inline-flex items-center gap-1.5 h-6 px-2 rounded-[4px] border text-[12px] font-medium leading-none tracking-[0.01em] whitespace-nowrap', toneClass[tone], className)}>
+      {dot && <span className={cn('size-1.5 shrink-0 rounded-full', dotClass[tone])} />}
       {children}
     </span>
   )
@@ -104,14 +104,14 @@ export function Avatar({ name, src, size = 32, className }: { name?: string | nu
   )
 }
 
-const alertStyle: Record<Tone, { box: string; icon: string; title: string; Icon: typeof Info }> = {
-  neutral: { box: 'bg-surface-2 border-line-strong', icon: 'text-ink-2', title: 'text-ink', Icon: Info },
-  primary: { box: 'bg-primary-soft/70 border-primary', icon: 'text-primary', title: 'text-primary-ink', Icon: Info },
-  info: { box: 'bg-info-soft border-info', icon: 'text-info', title: 'text-info', Icon: Info },
-  accent: { box: 'bg-accent-soft border-accent', icon: 'text-accent', title: 'text-accent', Icon: Info },
-  success: { box: 'bg-success-soft border-success', icon: 'text-success', title: 'text-success', Icon: CircleCheck },
-  warning: { box: 'bg-warning-soft border-warning', icon: 'text-warning', title: 'text-warning', Icon: TriangleAlert },
-  danger: { box: 'bg-danger-soft border-danger', icon: 'text-danger', title: 'text-danger', Icon: OctagonAlert },
+const alertStyle: Record<Tone, { box: string; chip: string; title: string; Icon: typeof Info }> = {
+  neutral: { box: 'bg-surface-2 border-ink-3/45', chip: 'bg-surface-3 text-ink-2', title: 'text-ink', Icon: Info },
+  primary: { box: 'bg-primary-soft/70 border-primary', chip: 'bg-primary text-white', title: 'text-primary-ink', Icon: Megaphone },
+  info: { box: 'bg-info-soft border-info', chip: 'bg-info text-white', title: 'text-info', Icon: Info },
+  accent: { box: 'bg-accent-soft border-accent', chip: 'bg-accent text-white', title: 'text-accent', Icon: Lightbulb },
+  success: { box: 'bg-success-soft border-success', chip: 'bg-success text-white', title: 'text-success', Icon: Check },
+  warning: { box: 'bg-warning-soft border-warning', chip: 'bg-warning text-white', title: 'text-warning', Icon: TriangleAlert },
+  danger: { box: 'bg-danger-soft border-danger', chip: 'bg-danger text-white', title: 'text-danger', Icon: OctagonAlert },
 }
 
 /**
@@ -122,13 +122,13 @@ export function Alert({ tone = 'info', title, children, action, className, icon 
   const st = alertStyle[tone]
   return (
     <div role={tone === 'danger' || tone === 'warning' ? 'alert' : 'status'}
-      className={cn('flex flex-wrap items-start gap-3 rounded-[var(--radius-sm)] border border-l-[3px] border-y-transparent border-r-transparent px-3.5 py-3', st.box, className)}>
-      <span className={cn('mt-px grid size-5 shrink-0 place-items-center [&>svg]:size-[18px]', st.icon)}>{icon ?? <st.Icon strokeWidth={2.2} />}</span>
-      <div className="min-w-[200px] flex-1">
+      className={cn('flex flex-wrap items-center gap-x-3 gap-y-2 rounded-[var(--radius-sm)] border border-l-[3px] border-y-transparent border-r-transparent py-2.5 pl-3 pr-3.5', st.box, className)}>
+      <span className={cn('grid size-[26px] shrink-0 place-items-center self-start rounded-[5px] [&>svg]:size-[15px]', st.chip)}>{icon ?? <st.Icon strokeWidth={2.4} />}</span>
+      <div className="min-w-[180px] flex-1">
         {title && <p className={cn('text-[13.5px] font-semibold leading-snug', st.title)}>{title}</p>}
-        {children && <div className={cn('text-[13px] leading-relaxed text-ink-2', title && 'mt-0.5')}>{children}</div>}
+        {children && <div className={cn('text-[13px] leading-[1.5] text-ink-2', title && 'mt-0.5')}>{children}</div>}
       </div>
-      {action && <div className="flex shrink-0 items-center gap-2 self-center">{action}</div>}
+      {action && <div className="ml-auto flex shrink-0 items-center gap-2">{action}</div>}
     </div>
   )
 }

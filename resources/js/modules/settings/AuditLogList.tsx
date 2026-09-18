@@ -38,10 +38,10 @@ export default function AuditLogList() {
     () => [
       { key: 'date', header: 'Zaman', sortKey: 'created_at', width: 160, cell: (a) => <span className="tabular text-ink-2">{dateTime(a.created_at)}</span> },
       { key: 'user', header: 'İşlemi yapan', cell: (a) => <span className="text-ink">{a.user?.name ?? 'Sistem'}</span> },
-      { key: 'action', header: 'İşlem kodu', hideable: true, cell: (a) => <span className="text-ink-3 font-mono text-[12px]">{a.action}</span> },
-      { key: 'description', header: 'Açıklama', cell: (a) => <span className="text-ink-2 line-clamp-1">{a.description}</span> },
+      { key: 'action', priority: 4, header: 'İşlem kodu', hideable: true, cell: (a) => <span className="text-ink-3 font-mono text-[12px]">{a.action}</span> },
+      { key: 'description', priority: 2, header: 'Açıklama', cell: (a) => <span className="text-ink-2 line-clamp-1">{a.description}</span> },
       {
-        key: 'subject',
+        key: 'subject', priority: 3,
         header: 'İlgili kayıt',
         hideable: true,
         cell: (a) => a.subject_label ? (
@@ -52,7 +52,7 @@ export default function AuditLogList() {
           ) : <span className="whitespace-nowrap text-ink-3">{a.subject_label}{a.subject_id ? ` #${a.subject_id}` : ''}</span>
         ) : <span className="text-ink-3">—</span>,
       },
-      { key: 'ip', header: 'IP adresi', hideable: true, cell: (a) => <span className="text-ink-3 tabular">{a.ip_address ?? '—'}</span> },
+      { key: 'ip', priority: 4, header: 'IP adresi', hideable: true, cell: (a) => <span className="text-ink-3 tabular">{a.ip_address ?? '—'}</span> },
     ],
     [],
   )

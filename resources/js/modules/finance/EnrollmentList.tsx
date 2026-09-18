@@ -67,32 +67,32 @@ export default function EnrollmentList() {
         key: 'student',
         header: 'Öğrenci',
         cell: (e) => (
-          <div className="min-w-[170px]">
+          <div className="min-w-0">
             <p className="font-medium text-ink">{e.student?.full_name}</p>
             <p className="text-[12px] text-ink-3 tabular">Kayıt no: {e.enrollment_no}</p>
           </div>
         ),
       },
       {
-        key: 'program',
+        key: 'program', priority: 3,
         header: 'Program / dönem',
         cell: (e) => (
-          <div className="min-w-[140px]">
+          <div className="min-w-0">
             <p className="text-ink-2">{e.program}</p>
             <p className="text-[12px] text-ink-3">{e.term} · Kayıt: {date(e.enrolled_on)}</p>
           </div>
         ),
       },
       {
-        key: 'class_group',
+        key: 'class_group', priority: 4,
         header: 'Sınıf',
         hideable: true,
         cell: (e) => (e.class_group ? <span className="text-ink-2 whitespace-nowrap">{e.class_group}</span> : <span className="text-ink-3">—</span>),
       },
-      { key: 'package', header: 'Eğitim paketi', hideable: true, defaultHidden: true, cell: (e) => <span className="text-ink-2 truncate">{e.package ?? '—'}</span> },
+      { key: 'package', header: 'Eğitim paketi', hideable: true, defaultHidden: true, cell: (e) => <span className="block truncate text-ink-2" title={e.package ?? undefined}>{e.package ?? '—'}</span> },
       { key: 'status', header: 'Durum', cell: (e) => <Badge tone={enrollmentStatusTone[e.status] ?? 'neutral'} dot>{e.status_label}</Badge> },
       {
-        key: 'progress',
+        key: 'progress', priority: 3,
         header: 'Ödeme durumu',
         cell: (e) => {
           const pct = Number(e.net_price) > 0 ? (Number(e.paid) / Number(e.net_price)) * 100 : 100
@@ -107,7 +107,7 @@ export default function EnrollmentList() {
         },
       },
       {
-        key: 'installments',
+        key: 'installments', priority: 4,
         header: 'Ödenen taksit',
         align: 'right',
         hideable: true,
@@ -129,10 +129,10 @@ export default function EnrollmentList() {
         header: 'Ödeme sorumlusu veli',
         hideable: true,
         defaultHidden: true,
-        cell: (e) => (e.guardian ? <span className="text-ink-2 truncate">{e.guardian.name}</span> : <span className="text-ink-3">—</span>),
+        cell: (e) => (e.guardian ? <span className="block truncate text-ink-2" title={e.guardian.name}>{e.guardian.name}</span> : <span className="text-ink-3">—</span>),
       },
       {
-        key: 'contract',
+        key: 'contract', priority: 4,
         header: 'Sözleşme',
         hideable: true,
         cell: (e) =>
@@ -144,9 +144,9 @@ export default function EnrollmentList() {
             <span className="text-ink-3 text-[12.5px]">Hazırlanmadı</span>
           ),
       },
-      { key: 'net', header: 'Net tutar', sortKey: 'net_price', align: 'right', hideable: true, cell: (e) => <span className="text-ink-2">{money(e.net_price)}</span> },
+      { key: 'net', priority: 4, header: 'Net tutar', sortKey: 'net_price', align: 'right', hideable: true, cell: (e) => <span className="text-ink-2">{money(e.net_price)}</span> },
       {
-        key: 'remaining',
+        key: 'remaining', priority: 1,
         header: 'Kalan borç',
         align: 'right',
         cell: (e) => (

@@ -52,11 +52,11 @@ export default function EmployeeList() {
           </div>
         ),
       },
-      { key: 'position', header: 'Görevi', cell: (e) => <span className="text-ink-2">{e.position}</span> },
-      { key: 'phone', header: 'Cep telefonu', hideable: true, cell: (e) => <PhoneText value={e.phone} /> },
-      { key: 'email', header: 'E-posta', hideable: true, cell: (e) => <MailText value={e.email} /> },
+      { key: 'position', priority: 2, header: 'Görevi', cell: (e) => <span className="text-ink-2">{e.position}</span> },
+      { key: 'phone', priority: 2, header: 'Cep telefonu', hideable: true, cell: (e) => <PhoneText value={e.phone} /> },
+      { key: 'email', priority: 4, header: 'E-posta', hideable: true, cell: (e) => <MailText value={e.email} /> },
       {
-        key: 'hired_on',
+        key: 'hired_on', priority: 4,
         header: 'İşe başlama',
         sortKey: 'hired_on',
         hideable: true,
@@ -74,7 +74,7 @@ export default function EmployeeList() {
         },
       },
       {
-        key: 'user',
+        key: 'user', priority: 4,
         header: 'Sistem hesabı',
         cell: (e) =>
           e.has_user ? (
@@ -86,7 +86,7 @@ export default function EmployeeList() {
             <Badge tone="neutral">Yok</Badge>
           ),
       },
-      { key: 'status', header: 'Durum', cell: (e) => <Badge tone={e.is_active ? 'success' : 'neutral'} dot>{e.is_active ? 'Aktif' : 'Pasif'}</Badge> },
+      { key: 'status', priority: 2, header: 'Durum', cell: (e) => <Badge tone={e.is_active ? 'success' : 'neutral'} dot>{e.is_active ? 'Aktif' : 'Pasif'}</Badge> },
       ...(can('employees.manage')
         ? [{
             key: 'actions', header: '', align: 'right' as const,

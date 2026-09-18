@@ -79,16 +79,15 @@ const MOVE_TO: Record<string, SectionKey> = {
 }
 
 /** Başka yerden zaten erişilen sayfalar menüde tekrarlanmaz (bildirimler üst çubukta). */
-const HIDDEN = new Set(['/iletisim/bildirimler', '/gorevlerim', '/bugun',
+const HIDDEN = new Set(['/iletisim/bildirimler', '/gorevlerim',
   // Finans alt sayfaları: ilgili ekrandan ve kokpit kutularından açılır (menü kalabalıklaşmasın)
-  '/finans/tahsilat/veli', '/finans/iadeler', '/finans/takip', '/finans/mutabakat',
+  '/finans/iadeler', '/finans/takip', '/finans/mutabakat',
   // Yoklama çizelgesi çıktısı "Liste ve çizelge çıktıları" sayfasında seçilir
   '/ogrenciler/liste-ciktisi?tur=yoklama'])
 
 /** Sekme etiketi kısaltmaları: alan başlığı zaten bağlamı veriyor. */
 const SHORT_LABEL: Record<string, string> = {
   '/': 'Pano',
-  '/bugun': 'Bugün',
   '/finans': 'Özet',
   '/finans/tahsilat': 'Tahsilat al',
   '/finans/alacaklar': 'Taksit ve alacaklar',
@@ -119,7 +118,7 @@ const SHORT_LABEL: Record<string, string> = {
   '/iletisim/ileti-izinleri': 'İleti izinleri',
   '/iletisim/otomasyonlar': 'Otomasyonlar',
   '/yoklama/devamsizlik': 'Devamsızlık',
-  '/yoklama/cihazlar': 'Cihazlar',
+  '/yoklama/cihazlar': 'Yoklama terminalleri',
 }
 
 /**

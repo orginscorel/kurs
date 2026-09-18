@@ -262,7 +262,7 @@ export default function Devices() {
 
   return (
     <div className="animate-fade-in">
-      <PageHeader title="Cihazlar" description="Parmak izi, RFID, QR terminalleri ve öğrenci kimlik eşlemeleri" />
+      <PageHeader title="Yoklama terminalleri" description="Parmak izi, RFID, QR terminalleri ve öğrenci kimlik eşlemeleri" />
       <Tabs
         className="mb-4"
         value={tab}

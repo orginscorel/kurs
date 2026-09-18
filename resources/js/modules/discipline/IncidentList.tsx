@@ -77,11 +77,11 @@ export default function IncidentList() {
     },
     { key: 'severity', header: 'Ciddiyet', sortKey: 'severity', cell: (r) => (r.kind === 'positive' ? <KindBadge kind="positive" /> : <SeverityBadge severity={r.severity} label={r.severity_label} />) },
     { key: 'status', header: 'Durum', sortKey: 'status', cell: (r) => <StatusBadge status={r.status} label={r.outcome === 'unfounded' ? 'Asılsız' : r.status_label} map={INCIDENT_TONE} /> },
-    { key: 'sanctions', header: 'Verilen yaptırım', align: 'right', hideable: true, cell: (r) => (r.sanctions_count ? <Badge tone="danger">{r.sanctions_count} yaptırım</Badge> : <span className="text-ink-3">—</span>) },
-    { key: 'location', header: 'Olay yeri', hideable: true, cell: (r) => <span className="text-ink-2">{r.location ?? '—'}</span> },
-    { key: 'class_group', header: 'Sınıf / ders', hideable: true, cell: (r) => <span className="text-ink-2">{[r.class_group, r.subject].filter(Boolean).join(' · ') || '—'}</span> },
+    { key: 'sanctions', priority: 4, header: 'Verilen yaptırım', align: 'right', hideable: true, cell: (r) => (r.sanctions_count ? <Badge tone="danger">{r.sanctions_count} yaptırım</Badge> : <span className="text-ink-3">—</span>) },
+    { key: 'location', priority: 4, header: 'Olay yeri', hideable: true, cell: (r) => <span className="text-ink-2">{r.location ?? '—'}</span> },
+    { key: 'class_group', priority: 3, header: 'Sınıf / ders', hideable: true, cell: (r) => <span className="text-ink-2">{[r.class_group, r.subject].filter(Boolean).join(' · ') || '—'}</span> },
     {
-      key: 'reporter', header: 'Kaydeden personel', hideable: true,
+      key: 'reporter', priority: 4, header: 'Kaydeden personel', hideable: true,
       cell: (r) => <span className="text-ink-2">{r.reporter ?? '—'}{r.source === 'teacher_portal' && <Badge tone="info" className="ml-1.5">Öğretmen portalından</Badge>}</span>,
     },
     { key: 'notified', header: 'Veli bilgilendirmesi', hideable: true, defaultHidden: true, cell: (r) => (r.guardian_notified_at ? <Badge tone="success">Veli bilgilendirildi</Badge> : <span className="text-ink-3">—</span>) },
@@ -97,7 +97,7 @@ export default function IncidentList() {
           </>
         )} />
 
-      <div className="mb-3 flex max-w-full gap-1 overflow-x-auto scroll-thin">
+      <div className="mb-3 flex max-w-full flex-wrap gap-1">
         {STATUS_TABS.map((t) => {
           const active = (fl.status ?? '') === t.value
           const n = t.value ? t.value.split(',').reduce((a, k) => a + (counts[k] ?? 0), 0) : null

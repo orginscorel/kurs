@@ -117,7 +117,7 @@ function PosTab({ settlements, loading }: { settlements?: Settlement[]; loading:
         key: 'receipt',
         header: 'Makbuz no / tarih',
         cell: (r) => (
-          <div className="min-w-[120px]">
+          <div className="min-w-0">
             <p className="font-medium tabular">{r.receipt_no}</p>
             <p className="text-[12px] text-ink-3 tabular">{dateTime(r.paid_at)}</p>
           </div>

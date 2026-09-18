@@ -2,16 +2,78 @@
 
 use crate::AppCtx;
 use serde::Serialize;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use tauri::ipc::CapabilityBuilder;
 use tauri::webview::DownloadEvent;
-use tauri::{AppHandle, Manager, Runtime, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
+use tauri::{AppHandle, Emitter, Manager, Runtime, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
 use tauri_plugin_notification::NotificationExt;
 use tauri_plugin_opener::OpenerExt;
 
 pub const MAIN: &str = "main";
 pub const UPDATE: &str = "update";
 const BRIDGE_JS: &str = include_str!("bridge.js");
+
+/// Açılmasına izin verilen son indirmeler. `open_downloaded_path` / `reveal_downloaded_path`
+/// yalnız bu listedeki yolları kabul eder: web sayfası rastgele bir dosyayı açtıramaz.
+#[derive(Default)]
+pub struct Downloads {
+    /// macOS'ta `DownloadEvent::Finished` yolu boş gelir (WKWebView sınırı); hedefi istekte kaydedip
+    /// bitişte adres (URL) ile eşleştiriyoruz.
+    pending: Vec<(String, PathBuf)>,
+    /// İzinli yollar, en eskisi başta.
+    done: Vec<PathBuf>,
+}
+
+const KEEP_DOWNLOADS: usize = 20;
+const KEEP_PENDING: usize = 32;
+
+impl Downloads {
+    fn remember(&mut self, url: &str, dest: PathBuf) {
+        if self.pending.len() >= KEEP_PENDING {
+            self.pending.remove(0);
+        }
+        self.pending.push((url.to_string(), dest));
+    }
+
+    fn take(&mut self, url: &str, path: Option<PathBuf>) -> Option<PathBuf> {
+        match self.pending.iter().position(|(u, _)| u == url) {
+            Some(i) => Some(self.pending.remove(i).1),
+            None => path,
+        }
+    }
+
+    fn allow(&mut self, p: PathBuf) {
+        self.done.retain(|x| x != &p);
+        self.done.push(p);
+        if self.done.len() > KEEP_DOWNLOADS {
+            self.done.remove(0);
+        }
+    }
+
+    fn is_allowed(&self, p: &Path) -> bool {
+        self.done.iter().any(|x| x == p)
+    }
+}
+
+/// Yol bu uygulamanın indirdiği (ve hâlâ duran) bir dosya mı? Değilse `None`.
+pub fn allowed_download<R: Runtime>(app: &AppHandle<R>, path: &str) -> Option<PathBuf> {
+    let p = PathBuf::from(path);
+    let ok = app.state::<AppCtx>().downloads.read().map(|d| d.is_allowed(&p)).unwrap_or(false);
+    if ok && p.is_file() {
+        Some(p)
+    } else {
+        None
+    }
+}
+
+/// Ana pencerenin sağ altındaki indirme kartına (src/bridge.js) gönderilen bilgi.
+#[derive(Clone, Serialize)]
+struct DownloadDone {
+    ok: bool,
+    path: Option<String>,
+    name: String,
+    size: Option<u64>,
+}
 
 #[derive(Clone, Debug, Serialize)]
 pub struct ErrorInfo {
@@ -69,13 +131,42 @@ pub fn create_main<R: Runtime>(app: &AppHandle<R>, visible: bool) -> tauri::Resu
                         .unwrap_or_else(|| "indirilen-dosya".into());
                     let dir = dl_app.path().download_dir().unwrap_or_else(|_| std::env::temp_dir());
                     *destination = unique_path(dir, &suggested);
+                    if let Ok(mut d) = dl_app.state::<AppCtx>().downloads.write() {
+                        d.remember(url.as_str(), destination.clone());
+                    }
                     log::info!("İndirme: {} → {}", url, destination.display());
                 }
-                DownloadEvent::Finished { success, .. } => {
+                DownloadEvent::Finished { url, path, success } => {
+                    let file = dl_app.state::<AppCtx>().downloads.write().ok().and_then(|mut d| d.take(url.as_str(), path));
+                    let name = file
+                        .as_ref()
+                        .and_then(|p| p.file_name())
+                        .map(|n| n.to_string_lossy().to_string())
+                        .unwrap_or_else(|| "İndirilen dosya".into());
+                    let size = file.as_ref().and_then(|p| std::fs::metadata(p).ok()).map(|m| m.len());
+                    if success {
+                        if let Some(p) = file.clone() {
+                            if let Ok(mut d) = dl_app.state::<AppCtx>().downloads.write() {
+                                d.allow(p);
+                            }
+                        }
+                    }
+                    log::info!("İndirme bitti ({}): {}", if success { "tamam" } else { "başarısız" }, name);
+                    let _ = dl_app.emit(
+                        "download://done",
+                        DownloadDone {
+                            ok: success,
+                            path: if success { file.as_ref().map(|p| p.to_string_lossy().to_string()) } else { None },
+                            name: name.clone(),
+                            size: if success { size } else { None },
+                        },
+                    );
+                    // Uygulama arkadayken de görünsün diye macOS bildirimi kalıyor (tıklanınca açma:
+                    // tauri-plugin-notification masaüstünde tıklama geri çağrısı sunmuyor, bkz. docs/DESKTOP.md).
                     let (title, body) = if success {
-                        ("İndirme tamamlandı", "Dosya İndirilenler klasörüne kaydedildi.")
+                        ("İndirme tamamlandı", format!("{name} · İndirilenler klasörüne kaydedildi."))
                     } else {
-                        ("İndirme tamamlanamadı", "Dosya kaydedilemedi. Tekrar deneyin.")
+                        ("İndirme tamamlanamadı", "Dosya kaydedilemedi. Tekrar deneyin.".to_string())
                     };
                     let _ = dl_app.notification().builder().title(title).body(body).show();
                 }
@@ -169,7 +260,10 @@ pub fn allow_origin<R: Runtime>(app: &AppHandle<R>, origin: &str) {
             .permission("allow-update-install")
             .permission("allow-update-later")
             .permission("core:event:allow-listen")
-            .permission("core:event:allow-unlisten");
+            .permission("core:event:allow-unlisten")
+            // Sağ alttaki indirme kartı (yalnız uygulamanın kendi indirdiği dosyalar)
+            .permission("allow-open-downloaded-path")
+            .permission("allow-reveal-downloaded-path");
         if let Err(e) = app.add_capability(cap) {
             log::warn!("Köprü izni eklenemedi ({origin}): {e}");
         }

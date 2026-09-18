@@ -1,18 +1,17 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { Bar, BarChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import {
-  AlarmClock, ArrowRight, ArrowUpRight, CircleDollarSign, ClipboardCheck, Gavel, GraduationCap, LogIn, LogOut, PhoneCall,
-  Radio, ShieldAlert, UserPlus, UserX, Users,
+  AlarmClock, ArrowRight, ArrowUpRight, CircleDollarSign, ClipboardCheck, GraduationCap, LogIn, LogOut, PhoneCall,
+  Radio, ShieldAlert, UserX, Users,
 } from 'lucide-react'
 import { api } from '@/lib/api'
 import { compactMoney, date, money, num, relative, time } from '@/lib/format'
 import { cn } from '@/lib/cn'
 import { useAuth, useCan } from '@/app/auth'
 import { Panel } from '@/components/ui/layout'
-import { Alert, EmptyState, ProgressBar, Skeleton, StatusDot } from '@/components/ui/feedback'
-import { Button, ButtonLink } from '@/components/ui/Button'
+import { EmptyState, ProgressBar, Skeleton, StatusDot } from '@/components/ui/feedback'
 import { Segmented } from '@/components/ui/form'
 import { axisProps, ChartTooltip, Legend, monthLabel, series } from '@/components/charts/ChartKit'
 import { ErrorBoundary } from '@/components/layout/ErrorBoundary'
@@ -35,64 +34,30 @@ type DashboardData = {
 
 type FeedItem = { id: number; kind: string; message: string; student_id: number | null; occurred_at: string }
 
-export default function Dashboard() {
+/**
+ * Kurum özeti sekmesi: kurum ölçüleri, performans grafikleri, sıradaki dersler,
+ * sınıf doluluğu, dikkat kutusu ve canlı akış. Sayfa başlığı, hızlı işlemler ve
+ * gecikme uyarısı Home sarmalayıcısındadır; günlük operasyon "Bugün" sekmesindedir.
+ */
+export default function DashboardSummary() {
   const me = useAuth((s) => s.me)
   const can = useCan()
-  const navigate = useNavigate()
   const isTeacher = me?.user.user_type === 'teacher'
-
-  // Öğretmen kendi paneline; kurulumu tamamlanmamış kurumda süper yönetici kurulum sihirbazına
-  useEffect(() => {
-    if (isTeacher) navigate('/panelim', { replace: true })
-    else if (me && me.is_super_admin && !me.institution.onboarding_completed) navigate('/kurulum', { replace: true })
-  }, [me, isTeacher, navigate])
 
   const { data, isLoading } = useQuery({ queryKey: ['dashboard'], queryFn: () => api.get<DashboardData>('/dashboard'), refetchInterval: 60_000, enabled: !isTeacher && can('dashboard.view') })
 
   const i = data?.institution
   const f = data?.finance
-  const arrivedPct = i?.expected_today ? Math.round((i.arrived_today / i.expected_today) * 100) : 0
+  const c = data?.communication
   const fin = can('finance.view')
 
-  const quick = [
-    { show: can('payments.create'), to: '/finans/tahsilat', label: 'Tahsilat al', icon: <CircleDollarSign /> },
-    { show: can('attendance.take') || can('attendance.view'), to: '/yoklama', label: 'Yoklama', icon: <ClipboardCheck /> },
-    { show: can('students.create'), to: '/ogrenciler?yeni=1', label: 'Öğrenci ekle', icon: <UserPlus /> },
-    { show: can('crm.view'), to: '/on-kayit?yeni=1', label: 'Ön kayıt', icon: <PhoneCall /> },
-    { show: can('discipline.create'), to: '/disiplin/olaylar?yeni=1', label: 'Olay kaydet', icon: <Gavel /> },
-  ].filter((q) => q.show)
-
   return (
-    <div className="animate-fade-in flex flex-col gap-5">
-      <header className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <h1 className="text-[22px] font-semibold tracking-[-0.02em]">Genel Bakış</h1>
-          {data && (
-            <span className="inline-flex items-center gap-1.5 rounded-[3px] border border-line bg-surface px-2 py-0.5 text-[12px] text-ink-3" title="Veriler dakikada bir yenilenir">
-              <StatusDot tone="success" pulse /> Canlı · {time(data.generated_at)}
-            </span>
-          )}
-        </div>
-        {quick.length > 0 && (
-          <nav aria-label="Hızlı işlemler" className="flex flex-wrap gap-2">
-            {quick.map((q) => (
-              <ButtonLink key={q.to} to={q.to} size="sm" icon={<span className="[&>svg]:size-4">{q.icon}</span>}>{q.label}</ButtonLink>
-            ))}
-          </nav>
-        )}
-      </header>
-
-      {fin && <OverdueBanner />}
-
-      {/* Göstergeler: tek sırada kısa kutular */}
-      <section className={cn('grid grid-cols-2 gap-3 md:grid-cols-3', fin ? 'xl:grid-cols-6' : 'xl:grid-cols-4')}>
-        <Kpi loading={isLoading} to="/yoklama/canli" label="Bugün gelen" value={num(i?.arrived_today)} suffix={`/ ${num(i?.expected_today)}`}
-          bar={{ value: arrivedPct, tone: 'success' }} note={`%${arrivedPct} · ${num(i?.inside_now)} kişi içeride`} />
-        <Kpi loading={isLoading} to="/yoklama/devamsizlik" label="Gelmeyen" value={num(i?.not_arrived_today)} tone={(i?.not_arrived_today ?? 0) > 0 ? 'danger' : undefined}
-          note={`${num(i?.late_today)} geç kalan`} />
-        <Kpi loading={isLoading} to="/takvim?gorunum=gun" label="Dersler" value={num(i?.lessons_in_progress)} suffix={`derste · ${num(i?.lessons_today)}`}
-          note={`${num(i?.lessons_done)} ders bitti · ${num(i?.teachers_teaching_today)} öğretmen`} />
+    <div className="flex flex-col gap-5">
+      {/* Kurum ölçüleri: günlük gelen/gelmeyen/ders sayıları "Bugün" sekmesinde, burada tekrarlanmaz */}
+      <section className={cn('grid grid-cols-2 gap-3', fin ? 'md:grid-cols-4' : 'md:grid-cols-2')}>
         <Kpi loading={isLoading} to="/ogrenciler" label="Aktif öğrenci" value={num(i?.students_active)} note={`${num(i?.students_total)} kayıt`} />
+        <Kpi loading={isLoading} to="/iletisim/whatsapp" label="Bugün gönderilen mesaj" value={num(c?.messages_today)}
+          note={(c?.failed_today ?? 0) > 0 ? `${num(c?.failed_today)} başarısız · bu ay ${num(c?.messages_month)}` : `Bu ay ${num(c?.messages_month)}`} />
         {fin && (
           <>
             <Kpi loading={isLoading} to="/finans/tahsilatlar" label="Bugün tahsilat" value={money(f?.collected_today, { short: true })}
@@ -409,7 +374,7 @@ function LiveFeed() {
 function NextLessons({ data, loading }: { data?: DashboardData; loading: boolean }) {
   const now = Date.now()
   return (
-    <Panel title="Sıradaki dersler" actions={<Link to="/takvim?gorunum=ajanda" className="inline-flex items-center gap-1 text-[12.5px] text-ink-3 hover:text-ink">Tümü <ArrowRight className="size-3.5" /></Link>}>
+    <Panel title="Sıradaki dersler" description="Önümüzdeki 24 saat" actions={<Link to="/takvim?gorunum=ajanda" className="inline-flex items-center gap-1 text-[12.5px] text-ink-3 hover:text-ink">Tümü <ArrowRight className="size-3.5" /></Link>}>
       {loading ? (
         <Skeleton className="h-[280px]" />
       ) : !data?.next_lessons.length ? (
@@ -457,65 +422,5 @@ function OccupancyPanel({ data, loading }: { data?: DashboardData; loading: bool
         </ul>
       )}
     </Panel>
-  )
-}
-
-type OverdueAlertData = {
-  date: string
-  installments: { count: number; amount: string; students: number }
-  invoices: { count: number; amount: string }
-  due_today: { count: number; amount: string }
-}
-
-const dismissKey = 'ebe-dismiss:dashboard-overdue'
-function readDismissed(day: string) {
-  try {
-    return localStorage.getItem(dismissKey) === day
-  } catch {
-    return false
-  }
-}
-
-/** Günlük gecikme uyarısı: vadesi geçmiş taksit + tahsil edilmemiş fatura, bugün vadesi dolanlar. "Bugün gizle" ertesi gün sıfırlanır. */
-function OverdueBanner() {
-  const { data } = useQuery({
-    queryKey: ['finance', 'overdue-alert'],
-    queryFn: () => api.get<{ data: OverdueAlertData }>('/finance/overdue-alert').then((r) => r.data),
-    refetchInterval: 300_000,
-  })
-  const [hidden, setHidden] = useState(false)
-  if (!data || hidden || readDismissed(data.date)) return null
-  const { installments: inst, invoices: inv, due_today: today } = data
-  if (inst.count === 0 && inv.count === 0 && today.count === 0) return null
-  const hide = () => {
-    try {
-      localStorage.setItem(dismissKey, data.date)
-    } catch {
-      /* yok say */
-    }
-    setHidden(true)
-  }
-  const parts = [
-    inst.count > 0 && `${num(inst.count)} taksit · ${money(inst.amount)} (${num(inst.students)} öğrenci)`,
-    inv.count > 0 && `${num(inv.count)} fatura · ${money(inv.amount)}`,
-  ].filter(Boolean)
-  return (
-    <Alert
-      tone={inst.count > 0 || inv.count > 0 ? 'danger' : 'warning'}
-      title={parts.length ? `Vadesi geçmiş ödemeler: ${parts.join(' + ')}` : `Bugün vadesi dolan ${num(today.count)} taksit`}
-      action={
-        <>
-          {inst.count > 0 && <Link to="/finans/takip" className="text-[13px] font-medium text-ink underline-offset-2 hover:underline">Gecikme takibi</Link>}
-          {inv.count > 0 && <Link to="/finans/faturalar?status=issued" className="text-[13px] font-medium text-ink underline-offset-2 hover:underline">Faturalar</Link>}
-          <Button size="xs" variant="ghost" onClick={hide}>Bugün gizle</Button>
-        </>
-      }
-    >
-      {today.count > 0 ? (
-        <Link to="/finans/alacaklar?status=pending" className="hover:underline">Bugün vadesi dolan: {num(today.count)} taksit · {money(today.amount)}</Link>
-      ) : (
-        'Bugün vadesi dolan taksit yok.'
-      )}
-    </Alert>
   )
 }

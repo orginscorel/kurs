@@ -117,7 +117,7 @@ export default function StudentList() {
           ),
       },
       {
-        key: 'last_exam',
+        key: 'last_exam', priority: 4,
         header: 'Son deneme neti',
         sortKey: 'last_exam',
         align: 'right',
@@ -132,7 +132,7 @@ export default function StudentList() {
       { key: 'class', header: 'Sınıf', hideable: true, defaultHidden: true, cell: (s) => (s.class_groups.length ? <span className="text-ink-2">{s.class_groups.map((g) => g.name).join(', ')}</span> : <span className="text-ink-3">—</span>) },
       { key: 'program', header: 'Kayıtlı program', hideable: true, defaultHidden: true, cell: (s) => <span className="text-ink-2">{s.program ?? '—'}</span> },
       {
-        key: 'guardian',
+        key: 'guardian', priority: 2,
         header: 'Veli',
         hideable: true,
         cell: (s) =>
@@ -251,7 +251,7 @@ export default function StudentList() {
                   { value: 'graduated', label: `Mezun ${counts.graduated ?? ''}` },
                   { value: 'all', label: 'Tümü' },
                 ]}
-                className="overflow-x-auto max-w-full"
+                className="max-w-full"
               />
               <Button size="sm" variant={activeFilterCount ? 'soft' : 'ghost'} icon={<Filter className="size-4" />} onClick={() => setShowFilters((v) => !v)}>
                 Filtre{activeFilterCount ? ` (${activeFilterCount})` : ''}

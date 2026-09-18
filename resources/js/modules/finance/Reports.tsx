@@ -94,7 +94,7 @@ export default function Reports() {
           size="sm"
           value={period.startsWith('term:') ? 'term' : period}
           onChange={(v) => (v === 'term' ? choose(`term:${data?.terms.find((x) => x.is_current)?.id ?? data?.terms[0]?.id}`) : choose(v))}
-          className="overflow-x-auto max-w-full"
+          className="max-w-full"
           options={[
             { value: 'today', label: 'Bugün' },
             { value: 'week', label: 'Bu hafta' },
@@ -153,7 +153,22 @@ export default function Reports() {
           )}
         </Panel>
 
-        <Panel title="Alacak yaşlandırma">
+        <Panel
+          title="Alacak yaşlandırma"
+          actions={can('reports.export') && can('finance.view')
+            ? (
+              <Button
+                size="xs"
+                variant="ghost"
+                icon={<Download className="size-3.5" />}
+                disabled={!Number(r?.receivables.total ?? 0)}
+                onClick={() => api.download('/finance/installments/export', { status: 'open' }, 'alacaklar.xlsx').catch((e) => toast.error(e.message))}
+              >
+                Alacak listesi
+              </Button>
+            )
+            : undefined}
+        >
           {isLoading || !r ? (
             <Skeleton className="h-40" />
           ) : (
@@ -175,7 +190,22 @@ export default function Reports() {
       </div>
 
       <div className="mt-4 grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <Panel title="Tahsilat yöntemleri">
+        <Panel
+          title="Tahsilat yöntemleri"
+          actions={can('reports.export') && can('finance.view')
+            ? (
+              <Button
+                size="xs"
+                variant="ghost"
+                icon={<Download className="size-3.5" />}
+                disabled={!Number(t?.collections ?? 0)}
+                onClick={() => api.download('/finance/payments/export', { from: range.from, to: range.to, status: 'active' }, 'tahsilatlar.xlsx').catch((e) => toast.error(e.message))}
+              >
+                Tahsilat listesi
+              </Button>
+            )
+            : undefined}
+        >
           {!r ? <Skeleton className="h-32" /> : r.by_method.length === 0 ? <p className="text-[13px] text-ink-3">Tahsilat yok.</p> : (
             <ul className="divide-y divide-line">
               {r.by_method.map((m) => (

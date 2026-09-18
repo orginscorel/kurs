@@ -76,8 +76,23 @@ Sonraki açılışlar ("Başlatılıyor" ekranı → `start_local`): sürüm de�
 4. Açılışta sunucuya ulaşılamazsa hata ekranı ("Yeniden dene", "Kurulum seçenekleri").
 
 Ortak: dış bağlantılar (wa.me, tel:, mailto:, başka siteler) sistem tarayıcısında açılır; indirmeler (PDF/Excel)
-İndirilenler klasörüne kaydedilir ve bildirim verilir; `erbaakurs://ac?yol=/ogrenciler/12` derin bağlantısı
-uygulamayı öne getirip o sayfayı açar.
+İndirilenler klasörüne kaydedilir; `erbaakurs://ac?yol=/ogrenciler/12` derin bağlantısı uygulamayı öne getirip
+o sayfayı açar.
+
+**İndirme kartı:** dosya inince ana pencerenin sağ altında küçük bir kart çıkar (dosya adı + boyut, **Aç** /
+**Klasörde göster** / kapat). Kart `src/bridge.js` içinde, güncelleme şeridiyle aynı tasarım dilinde, ayrı bir
+shadow DOM öğesidir (şerit üstte, kart altta — çakışmazlar); 10 sn sonra kendiliğinden kapanır, fare üzerindeyken
+ya da içinde odak varken sayaç durur. İndirme başarısızsa kart kırmızı tonda hata gösterir. Kartı besleyen olay:
+`download://done` (src/window.rs › `on_download`).
+
+Düğmeler `open_downloaded_path` / `reveal_downloaded_path` komutlarını çağırır. Bu komutlar **yalnız uygulamanın
+kendi indirdiği son 20 dosyayı** açar (`src/window.rs` › `Downloads`): web sayfası rastgele bir yolu açtıramaz.
+macOS'ta `DownloadEvent::Finished` dosya yolunu boş döndürür (WKWebView sınırı); bu yüzden hedef yol istek
+anında kaydedilip bitişte adres (URL) ile eşleştirilir.
+
+macOS bildirimi de gösterilmeye devam eder (uygulama arkadayken görünsün diye) ama **tıklanınca dosyayı açmaz**:
+`tauri-plugin-notification` 2.4 masaüstünde (notify-rust) bildirim tıklama/aksiyon geri çağrısı sunmuyor,
+yalnız iOS/Android tarafında var. Bu yüzden "tıklayınca aç" yalnız uygulama içi kartta.
 
 ## 3. Güvenlik kararları
 
@@ -137,11 +152,11 @@ desktop/                              (sunucuda /home/oritoriu/kurs-desktop)
 │       ├── runtime.rs                php -S, zamanlayıcı, çökme gözetimi, yedek, durdurma
 │       ├── php.rs                    ortam, .env, artisan çalıştırma (satır satır JSON olaylar)
 │       ├── secrets.rs                Anahtar Zinciri
-│       ├── window.rs                 pencere, gezinme koruması, indirmeler, Kip B, yedek güncelleme penceresi
+│       ├── window.rs                 pencere, gezinme koruması, indirmeler + izinli yol listesi, Kip B, yedek güncelleme penceresi
 │       ├── updater.rs                güncelleme denetimi/kurulumu (şeride olay, yedekte ayrı pencere)
 │       ├── menu.rs                   menü çubuğu + tepsi
 │       ├── settings.rs, paths.rs
-│       └── bridge.js                 web sayfalarına eklenen köprü + sayfa üstü güncelleme şeridi (shadow DOM)
+│       └── bridge.js                 köprü + güncelleme şeridi (üst) + indirme kartı (sağ alt), ikisi de shadow DOM
 ├── scripts/
 │   ├── build-static-php.sh           static-php-cli 2.8.5 ile PHP 8.4 (CI, macOS)
 │   ├── bundle-laravel.sh             web uygulamasının üretim kopyası → build/laravel

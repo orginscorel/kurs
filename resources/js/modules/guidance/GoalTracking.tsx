@@ -20,7 +20,7 @@ function CompareCell({ label, c }: { label: string; c: GoalCompare }) {
   if (c.target === null) return <span className="text-ink-3">—</span>
   const tone = c.pct === null ? 'primary' : c.pct >= 90 ? 'success' : c.pct >= 70 ? 'warning' : 'danger'
   return (
-    <div className="min-w-[130px]">
+    <div className="min-w-0">
       <div className="flex items-center justify-between text-[12px] text-ink-2">
         <span title={`${label}: son deneme / hedef`}>{c.actual !== null ? num(c.actual, 1) : '—'} / {num(c.target, 1)}</span>
         {c.pct !== null && <span className="tabular font-medium">%{num(c.pct, 0)}</span>}

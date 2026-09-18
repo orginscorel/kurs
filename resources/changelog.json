@@ -1,5 +1,40 @@
 [
   {
+    "version": "1.12.0",
+    "date": "2026-09-17",
+    "title": "Sade genel bakış, kaydırmasız tablolar ve yeni görsel dil",
+    "items": [
+      {
+        "type": "yeni",
+        "text": "Genel Bakış iki sekmeye ayrıldı — Bugün (günlük operasyon) ve Kurum özeti; sayfa üç ekran boyundan tek ekrana indi"
+      },
+      {
+        "type": "yeni",
+        "text": "Maskot Bilge: sayfa geçişlerinde ve yükleme sırasında canlanıyor, boş listelerde karşılıyor"
+      },
+      {
+        "type": "iyilestirme",
+        "text": "Tablolarda yatay kaydırma kalktı; ekran daraldıkça sütunlar önceliğine göre satır altına iniyor, bilgi kaybolmuyor"
+      },
+      {
+        "type": "iyilestirme",
+        "text": "Uyarı kutuları türüne göre ayrı simge ve renkle geliyor; rozetler sadeleşti, telefon simgeleri yeşil"
+      },
+      {
+        "type": "iyilestirme",
+        "text": "Tema artık bilgisayarın açık/koyu ayarını izliyor (Sistem / Açık / Koyu)"
+      },
+      {
+        "type": "iyilestirme",
+        "text": "Ayarlar menüsü dar ekranda kaydırmalı şerit yerine tek seçim kutusu"
+      },
+      {
+        "type": "iyilestirme",
+        "text": "Alt bilgide yazılım sahibi künyesi: Bogahost Bilişim ve Telekomünikasyon Hiz. San. ve Tic. Ltd. Şti."
+      }
+    ]
+  },
+  {
     "version": "1.11.0",
     "date": "2026-09-17",
     "title": "Parmak izi terminali ve tek sürüm numarası",

@@ -153,7 +153,7 @@ export function Segmented<T extends string>({
   className?: string
 }) {
   return (
-    <div className={cn('inline-flex max-w-full overflow-x-auto scroll-thin rounded-[var(--radius-sm)] bg-surface-2 p-0.5 border border-line', className)}>
+    <div className={cn('inline-flex max-w-full overflow-x-auto scroll-thin rounded-[var(--radius-sm)] bg-surface-2 p-0.5 border border-line max-sm:flex-wrap max-sm:gap-0.5 max-sm:overflow-x-visible', className)}>
       {options.map((o) => (
         <button
           key={o.value}

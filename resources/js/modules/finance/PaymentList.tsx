@@ -82,7 +82,7 @@ export default function PaymentList() {
         header: 'Makbuz no / tarih',
         sortKey: 'receipt_no',
         cell: (p) => (
-          <div className="min-w-[130px]">
+          <div className="min-w-0">
             <p className={cn('font-medium tabular', p.voided_at && 'line-through text-ink-3')}>{p.receipt_no}</p>
             <p className="text-[12px] text-ink-3 tabular">{dateTime(p.paid_at)}</p>
           </div>
@@ -92,21 +92,21 @@ export default function PaymentList() {
         key: 'student',
         header: 'Öğrenci',
         cell: (p) => (
-          <div className="min-w-[160px]">
+          <div className="min-w-0">
             <p className="truncate font-medium text-ink">{p.student?.full_name ?? '—'}</p>
             <p className="truncate text-[12px] text-ink-3">{p.payer_name ? `Ödeyen: ${p.payer_name}` : `Öğrenci no: ${p.student?.student_no ?? '—'}`}</p>
           </div>
         ),
       },
       {
-        key: 'amount',
+        key: 'amount', priority: 1,
         header: 'Tahsilat tutarı',
         sortKey: 'amount',
         align: 'right',
         cell: (p) => <span className={cn('font-semibold tabular whitespace-nowrap', p.voided_at && 'line-through text-ink-3 font-normal')}>{money(p.amount)}</span>,
       },
       {
-        key: 'program',
+        key: 'program', priority: 4,
         header: 'Program / kayıt no',
         hideable: true,
         cell: (p) =>
@@ -120,7 +120,7 @@ export default function PaymentList() {
           ),
       },
       {
-        key: 'installments',
+        key: 'installments', priority: 4,
         header: 'Kapattığı taksit',
         hideable: true,
         // Tahsilatın kapattığı taksitlerin sıra numaraları
@@ -131,7 +131,7 @@ export default function PaymentList() {
             <span className="text-ink-3">—</span>
           ),
       },
-      { key: 'method', header: 'Ödeme yöntemi', cell: (p) => <span className="text-ink-2 whitespace-nowrap">{p.method_label}</span> },
+      { key: 'method', priority: 3, header: 'Ödeme yöntemi', cell: (p) => <span className="text-ink-2 whitespace-nowrap">{p.method_label}</span> },
       { key: 'account', header: 'Kasa / banka', hideable: true, defaultHidden: true, cell: (p) => <span className="text-ink-2 whitespace-nowrap">{p.account?.name ?? '—'}</span> },
       { key: 'receiver', header: 'Tahsil eden', hideable: true, defaultHidden: true, cell: (p) => <span className="text-ink-2 whitespace-nowrap">{p.received_by ?? '—'}</span> },
       { key: 'reference', header: 'Referans no', hideable: true, defaultHidden: true, cell: (p) => <span className="text-ink-3 tabular">{p.reference ?? '—'}</span> },

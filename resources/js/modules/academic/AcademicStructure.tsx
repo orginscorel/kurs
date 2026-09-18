@@ -64,7 +64,7 @@ function ProgramsTab({ newOpen, onCloseNew, onNew }: { newOpen: boolean; onClose
 
   const columns = useMemo<Column<ProgramRow>[]>(
     () => [
-      { key: 'name', header: 'Program', sortKey: 'name', cell: (p) => <div className="flex items-center gap-2.5 min-w-[200px]"><ColorChip>{p.code}</ColorChip><span className="font-medium">{p.name}</span></div> },
+      { key: 'name', header: 'Program', sortKey: 'name', cell: (p) => <div className="flex items-center gap-2.5 min-w-0"><ColorChip>{p.code}</ColorChip><span className="font-medium">{p.name}</span></div> },
       { key: 'kind', header: 'Tür', sortKey: 'kind', cell: (p) => <span className="text-ink-2">{p.kind_label}{p.track_label ? ` · ${p.track_label}` : ''}</span> },
       { key: 'subjects', header: 'Ders', align: 'center', cell: (p) => <span className="tabular">{p.subjects_count}</span> },
       { key: 'hours', header: 'Haftalık saat', align: 'center', cell: (p) => <span className="tabular">{p.weekly_hours}</span> },
@@ -139,7 +139,7 @@ function SubjectsTab({ newOpen, onCloseNew, onNew }: { newOpen: boolean; onClose
   const { data, isLoading, isFetching } = useQuery({ queryKey: ['subjects', 'list', list.query], queryFn: () => api.get<Paginated<SubjectRow>>('/subjects', list.query), placeholderData: keepPreviousData })
   const columns = useMemo<Column<SubjectRow>[]>(
     () => [
-      { key: 'name', header: 'Ders', sortKey: 'name', cell: (s) => <div className="flex items-center gap-2.5 min-w-[180px]"><ColorChip color={s.color}>{s.short_name ?? s.code}</ColorChip><span className="font-medium">{s.name}</span></div> },
+      { key: 'name', header: 'Ders', sortKey: 'name', cell: (s) => <div className="flex items-center gap-2.5 min-w-0"><ColorChip color={s.color}>{s.short_name ?? s.code}</ColorChip><span className="font-medium">{s.name}</span></div> },
       { key: 'topics', header: 'Konu / kazanım', sortKey: 'topics_count', align: 'center', cell: (s) => <span className="tabular">{s.topics_count}</span> },
       { key: 'teachers', header: 'Öğretmen', sortKey: 'teachers_count', align: 'center', cell: (s) => <span className="tabular">{s.teachers_count}</span> },
       { key: 'lessons', header: 'Haftalık ders', sortKey: 'weekly_lessons', align: 'center', cell: (s) => <span className="tabular">{s.weekly_lessons}</span> },
@@ -201,7 +201,7 @@ function ClassroomsTab({ newOpen, onCloseNew, onNew }: { newOpen: boolean; onClo
   const { data, isLoading, isFetching } = useQuery({ queryKey: ['classrooms', 'list', list.query], queryFn: () => api.get<ClassroomsResponse>('/classrooms', list.query), placeholderData: keepPreviousData })
   const columns = useMemo<Column<ClassroomRow>[]>(
     () => [
-      { key: 'name', header: 'Derslik', sortKey: 'name', cell: (c) => <div className="min-w-[160px]"><p className="font-medium">{c.name}</p><p className="text-[12px] text-ink-3">{c.kind_label}{c.floor ? ` · ${c.floor}` : ''}</p></div> },
+      { key: 'name', header: 'Derslik', sortKey: 'name', cell: (c) => <div className="min-w-0"><p className="font-medium">{c.name}</p><p className="text-[12px] text-ink-3">{c.kind_label}{c.floor ? ` · ${c.floor}` : ''}</p></div> },
       { key: 'capacity', header: 'Kapasite', sortKey: 'capacity', align: 'center', cell: (c) => <span className="tabular">{c.capacity}</span> },
       { key: 'occupancy', header: 'Haftalık doluluk', sortKey: 'weekly_minutes', width: 180, cell: (c) => <div><div className="flex justify-between text-[12px] tabular"><span>{Math.round(c.weekly_minutes / 60)} saat</span><span className="text-ink-3">%{c.occupancy}</span></div><ProgressBar value={c.occupancy} tone={c.occupancy >= 80 ? 'warning' : 'primary'} className="mt-1" /></div> },
       { key: 'today', header: 'Bugün', align: 'center', cell: (c) => <span className="tabular">{c.today_sessions} ders</span> },

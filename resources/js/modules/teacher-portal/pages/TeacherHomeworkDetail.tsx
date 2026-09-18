@@ -159,7 +159,7 @@ export default function TeacherHomeworkDetail() {
           { value: 'to_grade', label: `Kontrol (${h.to_grade_count})` },
           { value: 'submitted', label: 'Teslim edenler' },
           { value: 'missing', label: 'Etmeyenler' },
-        ]} className="max-w-full overflow-x-auto" />
+        ]} className="max-w-full" />
         {!editable && <span className="text-[12.5px] text-ink-3">Önizleme: değerlendirme kaydedilemez.</span>}
       </div>
 

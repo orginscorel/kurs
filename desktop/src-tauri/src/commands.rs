@@ -261,3 +261,19 @@ pub fn desktop_badge<R: Runtime>(window: WebviewWindow<R>, count: i64) -> Result
     let value = if count > 0 { Some(count.min(999)) } else { None };
     window.set_badge_count(value).map_err(|e| e.to_string())
 }
+
+const NOT_OURS: &str = "Bu dosya uygulamanın indirdiği dosyalar arasında değil ya da taşınmış.";
+
+/// İndirme kartındaki "Aç". Yalnız uygulamanın kendi indirdiği son dosyaları açar (src/window.rs › Downloads).
+#[tauri::command]
+pub fn open_downloaded_path<R: Runtime>(app: AppHandle<R>, path: String) -> Result<(), String> {
+    let p = window::allowed_download(&app, &path).ok_or(NOT_OURS)?;
+    app.opener().open_path(p.to_string_lossy(), None::<&str>).map_err(|e| format!("Dosya açılamadı: {e}"))
+}
+
+/// İndirme kartındaki "Klasörde göster" (Finder'da seçili olarak açar).
+#[tauri::command]
+pub fn reveal_downloaded_path<R: Runtime>(app: AppHandle<R>, path: String) -> Result<(), String> {
+    let p = window::allowed_download(&app, &path).ok_or(NOT_OURS)?;
+    app.opener().reveal_item_in_dir(&p).map_err(|e| format!("Klasör açılamadı: {e}"))
+}

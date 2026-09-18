@@ -151,7 +151,7 @@ export default function DevicesPage() {
   return (
     <div className="animate-fade-in">
       <PageHeader
-        title="Bağlı cihazlar"
+        title="Bağlı masaüstü cihazlar"
         description="Çevrimdışı çalışan masaüstü kurulumları ve mobil uygulamalar web ile iki yönlü eşitlenir."
         actions={
           <Button icon={<RefreshCw className="size-4" />} onClick={() => qc.invalidateQueries({ queryKey: ['sync'] })}>

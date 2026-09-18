@@ -47,7 +47,7 @@ export function ResultsTable({ examId, storageKey = 'exam-results' }: { examId: 
         header: 'Öğrenci',
         sortKey: 'name',
         cell: (r) => (
-          <div className="min-w-[180px]">
+          <div className="min-w-0">
             <p className="font-medium text-ink truncate">{r.student_name}</p>
             <p className="text-[12px] text-ink-3 tabular">Öğrenci no: {r.student_no}{r.class_group ? ` · Sınıf: ${r.class_group}` : ''}</p>
           </div>

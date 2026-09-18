@@ -9,6 +9,7 @@ import { ApiError, setUnauthorizedHandler } from '@/lib/api'
 import { useAuth } from '@/app/auth'
 import { router } from '@/app/router'
 import { UpdateNotifier } from '@/components/app/UpdateNotifier'
+import { watchSystem } from '@/lib/theme'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -29,6 +30,9 @@ setUnauthorizedHandler(() => {
     useAuth.getState().setMe(null)
   }
 })
+
+// Bilgisayarın açık/koyu ayarı değişince (seçim "Sistem" ise) tüm ekranlar anında uyar — portallar dahil
+watchSystem()
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

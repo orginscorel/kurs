@@ -8,9 +8,9 @@ import { date, money, todayISO } from '@/lib/format'
 import { cn } from '@/lib/cn'
 import { useCan } from '@/app/auth'
 import { useDebounced } from '@/hooks/useListState'
-import { PageHeader, Panel } from '@/components/ui/layout'
+import { Panel } from '@/components/ui/layout'
 import { Alert, Avatar, Badge, EmptyState, Skeleton, Spinner } from '@/components/ui/feedback'
-import { Button, ButtonLink } from '@/components/ui/Button'
+import { Button } from '@/components/ui/Button'
 import { Checkbox, Field, Input, Textarea } from '@/components/ui/form'
 import { PhoneText } from '@/components/ui/contact'
 import { AccountSelect, MetricRow, MoneyInput, useAccounts } from './components'
@@ -27,6 +27,7 @@ const nowLocal = () => {
   return `${todayISO()}T${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
 }
 
+/** Veli toplu tahsilatı (kardeşler). Sayfa başlığı ve sekmeler CollectPage sarmalayıcısındadır. */
 export default function GuardianCollect() {
   const can = useCan()
   const qc = useQueryClient()
@@ -182,12 +183,7 @@ export default function GuardianCollect() {
 
   return (
     <div className="animate-fade-in">
-      <PageHeader
-        title="Veli toplu tahsilat"
-        breadcrumbs={[{ label: 'Finans', to: '/finans' }, { label: 'Tahsilat al', to: '/finans/tahsilat' }, { label: 'Veli toplu' }]}
-        description="Bir velinin birden çok çocuğu için tek işlemde tahsilat; her çocuğa ayrı makbuz kesilir."
-        actions={<ButtonLink to="/finans/tahsilat" icon={<HandCoins className="size-4" />}>Tek öğrenci tahsilatı</ButtonLink>}
-      />
+      <p className="mb-4 text-[13px] text-ink-2">Bir velinin birden çok çocuğu için tek işlemde tahsilat; her çocuğa ayrı makbuz kesilir.</p>
 
       <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[minmax(0,1fr)_360px]">
         <div className="flex min-w-0 flex-col gap-4">

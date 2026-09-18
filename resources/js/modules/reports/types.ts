@@ -23,17 +23,6 @@ export type StudentRow = {
 
 export type StudentSummary = { total: number; by_status: { key: string; label: string; total: number }[]; by_grade: { label: string; total: number }[]; without_class: number }
 
-export type ExamsData = {
-  exams: { id: number; name: string; exam_date: string | null; type: string | null; status: string; participants: number }[]
-  selected_exam_id: number | null
-  report: null | {
-    exam: { id: number; name: string; exam_date: string | null; type: string | null; status: string }
-    summary: { participants: number; avg_net: number | null; avg_score: number | null; max_net: number | null; min_net: number | null; max_score: number | null }
-    by_class: { id: number | null; name: string; participants: number; avg_net: number | null; avg_score: number | null; max_net: number | null }[]
-    rows: { id: number; student_id: number; full_name: string; student_no: string; class_name: string | null; correct: number; wrong: number; blank: number; net: number | null; score: number | null; institution_rank: number | null; class_rank: number | null }[]
-  }
-}
-
 export type LeadsData = {
   summary: { rate: number; won: number; total: number }
   by_source: { source: string; label: string; rate: number; won: number; total: number }[]

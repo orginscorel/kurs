@@ -1,32 +1,39 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { APP_VERSION } from '@/components/app/version'
 import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom'
-import { Bell, ChevronDown, ChevronsLeft, ChevronsRight, KeyRound, LogOut, Menu as MenuIcon, Moon, Search, Sparkles, Sun, X } from 'lucide-react'
+import { Bell, ChevronDown, ChevronsLeft, ChevronsRight, KeyRound, LogOut, Menu as MenuIcon, Monitor, Moon, Search, Sparkles, Sun, X } from 'lucide-react'
 import { cn } from '@/lib/cn'
+import { apply as applyTheme, readMode, resolve as resolveTheme, saveMode, watchSystem, type ThemeMode } from '@/lib/theme'
 import { useAuth, useCan } from '@/app/auth'
 import { activeGroupFor, navigation, type NavGroup, type NavItem } from '@/app/navigation'
 import { BrandMark } from '@/app/AuthGate'
 import { Avatar, Kbd } from '@/components/ui/feedback'
 import { Menu, Tooltip } from '@/components/ui/overlay'
 import { Button } from '@/components/ui/Button'
+import { VendorInfo } from '@/components/app/VendorInfo'
 import { CommandPalette } from './CommandPalette'
 import { NotificationCenter } from './NotificationCenter'
 import { SyncStatus } from './SyncStatus'
 
+/** Sistem → Açık → Koyu sırasıyla döner; "Sistem" bilgisayarın ayarını izler ve anında yanıt verir. */
+const THEME_ORDER: ThemeMode[] = ['system', 'light', 'dark']
+const THEME_LABEL: Record<ThemeMode, string> = { system: 'Sistem teması', light: 'Açık tema', dark: 'Koyu tema' }
+
 function useTheme() {
-  const [theme, setTheme] = useState<'light' | 'dark'>(() => (document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light'))
+  const [mode, setMode] = useState<ThemeMode>(readMode)
+  const [theme, setTheme] = useState<'light' | 'dark'>(() => resolveTheme(readMode()))
+
+  useEffect(() => watchSystem(setTheme), [])
+  useEffect(() => {
+    setTheme(applyTheme(mode))
+  }, [mode])
+
   const toggle = () => {
-    const next = theme === 'dark' ? 'light' : 'dark'
-    if (next === 'dark') document.documentElement.dataset.theme = 'dark'
-    else delete document.documentElement.dataset.theme
-    try {
-      localStorage.setItem('ebe-theme', next)
-    } catch {
-      /* yok say */
-    }
-    setTheme(next)
+    const next = THEME_ORDER[(THEME_ORDER.indexOf(mode) + 1) % THEME_ORDER.length]!
+    saveMode(next)
+    setMode(next)
   }
-  return { theme, toggle }
+  return { theme, mode, toggle }
 }
 
 /** Kullanıcının yetkili olduğu alanlar ve sayfalar */
@@ -100,11 +107,14 @@ export function AppShell({ children }: { children: ReactNode }) {
       <div className={cn('transition-[padding] duration-200', collapsed ? 'lg:pl-[64px]' : 'lg:pl-[232px]')}>
         <Topbar onMenu={() => setMobileOpen(true)} onSearch={() => setPaletteOpen(true)} />
         <main className="mx-auto w-full max-w-[1480px] px-4 sm:px-6 lg:px-8 pt-5 pb-24">
-          {active?.group.key === 'settings' ? (
-            <SettingsLayout group={active.group} activeTo={active.item.to}>{children}</SettingsLayout>
-          ) : (
-            children
-          )}
+          {/* Sayfa geçişi: yol değişince içerik yumuşak girer (hareket azaltılmışsa CSS'te durur) */}
+          <div key={location.pathname} className="page-enter">
+            {active?.group.key === 'settings' ? (
+              <SettingsLayout group={active.group} activeTo={active.item.to}>{children}</SettingsLayout>
+            ) : (
+              children
+            )}
+          </div>
         </main>
       </div>
 
@@ -113,8 +123,9 @@ export function AppShell({ children }: { children: ReactNode }) {
   )
 }
 
-/** Ayarlar: sayfalar başlıklara ayrılmış sol alt menüde; dar ekranda tek sıra kaydırmalı liste */
+/** Ayarlar: geniş ekranda başlıklara ayrılmış sol alt menü; dar ekranda tek seçim kutusu (yatay kaydırma yok) */
 function SettingsLayout({ group, activeTo, children }: { group: NavGroup; activeTo: string; children: ReactNode }) {
+  const navigate = useNavigate()
   const categories = useMemo(() => {
     const map = new Map<string, NavItem[]>()
     for (const item of group.items) {
@@ -128,11 +139,28 @@ function SettingsLayout({ group, activeTo, children }: { group: NavGroup; active
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-[200px_minmax(0,1fr)] lg:gap-10">
       <aside className="lg:sticky lg:top-[76px] lg:self-start">
         <p className="mb-3 hidden text-[15px] font-semibold tracking-[-0.01em] text-ink lg:block">Ayarlar</p>
-        <nav aria-label="Ayarlar" className="-mx-4 overflow-x-auto scroll-thin border-b border-line px-4 sm:-mx-6 sm:px-6 lg:mx-0 lg:overflow-visible lg:border-0 lg:px-0">
-          <div className="flex min-w-max gap-1 lg:min-w-0 lg:flex-col lg:gap-5">
+        {/* Dar ekran: yan yana kaydırmalı şerit yerine tek seçim kutusu (kaydırma gerekmesin) */}
+        <label className="block lg:hidden">
+          <span className="sr-only">Ayarlar sayfası</span>
+          <select
+            value={activeTo}
+            onChange={(e) => navigate(e.target.value)}
+            className="h-11 w-full rounded-[var(--radius-sm)] border border-line bg-surface px-3 text-[14px] text-ink"
+          >
             {categories.map(([category, items]) => (
-              <div key={category} className="flex gap-1 lg:flex-col lg:gap-0.5">
-                <p className="hidden px-2.5 pb-1 text-[11px] font-medium uppercase tracking-[0.06em] text-ink-3 lg:block">{category}</p>
+              <optgroup key={category} label={category}>
+                {items.map((item) => (
+                  <option key={item.to} value={item.to}>{item.label}</option>
+                ))}
+              </optgroup>
+            ))}
+          </select>
+        </label>
+        <nav aria-label="Ayarlar" className="hidden lg:block">
+          <div className="flex min-w-0 flex-col gap-5">
+            {categories.map(([category, items]) => (
+              <div key={category} className="flex flex-col gap-0.5">
+                <p className="px-2.5 pb-1 text-[11px] font-medium uppercase tracking-[0.06em] text-ink-3">{category}</p>
                 {items.map((item) => {
                   const isActive = item.to === activeTo
                   return (
@@ -140,12 +168,11 @@ function SettingsLayout({ group, activeTo, children }: { group: NavGroup; active
                       key={item.to}
                       to={item.to}
                       className={cn(
-                        'relative inline-flex h-10 items-center whitespace-nowrap px-3 text-[13px] font-medium transition-colors lg:h-8 lg:rounded-[var(--radius-sm)] lg:px-2.5 lg:font-normal',
-                        isActive ? 'text-ink lg:bg-surface-3 lg:font-medium' : 'text-ink-3 hover:text-ink-2 lg:text-ink-2 lg:hover:bg-surface-2 lg:hover:text-ink',
+                        'relative inline-flex h-8 items-center rounded-[var(--radius-sm)] px-2.5 text-[13px] transition-colors',
+                        isActive ? 'bg-surface-3 font-medium text-ink' : 'text-ink-2 hover:bg-surface-2 hover:text-ink',
                       )}
                     >
                       {item.label}
-                      {isActive && <span className="absolute inset-x-3 -bottom-px h-[2px] rounded-full bg-ink lg:hidden" />}
                     </Link>
                   )
                 })}
@@ -306,6 +333,7 @@ function Sidebar({
             {!collapsed && 'Daralt'}
           </Button>
         )}
+        {!collapsed && <VendorInfo compact className="mt-1" />}
       </div>
     </>
   )
@@ -315,7 +343,7 @@ function Topbar({ onMenu, onSearch }: { onMenu: () => void; onSearch: () => void
   const me = useAuth((s) => s.me)
   const logout = useAuth((s) => s.logout)
   const navigate = useNavigate()
-  const { theme, toggle } = useTheme()
+  const { mode, toggle } = useTheme()
   const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform)
 
   return (
@@ -340,9 +368,9 @@ function Topbar({ onMenu, onSearch }: { onMenu: () => void; onSearch: () => void
 
       <div className="ml-auto flex items-center gap-1">
         <SyncStatus />
-        <Tooltip content={theme === 'dark' ? 'Açık tema' : 'Koyu tema'} side="bottom">
-          <Button variant="ghost" size="icon" onClick={toggle} aria-label="Tema">
-            {theme === 'dark' ? <Sun className="size-[18px]" /> : <Moon className="size-[18px]" />}
+        <Tooltip content={`${THEME_LABEL[mode]} · değiştirmek için tıklayın`} side="bottom">
+          <Button variant="ghost" size="icon" onClick={toggle} aria-label={THEME_LABEL[mode]}>
+            {mode === 'system' ? <Monitor className="size-[18px]" /> : mode === 'dark' ? <Moon className="size-[18px]" /> : <Sun className="size-[18px]" />}
           </Button>
         </Tooltip>
         <NotificationCenter trigger={<Bell className="size-[18px]" />} />

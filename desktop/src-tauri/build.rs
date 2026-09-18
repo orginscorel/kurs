@@ -21,6 +21,8 @@ fn main() {
             "desktop_info",
             "desktop_notify",
             "desktop_badge",
+            "open_downloaded_path",
+            "reveal_downloaded_path",
         ])),
     )
     .expect("tauri-build başarısız");

@@ -10,6 +10,8 @@
  *  - Güncelleme şeridi: ayrı pencere yerine sayfanın üstünde ince bir bant (shadow DOM; sayfanın DOM'una ve
  *    CSS'ine karışmaz). "Güncelle" indirmeyi başlatır, yüzde aynı şeritte akar, kurulum bitince Rust uygulamayı
  *    yeniden başlatır. "Daha sonra" mevcut erteleme (snooze) kuralını çalıştırır.
+ *  - İndirme kartı: dosya inince sağ altta küçük bir kart (şerit üstte olduğu için çakışmaz) — "Aç" ve
+ *    "Klasörde göster". 10 sn sonra kendiliğinden kapanır, fare üzerindeyken sayaç durur.
  */
 (function () {
   'use strict'
@@ -116,13 +118,15 @@
     setInterval(poll, 60000)
     document.addEventListener('visibilitychange', function () { if (!document.hidden) poll() })
 
-    // --- Güncelleme şeridi
+    // --- Güncelleme şeridi ve indirme kartı
     startUpdateBanner()
+    startDownloadCard()
   }).catch(function () { /* izinsiz köken */ })
 
   // ------------------------------------------------------------------ güncelleme şeridi (shadow DOM)
 
-  var CSS = [
+  // Şerit ve indirme kartının ortak tasarım dili (renk belirteçleri + düğme biçimi)
+  var TOKENS = [
     ':host{',
     "  --ff:Inter,'Inter Variable',-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif;",
     '  --bg:#ffffff;--fg:#16212f;--muted:#5b6b7f;--line:#dbe2ea;--hover:#eef2f7;',
@@ -135,6 +139,19 @@
     '  --danger:#f0897d;--danger-h:#f5a096;--ok:#6cc79b;',
     '}}',
     '*{box-sizing:border-box}',
+    '.ico{flex:0 0 auto;width:17px;height:17px;color:var(--accent);display:flex}',
+    '.ico svg{width:17px;height:17px;display:block;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}',
+    '.btn{-webkit-appearance:none;appearance:none;margin:0;border:1px solid transparent;border-radius:3px;',
+    '  font:600 12.5px/1 var(--ff);padding:8px 13px;cursor:pointer;white-space:nowrap;background:transparent;color:inherit;',
+    '  transition:background .12s ease,color .12s ease,border-color .12s ease}',
+    '.btn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}',
+    '.btn.primary{background:var(--accent);color:var(--on-accent);border-color:var(--accent)}',
+    '.btn.primary:hover{background:var(--accent-h);border-color:var(--accent-h)}',
+    '.btn.ghost{color:var(--muted);border-color:var(--line)}',
+    '.btn.ghost:hover{color:var(--fg);background:var(--hover)}',
+  ]
+
+  var CSS = TOKENS.concat([
     '.wrap{width:100%;background:var(--bg);color:var(--fg);border-bottom:1px solid var(--line);',
     '  box-shadow:0 1px 2px rgba(14,24,38,.10),0 8px 22px rgba(14,24,38,.07);',
     "  font:500 13px/1.35 var(--ff);-webkit-font-smoothing:antialiased;text-align:left;direction:ltr;",
@@ -144,8 +161,6 @@
     '.wrap[data-tone="ok"]{--accent:var(--ok)}',
     '.bar{display:flex;align-items:center;gap:12px;padding:8px 14px;min-height:42px}',
     '.lead{flex:1 1 auto;min-width:0;display:flex;align-items:center;gap:10px}',
-    '.ico{flex:0 0 auto;width:17px;height:17px;color:var(--accent);display:flex}',
-    '.ico svg{width:17px;height:17px;display:block;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}',
     '.ico.spin svg{animation:kb-spin 1s linear infinite}',
     '@keyframes kb-spin{to{transform:rotate(360deg)}}',
     '.msg{min-width:0;display:flex;align-items:baseline;gap:8px;flex-wrap:nowrap;overflow:hidden}',
@@ -154,14 +169,6 @@
     '.pct{font-weight:650;color:var(--accent);font-variant-numeric:tabular-nums;white-space:nowrap}',
     '.sub{font-weight:450;color:var(--muted);flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
     '.acts{flex:0 0 auto;display:flex;align-items:center;gap:6px}',
-    '.btn{-webkit-appearance:none;appearance:none;margin:0;border:1px solid transparent;border-radius:3px;',
-    '  font:600 12.5px/1 var(--ff);padding:8px 13px;cursor:pointer;white-space:nowrap;background:transparent;color:inherit;',
-    '  transition:background .12s ease,color .12s ease,border-color .12s ease}',
-    '.btn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}',
-    '.btn.primary{background:var(--accent);color:var(--on-accent);border-color:var(--accent)}',
-    '.btn.primary:hover{background:var(--accent-h);border-color:var(--accent-h)}',
-    '.btn.ghost{color:var(--muted);border-color:var(--line)}',
-    '.btn.ghost:hover{color:var(--fg);background:var(--hover)}',
     '.track{display:none;height:2px;background:var(--track);overflow:hidden}',
     '.wrap[data-state="working"] .track{display:block}',
     '.fill{display:block;height:100%;width:0;background:var(--accent);transition:width .28s ease}',
@@ -174,13 +181,49 @@
     '  .wrap:not([data-tone="danger"]) .sub{display:none}',
     '  .acts{flex:1 1 100%;justify-content:flex-end}.btn{flex:0 1 auto}}',
     '@media (prefers-reduced-motion:reduce){.wrap,.fill,.ico.spin svg,.fill.indet{animation:none;transition:none}}',
-  ].join('\n')
+  ]).join('\n')
+
+  // --- sağ alttaki indirme kartı
+  var CARD_CSS = TOKENS.concat([
+    '.stack{display:flex;flex-direction:column;gap:8px;width:100%}',
+    '.card{width:100%;background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:3px;',
+    '  box-shadow:0 2px 6px rgba(14,24,38,.12),0 14px 34px rgba(14,24,38,.14);',
+    "  font:500 13px/1.35 var(--ff);-webkit-font-smoothing:antialiased;text-align:left;direction:ltr;",
+    '  padding:10px 11px 10px 12px;overflow:hidden;animation:kc-in .22s cubic-bezier(.2,.8,.3,1) both}',
+    '@keyframes kc-in{from{transform:translateY(12px) scale(.98);opacity:0}to{transform:none;opacity:1}}',
+    '.card.out{animation:kc-out .18s ease both}',
+    '@keyframes kc-out{to{transform:translateY(8px);opacity:0}}',
+    '.card[data-tone="danger"]{--accent:var(--danger);--accent-h:var(--danger-h)}',
+    '.top{display:flex;align-items:flex-start;gap:9px}',
+    '.ico{margin-top:1px}',
+    '.txt{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:2px}',
+    '.nm{font-weight:650;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
+    '.mt{font-weight:450;font-size:12px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
+    '.x{flex:0 0 auto;-webkit-appearance:none;appearance:none;background:transparent;border:0;border-radius:3px;',
+    '  padding:3px;margin:-3px -3px 0 0;cursor:pointer;color:var(--muted);display:flex}',
+    '.x:hover{color:var(--fg);background:var(--hover)}',
+    '.x:focus-visible{outline:2px solid var(--accent);outline-offset:1px}',
+    '.x svg{width:14px;height:14px;display:block;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round}',
+    '.acts{display:flex;justify-content:flex-end;gap:6px;margin-top:10px}',
+    '.acts:empty{display:none}',
+    '.life{height:2px;background:var(--track);margin:10px -11px -10px -12px}',
+    '.life>span{display:block;height:100%;width:100%;background:var(--accent);transform-origin:left;',
+    '  animation:kc-life 10s linear both}',
+    '@keyframes kc-life{to{transform:scaleX(0)}}',
+    '.card.hold .life>span{animation-play-state:paused}',
+    '.card[data-tone="danger"] .life{display:none}',
+    '.card[data-tone="danger"] .mt{white-space:normal;overflow:visible}',
+    '@media (max-width:560px){.card{padding:10px}.acts{flex-wrap:wrap}.life{margin:10px -10px -10px}}',
+    '@media (prefers-reduced-motion:reduce){.card,.life>span{animation:none}}',
+  ]).join('\n')
 
   var ICONS = {
     sparkles: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5 13.6 8 18 9.6 13.6 11.2 12 15.7 10.4 11.2 6 9.6 10.4 8Z"/><path d="M18.5 15.5 19.2 17.3 21 18l-1.8.7-.7 1.8-.7-1.8L16 18l1.8-.7Z"/></svg>',
     spinner: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5a8.5 8.5 0 1 1-8.5 8.5" /></svg>',
     warn: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4.2 21 19.5H3Z"/><path d="M12 10v4.2"/><path d="M12 17.1h.01"/></svg>',
     check: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="m8.4 12.2 2.5 2.5 4.7-5"/></svg>',
+    saved: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.6v10.2"/><path d="m8 10 4 3.8 4-3.8"/><path d="M4.5 16.2v2.1a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2v-2.1"/></svg>',
+    close: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6.5 6.5 11 11"/><path d="m17.5 6.5-11 11"/></svg>',
   }
 
   function noteTitle(notes, version) {
@@ -343,6 +386,137 @@
     // Sayfa yeniden yüklendiyse ya da başka bir sayfaya geçildiyse şeridi geri getir (bu çağrı da bir ack'tir).
     invoke('update_info').then(function (i) {
       if (i && i.version && !i.snoozed && !state) show({ kind: 'available', info: i })
+    }).catch(noop)
+  }
+
+  // ------------------------------------------------------------------ indirme kartı (sağ alt, shadow DOM)
+
+  var LIFE_MS = 10000
+
+  function fmtSize(n) {
+    if (typeof n !== 'number' || !isFinite(n) || n < 0) return ''
+    var u = ['B', 'KB', 'MB', 'GB', 'TB']
+    var i = 0
+    var v = n
+    while (v >= 1024 && i < u.length - 1) { v /= 1024; i++ }
+    var s = i === 0 ? String(Math.round(v)) : v.toFixed(v < 10 ? 1 : 0)
+    try { s = Number(s).toLocaleString('tr-TR') } catch (e) { /* yok say */ }
+    return s + ' ' + u[i]
+  }
+
+  function startDownloadCard() {
+    var host = null
+    var sr = null
+    var stack = null
+
+    function build() {
+      host = document.createElement('kurs-download-card')
+      var fixed = {
+        position: 'fixed', right: '12px', bottom: '12px', left: 'auto', top: 'auto',
+        width: '340px', 'max-width': 'calc(100vw - 24px)', margin: '0', padding: '0',
+        'z-index': '2147483500', display: 'block', 'pointer-events': 'auto', contain: 'layout style',
+        'color-scheme': 'light dark', visibility: 'visible', opacity: '1', transform: 'none', float: 'none',
+      }
+      for (var k in fixed) { if (Object.prototype.hasOwnProperty.call(fixed, k)) host.style.setProperty(k, fixed[k], 'important') }
+      sr = host.attachShadow({ mode: 'open' })
+      var style = document.createElement('style')
+      style.textContent = CARD_CSS
+      stack = document.createElement('div')
+      stack.className = 'stack'
+      stack.setAttribute('role', 'status')
+      stack.setAttribute('aria-live', 'polite')
+      sr.appendChild(style)
+      sr.appendChild(stack)
+      stack.addEventListener('click', function (ev) {
+        var b = ev.target && ev.target.closest ? ev.target.closest('button[data-a]') : null
+        if (!b) return
+        var card = b.closest('.card')
+        if (card) act(card, b.getAttribute('data-a'))
+      })
+    }
+
+    function attach() {
+      if (!host) build()
+      var parent = document.documentElement || document.body
+      if (parent && host.parentNode !== parent) parent.appendChild(host)
+    }
+
+    function drop(card) {
+      clearTimeout(card.__t)
+      card.classList.add('out')
+      setTimeout(function () {
+        if (card.parentNode) card.parentNode.removeChild(card)
+        if (stack && !stack.children.length && host && host.parentNode) host.parentNode.removeChild(host)
+      }, 180)
+    }
+
+    function arm(card) {
+      if (card.getAttribute('data-tone') === 'danger') return
+      clearTimeout(card.__t)
+      card.__t = setTimeout(function () { drop(card) }, LIFE_MS)
+    }
+
+    function fail(card, message) {
+      card.setAttribute('data-tone', 'danger')
+      clearTimeout(card.__t)
+      card.removeAttribute('data-path')
+      card.querySelector('.ico').innerHTML = ICONS.warn
+      card.querySelector('.nm').textContent = 'Dosya açılamadı'
+      card.querySelector('.mt').textContent = message
+      card.querySelector('.acts').innerHTML = ''
+    }
+
+    function act(card, a) {
+      if (a === 'close') return drop(card)
+      var path = card.getAttribute('data-path')
+      if (!path) return drop(card)
+      clearTimeout(card.__t)
+      invoke(a === 'open' ? 'open_downloaded_path' : 'reveal_downloaded_path', { path: path })
+        .then(function () { drop(card) })
+        .catch(function (e) { fail(card, errText(e)) })
+    }
+
+    function add(info) {
+      attach()
+      var ok = !!info.ok && !!info.path
+      var card = document.createElement('div')
+      card.className = 'card'
+      card.setAttribute('data-tone', ok ? 'ok' : 'danger')
+      if (ok) card.setAttribute('data-path', info.path)
+      card.innerHTML =
+        '<div class="top"><span class="ico"></span><div class="txt"><span class="nm"></span><span class="mt"></span></div>' +
+        '<button class="x" data-a="close" aria-label="Kapat"></button></div>' +
+        '<div class="acts"></div><div class="life"><span></span></div>'
+      card.querySelector('.ico').innerHTML = ok ? ICONS.saved : ICONS.warn
+      card.querySelector('.x').innerHTML = ICONS.close
+      card.querySelector('.nm').textContent = ok ? String(info.name || 'İndirilen dosya') : 'İndirme tamamlanamadı'
+      var size = ok ? fmtSize(info.size) : ''
+      card.querySelector('.mt').textContent = ok
+        ? (size ? size + ' · İndirilenler klasörü' : 'İndirilenler klasörüne kaydedildi')
+        : String(info.name && info.name !== 'İndirilen dosya' ? info.name + ' — ' : '') + 'Dosya kaydedilemedi. Tekrar deneyin.'
+      if (ok) {
+        card.querySelector('.acts').innerHTML =
+          '<button class="btn ghost" data-a="reveal">Klasörde göster</button><button class="btn primary" data-a="open">Aç</button>'
+      }
+
+      var hold = function () { card.classList.add('hold'); clearTimeout(card.__t) }
+      var go = function () { card.classList.remove('hold'); arm(card) }
+      card.addEventListener('mouseenter', hold)
+      card.addEventListener('mouseleave', go)
+      card.addEventListener('focusin', hold)
+      card.addEventListener('focusout', go)
+
+      stack.appendChild(card)
+      while (stack.children.length > 4) {
+        var old = stack.children[0]
+        clearTimeout(old.__t)
+        stack.removeChild(old)
+      }
+      arm(card)
+    }
+
+    listen('download://done', function (p) {
+      if (p && typeof p === 'object') add(p)
     }).catch(noop)
   }
 })()

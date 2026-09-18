@@ -75,7 +75,7 @@ export default function Entries() {
         key: 'description',
         header: 'Açıklama',
         cell: (e) => (
-          <div className="min-w-[200px]">
+          <div className="min-w-0">
             <p className={cn('truncate text-ink', e.voided_at && 'line-through text-ink-3')}>{e.description}</p>
             <p className="truncate text-[12px] text-ink-3">{[e.counterparty, e.document_no && `Belge ${e.document_no}`].filter(Boolean).join(' · ') || '—'}</p>
           </div>

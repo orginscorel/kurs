@@ -35,6 +35,8 @@ pub struct AppCtx {
     /// Ana pencerede gezinmeye izin verilen kökenler (kurum sunucusu, yerel sunucu)
     pub allowed_origins: Arc<RwLock<Vec<String>>>,
     pub app_base_url: RwLock<Option<url::Url>>,
+    /// Uygulamanın kendi indirdiği dosyalar (kartın "Aç"/"Klasörde göster" düğmeleri yalnız bunları açabilir)
+    pub downloads: RwLock<window::Downloads>,
     pub capability_seq: AtomicU32,
     /// Ana penceredeki güncelleme şeridinin "buradayım" sayacı: `update_info` her çağrıldığında artar.
     /// Şerit yanıt vermezse (kurulum ekranı) updater ayrı pencereyi yedek yol olarak açar.
@@ -140,6 +142,8 @@ pub fn run() {
             commands::desktop_info,
             commands::desktop_notify,
             commands::desktop_badge,
+            commands::open_downloaded_path,
+            commands::reveal_downloaded_path,
         ])
         .setup(|app| {
             let handle = app.handle().clone();
@@ -169,6 +173,7 @@ pub fn run() {
                 last_error: RwLock::new(None),
                 allowed_origins: Arc::new(RwLock::new(origins)),
                 app_base_url: RwLock::new(None),
+                downloads: RwLock::new(window::Downloads::default()),
                 capability_seq: AtomicU32::new(1),
                 banner_seen: AtomicU64::new(0),
                 quitting: AtomicBool::new(false),

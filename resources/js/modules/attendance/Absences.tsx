@@ -61,7 +61,7 @@ export default function Absences() {
       key: 'student',
       header: 'Öğrenci',
       cell: (r) => (
-        <Link to={`/ogrenciler/${r.student_id}`} className="flex items-center gap-2.5 min-w-[160px] hover:text-primary">
+        <Link to={`/ogrenciler/${r.student_id}`} className="flex items-center gap-2.5 min-w-0 hover:text-primary">
           <Avatar name={r.full_name} size={28} />
           <span className="min-w-0">
             <span className="block truncate text-[13.5px] font-medium">{r.full_name}</span>
@@ -71,10 +71,10 @@ export default function Absences() {
       ),
     },
     { key: 'class', header: 'Sınıf', cell: (r) => r.class_group || <span className="text-ink-3">—</span> },
-    { key: 'subject', header: 'Ders', hideable: true, cell: (r) => r.subject },
-    { key: 'status', header: 'Durum', cell: (r) => <Badge tone={STATUS_TONE[r.status]}>{STATUS_LABEL[r.status]}{r.status === 'late' && r.late_minutes ? ` (${r.late_minutes} dk)` : ''}</Badge> },
-    { key: 'method', header: 'Yoklama yöntemi', hideable: true, cell: (r) => <span className="text-ink-3">{r.method}</span> },
-    { key: 'note', header: 'Not', hideable: true, cell: (r) => r.note || <span className="text-ink-3">—</span> },
+    { key: 'subject', priority: 3, header: 'Ders', hideable: true, cell: (r) => r.subject },
+    { key: 'status', priority: 1, header: 'Durum', cell: (r) => <Badge tone={STATUS_TONE[r.status]}>{STATUS_LABEL[r.status]}{r.status === 'late' && r.late_minutes ? ` (${r.late_minutes} dk)` : ''}</Badge> },
+    { key: 'method', priority: 4, header: 'Yoklama yöntemi', hideable: true, cell: (r) => <span className="text-ink-3">{r.method}</span> },
+    { key: 'note', priority: 4, header: 'Not', hideable: true, cell: (r) => r.note || <span className="text-ink-3">—</span> },
   ]
 
   return (

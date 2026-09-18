@@ -58,7 +58,7 @@ export default function Inventory() {
         header: 'Ürün',
         sortKey: 'name',
         cell: (p) => (
-          <div className="min-w-[200px]">
+          <div className="min-w-0">
             <p className="font-medium text-ink">{p.name}</p>
             <p className="text-[12px] text-ink-3">{[p.publisher, p.subject, p.barcode].filter(Boolean).join(' · ') || '—'}</p>
           </div>

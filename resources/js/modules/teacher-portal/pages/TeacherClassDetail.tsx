@@ -75,7 +75,7 @@ export default function TeacherClassDetail() {
 
       <Panel title="Öğrenciler" actions={
         <span className="flex max-w-full items-center gap-1.5"><span className="hidden text-[12.5px] text-ink-3 min-[420px]:inline">Sırala:</span>
-        <Segmented size="sm" className="max-w-full overflow-x-auto" value={sort} onChange={setSort} options={[
+        <Segmented size="sm" className="max-w-full" value={sort} onChange={setSort} options={[
           { value: 'name', label: 'Ad' }, { value: 'absent', label: 'Devamsızlık' }, { value: 'homework', label: 'Ödev' }, { value: 'net', label: 'Son net' },
         ]} /></span>
       } flush>

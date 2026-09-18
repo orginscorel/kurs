@@ -45,7 +45,7 @@ export type ModuleCommand = {
   label: string
   to: string
   icon: LucideIcon
-  permission?: string
+  permission?: string | string[]
   hint?: string
   keywords?: string[]
 }

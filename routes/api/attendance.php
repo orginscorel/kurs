@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\Attendance\AbsenceController;
 use App\Http\Controllers\Api\Attendance\AttendanceTakingController;
 use App\Http\Controllers\Api\Attendance\DeviceController;
+use App\Http\Controllers\Api\Attendance\DeviceDiscoveryController;
 use App\Http\Controllers\Api\Attendance\DeviceIdentityController;
 use App\Http\Controllers\Api\Attendance\LivePresenceController;
 use App\Http\Controllers\Api\Attendance\StudentQrController;
@@ -47,6 +48,19 @@ Route::prefix('attendance')->group(function () {
         Route::put('devices/{device}', [DeviceController::class, 'update'])->middleware('throttle:writes');
         Route::delete('devices/{device}', [DeviceController::class, 'destroy'])->middleware('throttle:writes');
         Route::post('devices/{device}/token', [DeviceController::class, 'issueToken'])->middleware('throttle:writes');
+
+        /*
+         | AĞDA CİHAZ BUL (docs/CIHAZ-KESIF.md) — elle IP/JSON yazmayı bitiren uçlar.
+         | Tarama yalnız cihazla aynı yerel ağdaki makinede sonuç verir; sunucuda çağrılırsa
+         | yanıt yine temiz döner ve `ortam.uyari` nedeni Türkçe açıklar.
+         | "kesif" segmenti {device} parametresiyle ÇAKIŞMAZ (farklı segment sayısı/ad).
+         */
+        Route::get('devices/protokoller', [DeviceDiscoveryController::class, 'protocols']);
+        Route::get('devices/teshis', [DeviceDiscoveryController::class, 'diagnostics']);
+        Route::get('devices/kesif/ortam', [DeviceDiscoveryController::class, 'environment']);
+        Route::post('devices/kesif/tara', [DeviceDiscoveryController::class, 'scan'])->middleware('throttle:writes');
+        Route::post('devices/kesif/dene', [DeviceDiscoveryController::class, 'probe'])->middleware('throttle:writes');
+        Route::post('devices/kesif/ekle', [DeviceDiscoveryController::class, 'register'])->middleware('throttle:writes');
 
         // Biyometrik terminal köprüsü (ZKTeco / Perkotek YT-33) — docs/CIHAZ-KOPRUSU.md
         Route::prefix('zk')->group(function () {

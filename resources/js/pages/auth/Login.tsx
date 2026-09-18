@@ -7,6 +7,7 @@ import { BrandMark } from '@/app/AuthGate'
 import { Button } from '@/components/ui/Button'
 import { Checkbox, Field, Input } from '@/components/ui/form'
 import { Alert } from '@/components/ui/feedback'
+import { VendorInfo } from '@/components/app/VendorInfo'
 
 export default function Login() {
   const [login, setLogin] = useState('')
@@ -131,6 +132,7 @@ export default function Login() {
             </Button>
           </form>
           <p className="mt-8 text-center text-[12.5px] text-ink-3">Parolanızı unuttuysanız kurum yöneticinizle iletişime geçin.</p>
+          <VendorInfo className="mt-4" />
         </div>
       </div>
     </div>

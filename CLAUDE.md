@@ -67,3 +67,5 @@ Mobil (Expo) aynı `/api/v1` uçlarını Bearer jetonla kullanır.
   - aynı sürüme madde → `add "duzeltme: …"`
 - Sürüm = günlüğün en üstündeki kayıt. `vite build` sürümü ve derleme kimliğini `build/version.json` + `build/changelog.json` olarak yazar. Açık ekranlar `UpdateNotifier` (resources/js/components/app) ile dakikada bir yoklar ve "Yeni sürüm yayında" penceresini gösterir.
 - Yenilikler sayfası `/yenilikler`; sürüm numarası kenar menüsünün altında.
+- TEK NUMARA: web ve macOS masaüstü uygulaması aynı sürümü kullanır (17.09.2026'da birleştirildi; masaüstü 0.1.x → 1.11.0). Masaüstü yayını:
+  `resources/changelog.json` (web) ve `/home/oritoriu/kurs-desktop/CHANGELOG.json` (masaüstü) aynı numarayı taşımalı → masaüstünde `node scripts/release.mjs sync`, `src-tauri/Cargo.lock` içindeki `erbaa-kurs` sürümü de elle güncellenir → `assemble-repo.sh` → push → `desktop-v<sürüm>` etiketi (CI derler, imzalar, yayımlar) → sunucuda `kurs:desktop-release-sync`.

@@ -48,7 +48,7 @@ export default function TeacherList() {
         header: 'Öğretmen',
         sortKey: 'full_name',
         cell: (t) => (
-          <div className="flex items-center gap-3 min-w-[200px]">
+          <div className="flex items-center gap-3 min-w-0">
             <Avatar name={t.full_name} src={t.avatar_url} size={34} />
             <div className="min-w-0">
               <p className="font-medium text-ink truncate">{t.full_name}</p>
@@ -58,7 +58,7 @@ export default function TeacherList() {
         ),
       },
       {
-        key: 'subjects',
+        key: 'subjects', priority: 3,
         header: 'Branşlar',
         hideable: true,
         cell: (t) => (
@@ -70,16 +70,16 @@ export default function TeacherList() {
           </div>
         ),
       },
-      { key: 'employment', header: 'Çalışma türü', hideable: true, cell: (t) => <span className="text-ink-2 whitespace-nowrap">{t.employment_type_label}</span> },
+      { key: 'employment', priority: 4, header: 'Çalışma türü', hideable: true, cell: (t) => <span className="text-ink-2 whitespace-nowrap">{t.employment_type_label}</span> },
       {
-        key: 'classes',
+        key: 'classes', priority: 3,
         header: 'Girdiği sınıf',
         align: 'right',
         hideable: true,
         cell: (t) => (t.class_count === null || t.class_count === undefined ? <span className="text-ink-3">—</span> : <span className="tabular text-ink">{t.class_count}</span>),
       },
       {
-        key: 'hours',
+        key: 'hours', priority: 4,
         header: 'Bu hafta ders saati',
         sortKey: 'weekly_hours',
         align: 'right',
@@ -98,11 +98,11 @@ export default function TeacherList() {
           )
         },
       },
-      { key: 'phone', header: 'Cep telefonu', hideable: true, cell: (t) => <PhoneText value={t.phone} whatsapp /> },
+      { key: 'phone', priority: 2, header: 'Cep telefonu', hideable: true, cell: (t) => <PhoneText value={t.phone} whatsapp /> },
       { key: 'email', header: 'E-posta', hideable: true, defaultHidden: true, cell: (t) => <MailText value={t.email} /> },
       { key: 'hired', header: 'İşe başlama', sortKey: 'hired_on', hideable: true, defaultHidden: true, cell: (t) => <span className="text-ink-2 tabular whitespace-nowrap">{t.hired_on ? date(t.hired_on) : '—'}</span> },
-      { key: 'user', header: 'Portal hesabı', hideable: true, cell: (t) => <Badge tone={t.has_user ? 'success' : 'neutral'}>{t.has_user ? 'Var' : 'Yok'}</Badge> },
-      { key: 'status', header: 'Durum', cell: (t) => <Badge tone={t.is_active ? 'success' : 'neutral'} dot>{t.is_active ? 'Aktif' : 'Pasif'}</Badge> },
+      { key: 'user', priority: 4, header: 'Portal hesabı', hideable: true, cell: (t) => <Badge tone={t.has_user ? 'success' : 'neutral'}>{t.has_user ? 'Var' : 'Yok'}</Badge> },
+      { key: 'status', priority: 2, header: 'Durum', cell: (t) => <Badge tone={t.is_active ? 'success' : 'neutral'} dot>{t.is_active ? 'Aktif' : 'Pasif'}</Badge> },
     ],
     [],
   )

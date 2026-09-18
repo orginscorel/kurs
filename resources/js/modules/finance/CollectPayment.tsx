@@ -2,12 +2,12 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { CheckCircle2, CreditCard, Download, HandCoins, Printer, ReceiptText, RotateCcw, Users, Wallet } from 'lucide-react'
+import { CheckCircle2, CreditCard, Download, HandCoins, Printer, RotateCcw, Wallet } from 'lucide-react'
 import { api, ApiError, idempotencyKey } from '@/lib/api'
 import { date, dateTime, money, todayISO } from '@/lib/format'
 import { cn } from '@/lib/cn'
 import { useCan } from '@/app/auth'
-import { PageHeader, Panel } from '@/components/ui/layout'
+import { Panel } from '@/components/ui/layout'
 import { Alert, Avatar, Badge, EmptyState, Skeleton } from '@/components/ui/feedback'
 import { Button, ButtonLink } from '@/components/ui/Button'
 import { Checkbox, Field, Input, Segmented, Select, Textarea } from '@/components/ui/form'
@@ -27,6 +27,7 @@ const nowLocal = () => {
   return `${todayISO()}T${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
 }
 
+/** Tek öğrenci tahsilatı. Sayfa başlığı ve sekmeler CollectPage sarmalayıcısındadır. */
 export default function CollectPayment() {
   const can = useCan()
   const qc = useQueryClient()
@@ -181,17 +182,7 @@ export default function CollectPayment() {
 
   return (
     <div className="animate-fade-in">
-      <PageHeader
-        title="Tahsilat al"
-        breadcrumbs={[{ label: 'Finans', to: '/finans' }, { label: 'Tahsilat al' }]}
-        description="Öğrenciyi seçin, açık taksitleri işaretleyin; tutar en eski vadeden başlayarak dağıtılır."
-        actions={
-          <>
-            <ButtonLink to="/finans/tahsilat/veli" icon={<Users className="size-4" />}>Veli toplu tahsilat</ButtonLink>
-            <ButtonLink to="/finans/tahsilatlar" icon={<ReceiptText className="size-4" />}>Tahsilatlar</ButtonLink>
-          </>
-        }
-      />
+      <p className="mb-4 text-[13px] text-ink-2">Öğrenciyi seçin, açık taksitleri işaretleyin; tutar en eski vadeden başlayarak dağıtılır.</p>
 
       <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_380px] gap-4 items-start">
         <div className="flex flex-col gap-4 min-w-0">

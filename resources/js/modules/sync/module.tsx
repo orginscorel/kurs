@@ -19,11 +19,11 @@ export default {
   ],
   // Yerel kurulumda cihaz yönetimi yok (sunucuda yapılır)
   nav: isLocalNode() ? [] : [
-    { section: 'settings', label: 'Bağlı cihazlar', to: '/ayarlar/bagli-cihazlar', icon: MonitorSmartphone, permission: 'sync.manage', order: 6 },
+    { section: 'settings', label: 'Bağlı masaüstü cihazlar', to: '/ayarlar/bagli-cihazlar', icon: MonitorSmartphone, permission: 'sync.manage', order: 6 },
     { section: 'settings', label: 'Eşitleme çakışmaları', to: '/ayarlar/esitleme-cakismalari', icon: GitCompareArrows, permission: 'sync.manage', order: 7 },
   ],
   commands: isLocalNode() ? [] : [
-    { id: 'sync-devices', label: 'Bağlı cihazlar', to: '/ayarlar/bagli-cihazlar', icon: MonitorSmartphone, permission: 'sync.manage', keywords: ['cihaz', 'masaüstü', 'mobil', 'eşitleme', 'kurum kodu'] },
+    { id: 'sync-devices', label: 'Bağlı masaüstü cihazlar', to: '/ayarlar/bagli-cihazlar', icon: MonitorSmartphone, permission: 'sync.manage', keywords: ['cihaz', 'masaüstü', 'mobil', 'eşitleme', 'kurum kodu', 'bağlı'] },
     { id: 'sync-conflicts', label: 'Eşitleme çakışmaları', to: '/ayarlar/esitleme-cakismalari', icon: GitCompareArrows, permission: 'sync.manage', keywords: ['çakışma', 'mutabakat', 'eşitleme', 'çevrimdışı'] },
   ],
 } satisfies ModuleDef

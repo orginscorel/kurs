@@ -39,8 +39,8 @@ export default function ClassGroupList() {
 
   const columns = useMemo<Column<ClassGroupRow>[]>(
     () => [
-      { key: 'name', header: 'Sınıf', sortKey: 'name', cell: (g) => <div className="min-w-[160px]"><p className="font-medium">{g.name}</p>{g.term && <p className="text-[12.5px] text-ink-3">Dönem: {g.term}</p>}</div> },
-      { key: 'program', header: 'Program', sortKey: 'program', cell: (g) => (g.program ? <ColorChip>{g.program}</ColorChip> : '—') },
+      { key: 'name', header: 'Sınıf', sortKey: 'name', cell: (g) => <div className="min-w-0"><p className="font-medium">{g.name}</p>{g.term && <p className="text-[12.5px] text-ink-3">Dönem: {g.term}</p>}</div> },
+      { key: 'program', priority: 3, header: 'Program', sortKey: 'program', cell: (g) => (g.program ? <ColorChip>{g.program}</ColorChip> : '—') },
       {
         key: 'fill', header: 'Doluluk (öğrenci / kontenjan)', mobileLabel: 'Doluluk', sortKey: 'students_count', width: 170,
         cell: (g) => (
@@ -51,7 +51,7 @@ export default function ClassGroupList() {
         ),
       },
       {
-        key: 'lessons',
+        key: 'lessons', priority: 4,
         header: 'Haftalık ders sayısı',
         sortKey: 'lessons_count',
         align: 'right',
@@ -64,7 +64,7 @@ export default function ClassGroupList() {
         ),
       },
       {
-        key: 'attendance',
+        key: 'attendance', priority: 3,
         header: 'Devam oranı (30 gün)',
         align: 'right',
         hideable: true,
@@ -76,9 +76,9 @@ export default function ClassGroupList() {
             <p className={`tabular font-medium ${g.attendance_30 < 75 ? 'text-danger' : g.attendance_30 < 90 ? 'text-warning' : 'text-ink'}`}>%{g.attendance_30}</p>
           ),
       },
-      { key: 'homeroom', header: 'Ana derslik', hideable: true, cell: (g) => <span className="text-ink-2 whitespace-nowrap">{g.homeroom ?? '—'}</span> },
-      { key: 'advisor', header: 'Danışman öğretmen', hideable: true, cell: (g) => <span className="text-ink-2 whitespace-nowrap">{g.advisor ?? '—'}</span> },
-      { key: 'active', header: 'Durum', cell: (g) => <Badge tone={g.is_active ? 'success' : 'neutral'} dot>{g.is_active ? 'Aktif' : 'Pasif'}</Badge> },
+      { key: 'homeroom', priority: 4, header: 'Ana derslik', hideable: true, cell: (g) => <span className="text-ink-2 whitespace-nowrap">{g.homeroom ?? '—'}</span> },
+      { key: 'advisor', priority: 4, header: 'Danışman öğretmen', hideable: true, cell: (g) => <span className="text-ink-2 whitespace-nowrap">{g.advisor ?? '—'}</span> },
+      { key: 'active', priority: 2, header: 'Durum', cell: (g) => <Badge tone={g.is_active ? 'success' : 'neutral'} dot>{g.is_active ? 'Aktif' : 'Pasif'}</Badge> },
     ],
     [],
   )

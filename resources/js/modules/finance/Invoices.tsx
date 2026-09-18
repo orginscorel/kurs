@@ -97,7 +97,7 @@ function InvoiceList({ list }: { list: ReturnType<typeof useListState> }) {
         header: 'Fatura no / tarih',
         sortKey: 'invoice_no',
         cell: (r) => (
-          <div className="min-w-[150px]">
+          <div className="min-w-0">
             <p className={cn('font-medium tabular', r.status === 'cancelled' && 'line-through text-ink-3')}>{r.invoice_no ?? `Taslak #${r.id}`}</p>
             <p className="text-[12px] text-ink-3 tabular">{date(r.issue_date)} · {DOCUMENT_TYPES[r.document_type] ?? r.document_type}</p>
           </div>
@@ -107,24 +107,24 @@ function InvoiceList({ list }: { list: ReturnType<typeof useListState> }) {
         key: 'buyer',
         header: 'Alıcı',
         cell: (r) => (
-          <div className="min-w-[160px]">
+          <div className="min-w-0">
             <p className="truncate font-medium text-ink">{r.buyer_name}</p>
             <p className="truncate text-[12px] text-ink-3">{r.student ? `Öğrenci: ${r.student.full_name}` : r.buyer_tax_id_masked ? `TCKN/VKN: ${r.buyer_tax_id_masked}` : '—'}</p>
           </div>
         ),
       },
-      { key: 'kind', header: 'Fatura türü', cell: (r) => <Badge tone={INVOICE_KIND[r.kind]?.tone}>{INVOICE_KIND[r.kind]?.label}</Badge> },
+      { key: 'kind', priority: 3, header: 'Fatura türü', cell: (r) => <Badge tone={INVOICE_KIND[r.kind]?.tone}>{INVOICE_KIND[r.kind]?.label}</Badge> },
       { key: 'status', header: 'Durum', cell: (r) => <Badge tone={INVOICE_STATUS[r.status]?.tone} dot>{INVOICE_STATUS[r.status]?.label}</Badge> },
       {
-        key: 'gib',
+        key: 'gib', priority: 4,
         header: 'GİB gönderimi',
         hideable: true,
         cell: (r) => (r.status === 'draft' ? <span className="text-ink-3">—</span> : <Badge tone={INTEGRATOR_STATUS[r.integrator_status]?.tone ?? 'neutral'}>{INTEGRATOR_STATUS[r.integrator_status]?.label ?? r.integrator_status}</Badge>),
       },
-      { key: 'net', header: 'Matrah (KDV hariç)', align: 'right', hideable: true, cell: (r) => <span className="tabular text-ink-2 whitespace-nowrap">{money(r.net_total)}</span> },
-      { key: 'vat', header: 'KDV tutarı', align: 'right', hideable: true, cell: (r) => <span className="tabular text-ink-2 whitespace-nowrap">{money(r.vat_total)}</span> },
+      { key: 'net', priority: 4, header: 'Matrah (KDV hariç)', align: 'right', hideable: true, cell: (r) => <span className="tabular text-ink-2 whitespace-nowrap">{money(r.net_total)}</span> },
+      { key: 'vat', priority: 4, header: 'KDV tutarı', align: 'right', hideable: true, cell: (r) => <span className="tabular text-ink-2 whitespace-nowrap">{money(r.vat_total)}</span> },
       {
-        key: 'total',
+        key: 'total', priority: 1,
         header: 'Ödenecek tutar',
         sortKey: 'total',
         align: 'right',
@@ -259,7 +259,7 @@ function UnbilledList({ list }: { list: ReturnType<typeof useListState> }) {
         key: 'receipt',
         header: 'Makbuz no / tarih',
         cell: (r) => (
-          <div className="min-w-[130px]">
+          <div className="min-w-0">
             <p className="font-medium tabular">{r.receipt_no}</p>
             <p className="text-[12px] text-ink-3 tabular">{dateTime(r.paid_at)}</p>
           </div>
@@ -269,14 +269,14 @@ function UnbilledList({ list }: { list: ReturnType<typeof useListState> }) {
         key: 'student',
         header: 'Öğrenci',
         cell: (r) => (
-          <div className="min-w-[150px]">
+          <div className="min-w-0">
             <Link to={`/ogrenciler/${r.student_id}`} onClick={(e) => e.stopPropagation()} className="truncate font-medium text-ink hover:underline">{r.student}</Link>
             <p className="truncate text-[12px] text-ink-3">{r.program ? `Program: ${r.program}` : `Öğrenci no: ${r.student_no}`}</p>
           </div>
         ),
       },
-      { key: 'method', header: 'Ödeme yöntemi', cell: (r) => <span className="text-ink-2 whitespace-nowrap">{r.method_label}</span> },
-      { key: 'amount', header: 'Tahsilat tutarı', align: 'right', cell: (r) => <span className="tabular text-ink-2 whitespace-nowrap">{money(r.amount)}</span> },
+      { key: 'method', priority: 3, header: 'Ödeme yöntemi', cell: (r) => <span className="text-ink-2 whitespace-nowrap">{r.method_label}</span> },
+      { key: 'amount', priority: 1, header: 'Tahsilat tutarı', align: 'right', cell: (r) => <span className="tabular text-ink-2 whitespace-nowrap">{money(r.amount)}</span> },
       {
         key: 'available',
         header: 'Faturalanacak tutar',

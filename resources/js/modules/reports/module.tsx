@@ -1,3 +1,4 @@
+import { Navigate } from 'react-router-dom'
 import { BarChart3, ClipboardCheck, Presentation, Users } from 'lucide-react'
 import { lazyPage } from '@/app/lazy'
 import { page } from '@/app/page'
@@ -6,8 +7,6 @@ import type { ModuleDef } from '@/app/modules'
 const ReportsHome = lazyPage(() => import('./ReportsHome'))
 const StudentsReport = lazyPage(() => import('./StudentsReport'))
 const AttendanceReport = lazyPage(() => import('./AttendanceReport'))
-const FinanceReport = lazyPage(() => import('./FinanceReport'))
-const ExamsReport = lazyPage(() => import('./ExamsReport'))
 const LeadsReport = lazyPage(() => import('./LeadsReport'))
 const TeacherLoadReport = lazyPage(() => import('./TeacherLoadReport'))
 const DisciplineReport = lazyPage(() => import('./DisciplineReport'))
@@ -24,8 +23,10 @@ export default {
     { path: 'raporlar', element: page(<ReportsHome />) },
     { path: 'raporlar/ogrenciler', element: page(<StudentsReport />) },
     { path: 'raporlar/devamsizlik', element: page(<AttendanceReport />) },
-    { path: 'raporlar/tahsilat', element: page(<FinanceReport />) },
-    { path: 'raporlar/sinavlar', element: page(<ExamsReport />) },
+    // Tahsilat ve alacak raporu Finans > Finans raporları ile birleşti (aynı /finance/reports verisi).
+    { path: 'raporlar/tahsilat', element: <Navigate to="/finans/raporlar" replace /> },
+    // Sınav sonuçları özeti, Sınavlar > Sonuçlar sayfasındaki "Sınav özeti" bölümüyle birleşti.
+    { path: 'raporlar/sinavlar', element: <Navigate to="/sinav-sonuclari" replace /> },
     { path: 'raporlar/on-kayit', element: page(<LeadsReport />) },
     { path: 'raporlar/ogretmen-yuku', element: page(<TeacherLoadReport />) },
     { path: 'raporlar/disiplin', element: page(<DisciplineReport />) },

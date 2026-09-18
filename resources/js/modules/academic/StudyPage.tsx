@@ -49,14 +49,14 @@ export default function StudyPage() {
       {
         key: 'when', header: 'Zaman', sortKey: 'starts_at',
         cell: (s) => (
-          <div className="min-w-[130px]">
+          <div className="min-w-0">
             <p className="font-medium tabular">{date(s.date)} · {s.start_time}</p>
             <p className="text-[12px] text-ink-3 tabular">{s.start_time}–{s.end_time} · {s.duration} dk</p>
           </div>
         ),
       },
       { key: 'kind', header: 'Tür', sortKey: 'kind', cell: (s) => <Badge tone={s.kind === 'private' ? 'accent' : 'info'}>{s.kind_label}</Badge> },
-      { key: 'subject', header: 'Ders / konu', cell: (s) => <div className="flex items-center gap-2 min-w-[160px]">{s.subject ? <ColorChip color={s.subject.color}>{s.subject.name}</ColorChip> : <span className="text-ink-3">—</span>}<span className="truncate text-ink-2">{s.topic ?? ''}</span></div> },
+      { key: 'subject', header: 'Ders / konu', cell: (s) => <div className="flex items-center gap-2 min-w-0">{s.subject ? <ColorChip color={s.subject.color}>{s.subject.name}</ColorChip> : <span className="text-ink-3">—</span>}<span className="truncate text-ink-2">{s.topic ?? ''}</span></div> },
       { key: 'teacher', header: 'Öğretmen', cell: (s) => <span className="text-ink-2">{s.teacher?.name ?? '—'}</span> },
       { key: 'room', header: 'Derslik', hideable: true, cell: (s) => <span className="text-ink-2">{s.classroom?.name ?? '—'}</span> },
       { key: 'students', header: 'Öğrenci', sortKey: 'students_count', align: 'center', cell: (s) => <span className="tabular">{s.students_count}/{s.capacity}</span> },
@@ -101,7 +101,7 @@ export default function StudyPage() {
                 { value: 'open', label: 'Açık' }, { value: 'requested', label: `Onay bekleyen ${counts.requested ?? ''}` }, { value: 'approved', label: 'Onaylı' },
                 { value: 'completed', label: 'Tamamlanan' }, { value: 'all', label: 'Tümü' },
               ]}
-              className="overflow-x-auto max-w-full"
+              className="max-w-full"
             />
             <Select value={list.filters.kind ?? ''} onChange={(e) => list.update({ filters: { kind: e.target.value } })} placeholder="Tür" options={[{ value: 'study', label: 'Etüt' }, { value: 'private', label: 'Birebir' }]} className="w-[130px]" />
             <Select value={list.filters.teacher_id ?? ''} onChange={(e) => list.update({ filters: { teacher_id: e.target.value } })} placeholder="Tüm öğretmenler" options={(options.data?.teachers ?? []).map((t) => ({ value: t.id, label: t.name }))} className="w-[190px]" />

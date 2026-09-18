@@ -1,5 +1,28 @@
 [
   {
+    "version": "1.12.0",
+    "date": "2026-09-18",
+    "title": "Sade genel bakış ve indirme kartı",
+    "items": [
+      {
+        "type": "yeni",
+        "text": "Dosya indirince sağ altta \"Aç\" ve \"Klasörde göster\" düğmeli kart çıkıyor; 10 saniye sonra kendiliğinden kapanıyor"
+      },
+      {
+        "type": "yeni",
+        "text": "Genel Bakış iki sekmeye ayrıldı (Bugün / Kurum özeti); maskot Bilge sayfa geçişlerinde ve yüklemede görünüyor"
+      },
+      {
+        "type": "iyilestirme",
+        "text": "Tablolarda yatay kaydırma kalktı; sütunlar ekran genişliğine göre satır altına iniyor"
+      },
+      {
+        "type": "iyilestirme",
+        "text": "Uyarılar, rozetler ve telefon simgeleri yenilendi; tema bilgisayarın açık/koyu ayarını izliyor"
+      }
+    ]
+  },
+  {
     "version": "1.11.0",
     "date": "2026-09-17",
     "title": "Parmak izi terminali ve güncelleme şeridi",

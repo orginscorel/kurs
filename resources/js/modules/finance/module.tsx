@@ -2,12 +2,13 @@ import {
   AlarmClock, BookOpen, BookText, FileSignature, CircleDollarSign, FilePlus2, FileSpreadsheet, FileText, HandCoins, Landmark, LayoutGrid, Lock, Package, PhoneCall,
   ReceiptText, Scale, Settings2, TrendingDown, Undo2, UserPlus, Users, Wallet,
 } from 'lucide-react'
+import { Navigate, useLocation } from 'react-router-dom'
 import { lazyPage } from '@/app/lazy'
 import { page } from '@/app/page'
 import type { ModuleDef } from '@/app/modules'
 
 const FinanceHome = lazyPage(() => import('./FinanceHome'))
-const CollectPayment = lazyPage(() => import('./CollectPayment'))
+const CollectPage = lazyPage(() => import('./CollectPage'))
 const PaymentList = lazyPage(() => import('./PaymentList'))
 const Receivables = lazyPage(() => import('./Receivables'))
 const EnrollmentList = lazyPage(() => import('./EnrollmentList'))
@@ -25,19 +26,27 @@ const Accounting = lazyPage(() => import('./Accounting'))
 const Reconciliation = lazyPage(() => import('./Reconciliation'))
 const Collections = lazyPage(() => import('./Collections'))
 const Refunds = lazyPage(() => import('./Refunds'))
-const GuardianCollect = lazyPage(() => import('./GuardianCollect'))
 const FinanceSettings = lazyPage(() => import('./FinanceSettings'))
 const PromissoryNotes = lazyPage(() => import('./PromissoryNotes'))
+
+/** Eski /finans/tahsilat/veli adresi: "Veli toplu" sekmesine, mevcut sorgu parametreleri korunarak. */
+function GuardianCollectRedirect() {
+  const { search } = useLocation()
+  const params = new URLSearchParams(search)
+  params.set('kip', 'veli')
+  return <Navigate to={`/finans/tahsilat?${params.toString()}`} replace />
+}
 
 /**
  * Finans modülü. Rotalar /finans altında; tahsilat ekranı öğrenci profilinden
  * /finans/tahsilat?ogrenci=ID (isteğe bağlı &taksit=1,2) ile açılır.
+ * Veli toplu tahsilat aynı sayfanın ikinci sekmesidir: /finans/tahsilat?kip=veli
  */
 export default {
   id: 'finance',
   routes: [
     { path: 'finans', element: page(<FinanceHome />) },
-    { path: 'finans/tahsilat', element: page(<CollectPayment />) },
+    { path: 'finans/tahsilat', element: page(<CollectPage />) },
     { path: 'finans/tahsilatlar', element: page(<PaymentList />) },
     { path: 'finans/alacaklar', element: page(<Receivables />) },
     { path: 'finans/kayitlar', element: page(<EnrollmentList />) },
@@ -49,7 +58,7 @@ export default {
     { path: 'finans/raporlar', element: page(<Reports />) },
     { path: 'finans/paketler', element: page(<Packages />) },
     { path: 'finans/envanter', element: page(<Inventory />) },
-    { path: 'finans/tahsilat/veli', element: page(<GuardianCollect />) },
+    { path: 'finans/tahsilat/veli', element: <GuardianCollectRedirect /> },
     { path: 'finans/faturalar', element: page(<Invoices />) },
     { path: 'finans/faturalar/yeni', element: page(<InvoiceEditor />) },
     { path: 'finans/faturalar/:id', element: page(<InvoiceEditor />) },
@@ -72,7 +81,6 @@ export default {
     { section: 'finance', label: 'Kasa ve Banka', to: '/finans/hesaplar', icon: Landmark, permission: 'finance.view', order: 7 },
     { section: 'finance', label: 'Muhasebe', to: '/finans/muhasebe', icon: BookText, permission: 'finance.accounting', order: 7.5 },
     { section: 'finance', label: 'Finans Raporları', to: '/finans/raporlar', icon: FileSpreadsheet, permission: 'reports.finance', order: 8 },
-    { section: 'finance', label: 'Veli toplu tahsilat', to: '/finans/tahsilat/veli', icon: Users, permission: 'payments.create', order: 20 },
     { section: 'finance', label: 'İadeler', to: '/finans/iadeler', icon: Undo2, permission: 'finance.view', order: 21 },
     { section: 'finance', label: 'Gecikme takibi', to: '/finans/takip', icon: PhoneCall, permission: 'finance.view', order: 22 },
     { section: 'finance', label: 'Mutabakat', to: '/finans/mutabakat', icon: Scale, permission: 'finance.view', order: 23 },
@@ -91,7 +99,7 @@ export default {
     { id: 'finance-dayend', label: 'Gün sonu kasa özeti', to: '/finans/hesaplar?sekme=gun-sonu', icon: Landmark, permission: 'finance.view', hint: 'Finans', keywords: ['gün sonu', 'kasa', 'banka'] },
     { id: 'finance-invoice-new', label: 'Fatura kes', to: '/finans/faturalar/yeni', icon: FilePlus2, permission: 'finance.invoice', hint: 'Finans', keywords: ['fatura', 'e-arşiv', 'e-fatura', 'kdv'] },
     { id: 'finance-unbilled', label: 'Faturalanmamış tahsilatlar', to: '/finans/faturalar?sekme=faturalanmamis', icon: FileText, permission: 'finance.view', hint: 'Finans', keywords: ['fatura', 'toplu fatura', 'taslak'] },
-    { id: 'finance-guardian-bulk', label: 'Veli toplu tahsilat', to: '/finans/tahsilat/veli', icon: Users, permission: 'payments.create', hint: 'Finans', keywords: ['kardeş', 'veli', 'toplu tahsilat'] },
+    { id: 'finance-guardian-bulk', label: 'Veli toplu tahsilat', to: '/finans/tahsilat?kip=veli', icon: Users, permission: 'payments.create', hint: 'Finans', keywords: ['kardeş', 'veli', 'toplu tahsilat'] },
     { id: 'finance-collections', label: 'Gecikme takibi', to: '/finans/takip', icon: PhoneCall, permission: 'finance.view', hint: 'Finans', keywords: ['ödeme sözü', 'hatırlatma', 'yaşlandırma', 'arama'] },
     { id: 'finance-refunds', label: 'İadeler', to: '/finans/iadeler', icon: Undo2, permission: 'finance.view', hint: 'Finans', keywords: ['iade', 'geri ödeme'] },
     { id: 'finance-reconcile', label: 'Banka / POS mutabakatı', to: '/finans/mutabakat', icon: Scale, permission: 'finance.view', hint: 'Finans', keywords: ['mutabakat', 'pos', 'komisyon', 'banka ekstresi', 'yatış'] },

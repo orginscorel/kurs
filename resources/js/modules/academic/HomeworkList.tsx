@@ -46,14 +46,14 @@ export default function HomeworkList() {
       {
         key: 'title', header: 'Ödev', sortKey: 'title',
         cell: (h) => (
-          <div className="min-w-[220px]">
+          <div className="min-w-0">
             <p className="font-medium text-ink truncate">{h.title}</p>
             <p className="text-[12.5px] text-ink-3 truncate">{h.class_group ? `Sınıf: ${h.class_group}` : 'Seçili öğrencilere'}{h.topic ? ` · Konu: ${h.topic}` : ''}</p>
           </div>
         ),
       },
-      { key: 'subject', header: 'Ders', cell: (h) => (h.subject ? <ColorChip color={h.subject.color}>{h.subject.name}</ColorChip> : '—') },
-      { key: 'teacher', header: 'Veren öğretmen', hideable: true, cell: (h) => <span className="text-ink-2">{h.teacher ?? '—'}</span> },
+      { key: 'subject', priority: 3, header: 'Ders', cell: (h) => (h.subject ? <ColorChip color={h.subject.color}>{h.subject.name}</ColorChip> : '—') },
+      { key: 'teacher', priority: 4, header: 'Veren öğretmen', hideable: true, cell: (h) => <span className="text-ink-2">{h.teacher ?? '—'}</span> },
       {
         key: 'due', header: 'Son teslim', sortKey: 'due_at',
         cell: (h) => (
@@ -72,8 +72,8 @@ export default function HomeworkList() {
           </div>
         ),
       },
-      { key: 'missed', header: 'Yapmayan', align: 'center', hideable: true, cell: (h) => (h.missed_count ? <span className="text-danger tabular">{h.missed_count}</span> : <span className="text-ink-3">—</span>) },
-      { key: 'graded', header: 'Puan verilen', align: 'center', hideable: true, cell: (h) => <span className="tabular">{h.graded_count}</span> },
+      { key: 'missed', priority: 3, header: 'Yapmayan', align: 'center', hideable: true, cell: (h) => (h.missed_count ? <span className="text-danger tabular">{h.missed_count}</span> : <span className="text-ink-3">—</span>) },
+      { key: 'graded', priority: 4, header: 'Puan verilen', align: 'center', hideable: true, cell: (h) => <span className="tabular">{h.graded_count}</span> },
     ],
     [],
   )

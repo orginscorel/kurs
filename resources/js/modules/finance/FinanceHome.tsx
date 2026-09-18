@@ -70,7 +70,7 @@ export default function FinanceHome() {
               </ButtonLink>
             )}
             {can('payments.create') && (
-              <ButtonLink to="/finans/tahsilat/veli" icon={<Users className="size-4" />}>
+              <ButtonLink to="/finans/tahsilat?kip=veli" icon={<Users className="size-4" />}>
                 Veli toplu
               </ButtonLink>
             )}

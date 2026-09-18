@@ -69,7 +69,7 @@ export default function Refunds() {
         key: 'refund',
         header: 'İade no / tarih',
         cell: (r) => (
-          <div className="min-w-[130px]">
+          <div className="min-w-0">
             <p className={cn('font-medium tabular', r.voided_at && 'line-through text-ink-3')}>{r.refund_no}</p>
             <p className="text-[12px] text-ink-3 tabular">{dateTime(r.refunded_at)}</p>
           </div>
@@ -80,7 +80,7 @@ export default function Refunds() {
         header: 'Öğrenci',
         cell: (r) =>
           r.student ? (
-            <div className="min-w-[140px]">
+            <div className="min-w-0">
               <Link to={`/ogrenciler/${r.student.id}`} onClick={(e) => e.stopPropagation()} className="block truncate font-medium hover:underline">{r.student.full_name}</Link>
               <p className="truncate text-[12px] text-ink-3">{r.payee_name ? `İadeyi alan: ${r.payee_name}` : `Öğrenci no: ${r.student.student_no}`}</p>
             </div>

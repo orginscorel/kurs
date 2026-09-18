@@ -1,3 +1,4 @@
+import { Link, Navigate } from 'react-router-dom'
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { BarChart3, Info } from 'lucide-react'
@@ -19,7 +20,6 @@ const OPTIONS: { value: string; label: string }[] = [
   { value: 'aging', label: 'Yaşlandırma' },
   { value: 'invoice-vat', label: 'Fatura ve KDV' },
   { value: 'program-profitability', label: 'Program kârlılığı' },
-  { value: 'trial-balance', label: 'Mizan' },
 ]
 
 function fmt(v: string | number | null | undefined, type: AnalyticsColumn['type']): string {
@@ -43,9 +43,11 @@ function FinanceAnalyticsReport() {
   const def = presetRange('year')
   const [f, setF] = useUrlFilters({ rapor: 'income-statement', from: def.from, to: def.to })
   const key = OPTIONS.some((o) => o.value === f.rapor) ? f.rapor : 'income-statement'
+  // Mizan tek yerde: Finans > Muhasebe > Mizan. Eski ?rapor=trial-balance bağlantısı oraya gider.
+  const toTrialBalance = f.rapor === 'trial-balance'
   const isAging = key === 'aging'
   const query = { from: f.from, to: f.to }
-  const enabled = can('reports.view') && can('reports.finance')
+  const enabled = can('reports.view') && can('reports.finance') && !toTrialBalance
 
   const { data, isLoading, isFetching } = useQuery({
     queryKey: ['finance', 'analytics', key, query],
@@ -61,6 +63,8 @@ function FinanceAnalyticsReport() {
     : []
   const hasChart = chartRows.some((row) => r!.chart!.series.some((s) => (row as Record<string, number | string>)[s.key] !== 0))
   const empty = !!r && r.tables.every((t) => t.rows.length === 0)
+
+  if (toTrialBalance) return <Navigate to="/finans/muhasebe?sekme=mizan" replace />
 
   return (
     <ReportFrame
@@ -95,6 +99,11 @@ function FinanceAnalyticsReport() {
             <div className="flex flex-wrap items-center gap-2">
               <DateRange from={f.from} to={f.to} presets={['month', 'last_month', 'year', 'last12']} onChange={(x) => setF(x)} />
             </div>
+          )}
+          {can('finance.accounting') && (
+            <p className="text-[12.5px] text-ink-3">
+              Mizan, yevmiye ve hesap planı tek yerde: <Link to="/finans/muhasebe?sekme=mizan" className="text-primary hover:underline">Finans &gt; Muhasebe &gt; Mizan</Link>
+            </p>
           )}
         </div>
       }

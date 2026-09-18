@@ -104,7 +104,7 @@ export default function Collections() {
         header: 'Öğrenci',
         sortKey: 'student',
         cell: (r) => (
-          <div className="min-w-[150px]">
+          <div className="min-w-0">
             <p className="truncate font-medium text-ink">{r.student}</p>
             <p className="truncate text-[12px] text-ink-3">Öğrenci no: {r.student_no}</p>
           </div>
@@ -115,7 +115,7 @@ export default function Collections() {
         header: 'Veli',
         cell: (r) =>
           r.guardian ? (
-            <div className="min-w-[150px] space-y-0.5">
+            <div className="min-w-0 space-y-0.5">
               <PersonText className="text-ink-2">{r.guardian.name}</PersonText>
               <div><PhoneText value={r.guardian.phone} muted whatsapp /></div>
             </div>
@@ -124,7 +124,7 @@ export default function Collections() {
           ),
       },
       {
-        key: 'overdue',
+        key: 'overdue', priority: 1,
         header: 'Gecikmiş tutar',
         sortKey: 'overdue',
         align: 'right',
@@ -164,7 +164,7 @@ export default function Collections() {
         ),
       },
       {
-        key: 'promise',
+        key: 'promise', priority: 3,
         header: 'Ödeme sözü',
         sortKey: 'promise',
         cell: (r) =>
@@ -178,7 +178,7 @@ export default function Collections() {
           ),
       },
       {
-        key: 'note',
+        key: 'note', priority: 4,
         header: 'Son takip notu',
         hideable: true,
         maxWidth: 220,
@@ -192,7 +192,7 @@ export default function Collections() {
             <span className="text-ink-3">—</span>
           ),
       },
-      { key: 'responsible', header: 'Takip sorumlusu', hideable: true, cell: (r) => <span className="text-ink-2 whitespace-nowrap">{r.responsible ?? '—'}</span> },
+      { key: 'responsible', priority: 4, header: 'Takip sorumlusu', hideable: true, cell: (r) => <span className="text-ink-2 whitespace-nowrap">{r.responsible ?? '—'}</span> },
       {
         key: 'credit',
         header: 'Kullanılabilir avans',

@@ -159,7 +159,7 @@ function JournalTab() {
         key: 'no',
         header: 'Fiş no / tarih',
         cell: (r) => (
-          <div className="min-w-[120px]">
+          <div className="min-w-0">
             <p className={cn('font-medium tabular', r.reversed && 'text-ink-3')}>{r.entry_no}</p>
             <p className="text-[12px] text-ink-3 tabular">{date(r.entry_date)}</p>
           </div>

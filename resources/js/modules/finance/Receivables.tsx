@@ -99,24 +99,24 @@ export default function Receivables() {
         header: 'Öğrenci',
         sortKey: 'student',
         cell: (r) => (
-          <div className="min-w-[170px]">
+          <div className="min-w-0">
             <Link to={`/ogrenciler/${r.student_id}`} onClick={(e) => e.stopPropagation()} className="font-medium text-ink hover:underline">{r.student}</Link>
             <p className="truncate text-[12px] text-ink-3">{r.guardian ? `Veli: ${r.guardian}` : `Öğrenci no: ${r.student_no}`}</p>
           </div>
         ),
       },
       {
-        key: 'enrollment',
+        key: 'enrollment', priority: 4,
         header: 'Kayıt no / program',
         hideable: true,
         cell: (r) => (
-          <div className="min-w-[120px]">
+          <div className="min-w-0">
             <Link to={`/finans/kayitlar/${r.enrollment_id}`} onClick={(e) => e.stopPropagation()} className="tabular text-ink-2 hover:underline">{r.enrollment_no}</Link>
             <p className="truncate text-[12px] text-ink-3">{r.program}</p>
           </div>
         ),
       },
-      { key: 'seq', header: 'Taksit sırası', cell: (r) => <span className="text-ink-2 tabular whitespace-nowrap">{r.sequence}. taksit</span> },
+      { key: 'seq', priority: 4, header: 'Taksit sırası', cell: (r) => <span className="text-ink-2 tabular whitespace-nowrap">{r.sequence}. taksit</span> },
       {
         key: 'due',
         header: 'Vade tarihi',
@@ -129,9 +129,9 @@ export default function Receivables() {
         ),
       },
       { key: 'status', header: 'Durum', cell: (r) => <Badge tone={INSTALLMENT_STATUS[r.effective_status]?.tone ?? 'neutral'} dot>{INSTALLMENT_STATUS[r.effective_status]?.label ?? r.effective_status}</Badge> },
-      { key: 'amount', header: 'Taksit tutarı', sortKey: 'amount', align: 'right', hideable: true, cell: (r) => <span className="text-ink-2">{money(r.amount)}</span> },
+      { key: 'amount', priority: 3, header: 'Taksit tutarı', sortKey: 'amount', align: 'right', hideable: true, cell: (r) => <span className="text-ink-2">{money(r.amount)}</span> },
       { key: 'paid', header: 'Ödenen', align: 'right', hideable: true, defaultHidden: true, cell: (r) => <span className="text-ink-2">{money(r.paid_amount)}</span> },
-      { key: 'remaining', header: 'Kalan borç', sortKey: 'remaining', align: 'right', cell: (r) => <span className={cn('font-semibold', r.days_overdue > 0 && 'text-danger')}>{money(r.remaining)}</span> },
+      { key: 'remaining', priority: 1, header: 'Kalan borç', sortKey: 'remaining', align: 'right', cell: (r) => <span className={cn('font-semibold', r.days_overdue > 0 && 'text-danger')}>{money(r.remaining)}</span> },
     ],
     [],
   )
@@ -143,18 +143,18 @@ export default function Receivables() {
         header: 'Öğrenci',
         sortKey: 'student',
         cell: (r) => (
-          <div className="min-w-[170px]">
+          <div className="min-w-0">
             <p className="font-medium text-ink">{r.student}</p>
             <p className="text-[12px] text-ink-3 tabular">Öğrenci no: {r.student_no} · {r.open_count} açık taksit</p>
           </div>
         ),
       },
       {
-        key: 'guardian',
+        key: 'guardian', priority: 3,
         header: 'Veli / ödeme sorumlusu',
         cell: (r) =>
           r.guardian ? (
-            <div className="min-w-[150px] space-y-0.5">
+            <div className="min-w-0 space-y-0.5">
               <PersonText className="text-ink-2">{r.guardian.name}</PersonText>
               <div><PhoneText value={r.guardian.phone} muted whatsapp /></div>
             </div>
@@ -163,7 +163,7 @@ export default function Receivables() {
           ),
       },
       {
-        key: 'oldest',
+        key: 'oldest', priority: 3,
         header: 'En eski vade',
         sortKey: 'oldest_due',
         cell: (r) => (
@@ -178,10 +178,11 @@ export default function Receivables() {
         header: `Gecikme ${b.label}`,
         align: 'right' as const,
         hideable: true,
+        priority: 4 as const,
         cell: (r: StudentRow) => (Number(r.buckets[b.key]) > 0 ? <span className="text-ink-2">{money(r.buckets[b.key], { short: true })}</span> : <span className="text-ink-3">—</span>),
       })),
-      { key: 'overdue', header: 'Vadesi geçmiş', sortKey: 'overdue', align: 'right', cell: (r) => <span className={cn('font-semibold', Number(r.overdue) > 0 ? 'text-danger' : 'text-ink-3')}>{money(r.overdue, { short: true })}</span> },
-      { key: 'remaining', header: 'Toplam kalan borç', sortKey: 'remaining', align: 'right', cell: (r) => <span className="font-semibold">{money(r.remaining, { short: true })}</span> },
+      { key: 'overdue', priority: 2, header: 'Vadesi geçmiş', sortKey: 'overdue', align: 'right', cell: (r) => <span className={cn('font-semibold', Number(r.overdue) > 0 ? 'text-danger' : 'text-ink-3')}>{money(r.overdue, { short: true })}</span> },
+      { key: 'remaining', priority: 1, header: 'Toplam kalan borç', sortKey: 'remaining', align: 'right', cell: (r) => <span className="font-semibold">{money(r.remaining, { short: true })}</span> },
       {
         key: 'action',
         header: '',
@@ -213,7 +214,7 @@ export default function Receivables() {
             size="sm"
             value={status}
             onChange={(v) => list.update({ filters: { status: v === 'open' ? null : v } })}
-            className="overflow-x-auto max-w-full"
+            className="max-w-full"
             options={[
               { value: 'open', label: `Açık ${counts.open ?? ''}` },
               { value: 'overdue', label: `Gecikti ${counts.overdue ?? ''}` },

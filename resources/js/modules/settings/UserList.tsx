@@ -58,7 +58,7 @@ export default function UserList() {
       {
         key: 'name', header: 'Kullanıcı', sortKey: 'name',
         cell: (u) => (
-          <div className="flex items-center gap-3 min-w-[180px]">
+          <div className="flex items-center gap-3 min-w-0">
             <Avatar name={u.name} size={32} />
             <div className="min-w-0">
               <p className="font-medium text-ink truncate">{u.name}</p>
@@ -67,12 +67,12 @@ export default function UserList() {
           </div>
         ),
       },
-      { key: 'type', header: 'Hesap türü', cell: (u) => <Badge>{u.user_type_label}</Badge> },
-      { key: 'roles', header: 'Roller', hideable: true, cell: (u) => <div className="flex flex-wrap gap-1">{u.roles.length ? u.roles.map((r) => <Badge key={r}>{options.data?.role_labels?.[r] ?? r}</Badge>) : <span className="text-ink-3">—</span>}</div> },
-      { key: 'contact', header: 'İletişim', hideable: true, cell: (u) => u.phone || u.email ? <div className="flex flex-col gap-0.5"><PhoneText value={u.phone} />{u.email && <MailText value={u.email} />}</div> : <span className="text-ink-3">—</span> },
+      { key: 'type', priority: 3, header: 'Hesap türü', cell: (u) => <Badge>{u.user_type_label}</Badge> },
+      { key: 'roles', priority: 3, header: 'Roller', hideable: true, cell: (u) => <div className="flex flex-wrap gap-1">{u.roles.length ? u.roles.map((r) => <Badge key={r}>{options.data?.role_labels?.[r] ?? r}</Badge>) : <span className="text-ink-3">—</span>}</div> },
+      { key: 'contact', priority: 3, header: 'İletişim', hideable: true, cell: (u) => u.phone || u.email ? <div className="flex flex-col gap-0.5"><PhoneText value={u.phone} />{u.email && <MailText value={u.email} />}</div> : <span className="text-ink-3">—</span> },
       { key: 'status', header: 'Durum', cell: (u) => <Badge tone={u.is_active ? 'success' : 'neutral'} dot>{u.is_active ? 'Aktif' : 'Pasif'}</Badge> },
-      { key: 'last_login', header: 'Son giriş zamanı', hideable: true, cell: (u) => <span className="text-ink-2">{u.last_login_at ? relative(u.last_login_at) : '—'}</span> },
-      { key: 'last_ip', header: 'Son giriş IP adresi', hideable: true, cell: (u) => <span className="text-ink-2 tabular">{u.last_login_ip ?? '—'}</span> },
+      { key: 'last_login', priority: 4, header: 'Son giriş zamanı', hideable: true, cell: (u) => <span className="text-ink-2">{u.last_login_at ? relative(u.last_login_at) : '—'}</span> },
+      { key: 'last_ip', priority: 4, header: 'Son giriş IP adresi', hideable: true, cell: (u) => <span className="text-ink-2 tabular">{u.last_login_ip ?? '—'}</span> },
       {
         key: 'actions', header: '', align: 'right',
         cell: (u) =>

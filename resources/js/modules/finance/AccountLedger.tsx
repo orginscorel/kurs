@@ -39,7 +39,7 @@ export default function AccountLedger() {
       key: 'desc',
       header: 'Açıklama',
       cell: (t) => (
-        <div className="min-w-[220px]">
+        <div className="min-w-0">
           <p className="text-ink">{t.description}</p>
           <p className="text-[12px] text-ink-3">
             <Badge className="mr-1.5">{SOURCE_LABELS[t.source_type] ?? t.source_type}</Badge>
