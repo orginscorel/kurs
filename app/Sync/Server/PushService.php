@@ -3,6 +3,7 @@
 namespace App\Sync\Server;
 
 use App\Exceptions\BusinessRuleException;
+use App\Support\BranchContext;
 use App\Sync\BranchResolver;
 use App\Sync\ChangeRecorder;
 use App\Sync\Commands\CommandCodec;
@@ -12,12 +13,15 @@ use App\Sync\Models\SyncDevice;
 use App\Sync\RowCodec;
 use App\Sync\Sweeper;
 use App\Sync\SyncContext;
+use App\Sync\SyncNumbers;
 use App\Sync\SyncRegistry;
 use App\Sync\SyncSchema;
 use App\Sync\SyncTable;
-use App\Support\BranchContext;
 use Carbon\CarbonImmutable;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 /**
@@ -42,7 +46,7 @@ class PushService
     ) {}
 
     /**
-     * @param list<array<string, mixed>> $changes
+     * @param  list<array<string, mixed>>  $changes
      * @return array{results: list<array<string, mixed>>, cursor: int, accepted: int, rejected: int, conflicts: int, duplicates: int}
      */
     public function push(SyncDevice $device, array $changes, ?int $baseCursor, ?string $deviceTime): array
@@ -59,13 +63,17 @@ class PushService
 
         $results = [];
         $stats = ['accepted' => 0, 'rejected' => 0, 'conflicts' => 0, 'duplicates' => 0];
+        $newRejects = 0;
 
-        app(BranchContext::class)->run((int) $device->branch_id, function () use ($device, $changes, $baseCursor, $baseTime, $skew, &$results, &$stats) {
-            DB::transaction(function () use ($device, $changes, $baseCursor, $baseTime, $skew, &$results, &$stats) {
+        app(BranchContext::class)->run((int) $device->branch_id, function () use ($device, $changes, $baseCursor, $baseTime, $skew, &$results, &$stats, &$newRejects) {
+            DB::transaction(function () use ($device, $changes, $baseCursor, $baseTime, $skew, &$results, &$stats, &$newRejects) {
                 foreach ($changes as $change) {
                     $id = (string) ($change['id'] ?? '');
                     $receipt = $id !== '' ? DB::table('sync_receipts')->where('change_uuid', $id)->first() : null;
-                    if ($receipt) {
+                    // Reddedilmiş makbuz: cihaz yeniden deniyor (ör. üst kayıt artık var) → yeniden değerlendir.
+                    // Kabul edilmiş makbuz ise eskisi gibi 'duplicate' (işlem ikinci kez yürütülmez).
+                    $retry = $receipt && $receipt->status === 'rejected' && (int) $receipt->device_id === (int) $device->id;
+                    if ($receipt && ! $retry) {
                         $prev = json_decode((string) $receipt->result, true) ?: [];
                         $results[] = ['id' => $id, 'status' => 'duplicate', 'previous' => $receipt->status] + array_intersect_key($prev, array_flip(['row', 'unused_uuids']));
                         $stats['duplicates']++;
@@ -83,24 +91,32 @@ class PushService
                         $result = ['status' => 'rejected', 'code' => 'validation_failed', 'message' => collect($e->errors())->flatten()->first() ?? 'Doğrulama hatası.'];
                     } catch (SyncReject $e) {
                         $result = ['status' => 'rejected', 'code' => $e->errorCode, 'message' => $e->getMessage()];
-                    } catch (\Illuminate\Database\QueryException $e) {
+                    } catch (QueryException $e) {
                         report($e);
                         $result = ['status' => 'rejected', 'code' => 'database_error', 'message' => 'Kayıt sunucu veritabanı kurallarına uymadı.'];
                     }
 
                     $result['id'] = $id;
+                    if ($retry) {
+                        $result['retried'] = true;
+                    }
                     if ($result['status'] === 'rejected') {
                         $stats['rejected']++;
-                        $this->conflicts->rejected($device, $change, $result);
+                        $newRejects += $retry ? 0 : 1;
+                        // Yeniden denemede tekrar reddedilen: yeni çakışma kaydı açılmaz (açık kayıt notu güncellenir)
+                        $retry ? $this->conflicts->rejectedAgain($device, $change, $result) : $this->conflicts->rejected($device, $change, $result);
                     } elseif (($result['conflicts'] ?? 0) > 0) {
                         $stats['conflicts']++;
                         $stats['accepted']++;
                     } else {
                         $stats['accepted']++;
                     }
+                    if ($retry && $result['status'] !== 'rejected') {
+                        $this->conflicts->resolveRejected($device, $id);
+                    }
                     if ($id !== '') {
-                        DB::table('sync_receipts')->insert([
-                            'change_uuid' => $id, 'device_id' => $device->id, 'status' => $result['status'],
+                        DB::table('sync_receipts')->updateOrInsert(['change_uuid' => $id], [
+                            'device_id' => $device->id, 'status' => $result['status'],
                             'result' => json_encode($result, JSON_UNESCAPED_UNICODE), 'created_at' => now(),
                         ]);
                     }
@@ -109,7 +125,7 @@ class PushService
 
                 $device->forceFill([
                     'last_push_at' => now(), 'last_seen_at' => now(),
-                    'rejected_total' => $device->rejected_total + $stats['rejected'],
+                    'rejected_total' => $device->rejected_total + $newRejects,
                 ])->save();
             });
         });
@@ -372,7 +388,7 @@ class PushService
         }
         $this->recorder->write($def->table, $canonical, $op === 'delete' ? 'delete' : 'insert', $keyFields + $this->codec->encode($def->table, $decoded),
             $this->branches->resolve($def, $decoded), [
-                'change_uuid' => $c['id'] ?? (string) \Illuminate\Support\Str::uuid7(),
+                'change_uuid' => $c['id'] ?? (string) Str::uuid7(),
                 'source' => 'device', 'origin_device_id' => $device->id,
             ]);
 
@@ -393,7 +409,7 @@ class PushService
 
         $uuids = is_array($c['uuids'] ?? null) ? $c['uuids'] : [];
         $numbers = array_intersect_key(is_array($c['numbers'] ?? null) ? $c['numbers'] : [],
-            array_flip([...\App\Sync\SyncNumbers::DEVICE_DOCUMENTS, ...\App\Sync\SyncNumbers::LEASABLE]));
+            array_flip([...SyncNumbers::DEVICE_DOCUMENTS, ...SyncNumbers::LEASABLE]));
         // Cihazın vereceği uuid sunucuda başka satırda varsa (bozuk paket) kabul etme
         foreach ($uuids as $table => $list) {
             if (! is_string($table) || ! SyncRegistry::get($table)?->hasUuid() || ! $this->schema->hasUuid($table)) {
@@ -422,7 +438,7 @@ class PushService
         $handler = app($def['handler'][0]);
         $method = $def['handler'][1];
         $reconcile = function ($model, string $note) use ($device, $def, $c) {
-            $table = $model instanceof \Illuminate\Database\Eloquent\Model ? $model->getTable() : $def['root'];
+            $table = $model instanceof Model ? $model->getTable() : $def['root'];
             $this->conflicts->record($device, [
                 'kind' => 'finance', 'table_name' => $table, 'row_uuid' => $model->getAttribute('uuid'), 'row_id' => (int) $model->getKey(),
                 'device_value' => $def['label'], 'server_value' => null, 'winner' => 'both',
@@ -512,7 +528,7 @@ class PushService
 
         return (int) $this->context->applying(function () use ($class, $def, $decoded) {
             if ($class) {
-                /** @var \Illuminate\Database\Eloquent\Model $model */
+                /** @var Model $model */
                 $model = new $class;
                 $model->setRawAttributes($decoded);
                 if ($model->usesTimestamps()) {
@@ -542,7 +558,7 @@ class PushService
         $this->context->applying(function () use ($class, $def, $id, $decoded) {
             if ($class) {
                 $query = $class::query()->withoutGlobalScopes();
-                /** @var \Illuminate\Database\Eloquent\Model|null $model */
+                /** @var Model|null $model */
                 $model = $query->find($id);
                 if ($model) {
                     $model->setRawAttributes(array_merge($model->getAttributes(), $decoded));
@@ -561,7 +577,7 @@ class PushService
     private function recordApplied(SyncDevice $device, SyncTable $def, string $rowUuid, string $op, ?array $fields, array $row, array $c, bool $echo): void
     {
         $this->recorder->write($def->table, $rowUuid, $op, $fields, $this->branches->resolve($def, $row), [
-            'change_uuid' => $c['id'] ?? (string) \Illuminate\Support\Str::uuid7(),
+            'change_uuid' => $c['id'] ?? (string) Str::uuid7(),
             'source' => 'device', 'origin_device_id' => $device->id, 'echo' => $echo,
             'client_at' => isset($c['at']) ? CarbonImmutable::parse($c['at'])->format('Y-m-d H:i:s.v') : null,
         ]);

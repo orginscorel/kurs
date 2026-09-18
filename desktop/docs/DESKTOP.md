@@ -160,7 +160,9 @@ desktop/                              (sunucuda /home/oritoriu/kurs-desktop)
 ├── scripts/
 │   ├── build-static-php.sh           static-php-cli 2.8.5 ile PHP 8.4 (CI, macOS)
 │   ├── bundle-laravel.sh             web uygulamasının üretim kopyası → build/laravel
-│   ├── make-latest-json.mjs          güncelleyici bildirimi
+│   ├── make-latest-json.mjs          güncelleyici bildirimi (darwin-aarch64 / darwin-x86_64 / darwin-universal)
+│   ├── thin-macos-app.sh             CI: universal .app → işlemciye özel ince kopyalar (lipo -thin + yeniden imza)
+│   ├── notarize-parallel.sh          CI: DMG + ince .app'leri aynı anda notarize et, bekle, zımbala
 │   ├── release.mjs                   sürüm + CHANGELOG (+ check/sync)
 │   ├── local-smoke.sh                paket düzenini Linux'ta yerel kipte deneme
 │   └── assemble-repo.sh              tek depo çalışma ağacı (kök web + desktop/)
@@ -191,10 +193,46 @@ Web uygulamasına eklenenler (hepsi yeni dosya; tek ortak dosya `bootstrap/provi
 
 | İş | Koşucu | Ne yapar |
 |---|---|---|
-| `check` | macos-14 | sürüm tutarlılığı (`release.mjs check`), ön yüz `tsc` + `vite build`, yer tutucu paketle **`cargo check`** + clippy (uyarı), Cargo.lock'u yapıt olarak verir |
 | `php` (×2) | macos-14 (arm64), macos-15-intel (x86_64) | static-php-cli 2.8.5 → PHP 8.4 CLI; uzantılar: bcmath ctype curl dom exif fileinfo filter gd(png/jpeg/webp/freetype) iconv intl mbstring opcache openssl pcntl pdo pdo_sqlite phar posix session simplexml sodium sqlite3 tokenizer xml xmlreader xmlwriter zip zlib; JIT derlemede kapalı; Türkçe Collator, sodium, gd, sqlite doğrulaması; `actions/cache` (anahtar: mimari + spc + php + betik özeti) |
-| `laravel` | ubuntu-latest | PHP 8.4 + Node 22; web birim testleri; `bundle-laravel.sh` (composer `--no-dev -o --classmap-authoritative`, `vite build` → `public/build`, sadeleştirme, sır taraması, artisan doğrulaması) |
-| `build` | macos-14 | yapıtları yerleştir, `lipo` ile universal PHP, Mozilla CA listesi (özet doğrulamalı), güncelleyici açık anahtarı; **paketlenmiş PHP ile duman testi** (migrate, php -S + router, jetonsuz 403 / jetonlu 200); geçici anahtar zinciri + sertifika; gömülü PHP'yi imzala; `tauri build --target universal-apple-darwin` (imza + notarization + zımba + güncelleyici imzası); DMG imzala → `notarytool submit --wait` → `stapler staple`; `codesign --verify --deep --strict`, `spctl`; `latest.json` + SHA256SUMS; yapıt; etiketliyse GitHub Release |
+| `laravel` | ubuntu-latest | PHP 8.4 + Node 22; **masaüstü sürüm tutarlılığı** (`release.mjs check`, ucuz erken durdurma); web birim testleri; `bundle-laravel.sh` (composer `--no-dev -o --classmap-authoritative`, `vite build` → `public/build`, sadeleştirme, sır taraması, artisan doğrulaması) |
+| `build` | macos-14 | sürüm tutarlılığı (`release.mjs check`, etiket = sürüm), yapıtları yerleştir, `lipo` ile universal PHP, Mozilla CA listesi (özet doğrulamalı), güncelleyici açık anahtarı; **paketlenmiş PHP ile duman testi** (migrate, php -S + router, jetonsuz 403 / jetonlu 200); geçici anahtar zinciri + sertifika; gömülü PHP'yi imzala; `tauri build --target universal-apple-darwin` (imza + notarization + zımba + güncelleyici imzası); **işlemciye özel ince .app'ler** (`thin-macos-app.sh`: kopya → `lipo -thin` → önce `php`, sonra paket yeniden imzalanır → `codesign --verify --deep --strict`); DMG imzala → DMG + aarch64 .app + x86_64 .app **paralel** `notarytool submit --no-wait` → hepsini bekle → `stapler staple` (`notarize-parallel.sh`); ince .app'lerden `ErbaaKurs_<sürüm>_{aarch64,x86_64}.app.tar.gz` + `tauri signer sign` ile `.sig`; `codesign`/`spctl`/`stapler validate` (universal + iki ince); `latest.json` + SHA256SUMS; taslak ya da etiketliyse GitHub Release |
+
+Ayrı `check` işi (cargo check + tsc) 1.12.2'de kaldırıldı: aynı denetimler `build` içinde zaten koşuyor (tsc + vite
+`tauri build`'in `beforeBuildCommand`'ında, derleme `cargo check`'i kapsar); her macOS işi en az 1 dk (özel depoda
+×10) faturalandığı için yalnız dakika harcıyordu. clippy yalnız uyarı veriyordu → yerelde `cargo clippy` çalıştırın.
+Süre (1.12.0 ölçümü): build ~13 dk (tauri derleme ~10,5 dk, DMG notarization ~1,5 dk); ince paketler ~+2-4 dk
+(kopya/imza ~30 sn, notarization DMG ile paralel, tar+gzip iki mimari paralel). İş zaman aşımı 90 dk.
+
+### İşlemciye özel güncelleme paketleri (1.12.2+)
+
+Universal güncelleme arşivi 73 MB'tı (gömülü PHP iki dilim × ~24 MB sıkıştırılmış, Laravel ~12 MB, Tauri ikilisi
+iki dilim × ~4 MB). Güncelleyici artık yalnız kendi işlemcisinin paketini indirir:
+
+| Dosya | Boyut (1.12.0 içeriğiyle ölçüldü) | Kim indirir |
+|---|---|---|
+| `ErbaaKurs_<s>_aarch64.app.tar.gz` | ~42 MB (40,0 MiB) | Apple Silicon (`darwin-aarch64`) |
+| `ErbaaKurs_<s>_x86_64.app.tar.gz` | ~43 MB (40,6 MiB) | Intel (`darwin-x86_64`) |
+| `ErbaaKurs_<s>_universal.app.tar.gz` | ~74 MB (70,2 MiB) | yalnız `darwin-universal` anahtarı (geri uyumluluk / elle) |
+| `ErbaaKurs_<s>_universal.dmg` | ~72 MB | ilk kurulum (/uygulamalar) — universal kalır |
+
+* **Anahtar seçimi:** `tauri-plugin-updater` 2.11 `latest.json`'da önce `darwin-<arch>-app`, sonra `darwin-<arch>`
+  arar; `<arch>` ÇALIŞAN ikilinin mimarisidir (universal paket Apple Silicon'da aarch64 dilimiyle çalışır). `darwin-universal`
+  anahtarını eklenti kendiliğinden hiç okumaz (yalnız `Builder::target(...)` ile elle verilirse). Yani mevcut universal
+  kurulumlar da bir sonraki güncellemede kendi ince paketine geçer; ince kurulum da hep kendi anahtarını okur.
+* **Neden inceltme (iki ayrı `tauri build` değil):** universal derleme iki mimariyi zaten derliyor; ayrı hedefler her
+  biri için yeniden paketleme + SIRALI notarization bekleme demek (+5-10 dk). İnceltilmiş kopya universal paketle aynı
+  içeriği taşır; yalnız Mach-O dilimleri ayrılır, imza içten dışa yeniden atılır (Apple önerisi: önce iç kod, en son
+  paket; imzalamada `--deep` YOK — iç koda paketin yetkilerini basar ve hataları gizler; yalnız doğrulamada kullanılır).
+  Eski zımba bileti (`Contents/CodeResources`) silinir, yeni notarization'dan sonra yenisi zımbalanır. `php`'nin mevcut
+  imza kimliği (Identifier) korunur; yetkiler `src-tauri/Entitlements.plist` (tauri'nin kullandığıyla aynı).
+* **Arşiv yapısı** tauri'ninkiyle aynı: kökte `Erbaa Kurs.app/` (güncelleyici ilk yol bileşenini atlayarak açar).
+  macOS `tar`'ı `COPYFILE_DISABLE=1 --no-mac-metadata --no-xattrs` ile çalışır: `._*` AppleDouble dosyaları pakete
+  girerse açılan uygulamanın imzası bozulur (CI bunu denetler). `gzip -9` (updater yalnız gzip okur).
+* **İmza:** `npx tauri signer sign` + aynı `TAURI_SIGNING_PRIVATE_KEY` → tauri'nin universal için ürettiğiyle aynı
+  biçim (base64 kodlu minisign: `untrusted comment: signature from tauri secret key` / imza / `trusted comment:
+  timestamp:… file:<arşiv adı>` / genel imza). `make-latest-json.mjs` biçimi denetler. **`tauri signer sign --help`
+  CI'da çağırmayın: ortamdaki özel anahtarı ekrana basar.**
+* **İmzasız deneme (`unsigned`):** ince .app'ler ad-hoc imzalanır, notarize edilmez; arşivler yine üretilir.
 
 İmzasız deneme (Apple hesabı hazır değilken): Actions › desktop-macos › Run workflow › `unsigned` ✔ →
 ad-hoc imzalı DMG yapıt olarak iner (Gatekeeper uyarır; sağ tık › Aç). Yine de `TAURI_SIGNING_PRIVATE_KEY` ve
@@ -226,11 +264,17 @@ Sunucu tarafı (`/home/oritoriu/kurs-app/.env`, elle eklenir): `DESKTOP_GITHUB_T
 * **Bildirim adresi: `https://kurs.bogahostdeveloper.com.tr/desktop/latest.json`** (tauri.conf.json › plugins.updater).
   GitHub Releases doğrudan kullanılamaz: depo **özel** olduğu için sürüm dosyaları oturumsuz indirilemez (uygulamaya
   GitHub anahtarı gömmek kabul edilemez). Bu yüzden:
-  1. CI sürümü GitHub Release'e yükler (`ErbaaKurs_<sürüm>_universal.dmg`, `.app.tar.gz`, `.sig`, `latest.json`, `CHANGELOG.json`).
+  1. CI sürümü GitHub Release'e yükler (`ErbaaKurs_<sürüm>_universal.dmg`, `ErbaaKurs_<sürüm>_{universal,aarch64,x86_64}.app.tar.gz`
+     + `.sig`, `latest.json`, `CHANGELOG.json`; bkz. §6 İşlemciye özel güncelleme paketleri).
   2. Sunucu `php artisan kurs:desktop-release-sync` (zamanlayıcıda 15 dakikada bir, token yoksa sessiz) en yeni
      taslak olmayan `desktop-v*` sürümünü salt okur anahtarla indirir, boyut/SHA-256 doğrular, web köküne
      `desktop/<sürüm>/` olarak koyar, `latest.json` adreslerini kendi alan adına çevirir, `release.json` (indirme
-     sayfası) ve `changelog.json` yazar, eski sürümlerden 2'sini tutar. Hemen yayın için komutu elle çalıştırın
+     sayfası; `updater` alanında platform başına arşiv adı/boyutu) ve `changelog.json` yazar, eski sürümlerden 2'sini tutar.
+     Çekilen dosyalar: `.dmg`, `ErbaaKurs_<s>_(universal|aarch64|x86_64).app.tar.gz(.sig)`, `latest.json`, `CHANGELOG.json`.
+     Kök `.htaccess` tüm `.tar`/`.gz`'yi yasaklar; `desktop/.htaccess` yalnız
+     `^ErbaaKurs_[0-9.]+_(universal|aarch64|x86_64)\.app\.tar\.gz(\.sig)?$` dosyalarını açar. Komut bu izin satırını
+     her sürümde (latest.json yazılmadan ÖNCE) denetler: dosya yoksa şablonu yazar, eski universal-yalnız satırı yerinde
+     günceller, hiç yoksa bloğu sona ekler (elle yapılan diğer ayarlara dokunmaz). Hemen yayın için komutu elle çalıştırın
      (`--dry-run`, `--tag=desktop-v0.2.0`, `--force`).
   3. Uygulama açılıştan 20 sn sonra, saatte bir ve ana pencere odağa geldiğinde (en sık 15 dakikada bir) denetler.
      Yeni sürüm varsa ana pencerenin üstünde ince bir şerit çıkar ("Yeni sürüm 0.1.3 hazır · Daha sonra / Güncelle");
@@ -333,7 +377,7 @@ bash scripts/local-smoke.sh serve 18743 <jeton>     # http://127.0.0.1:18743/__d
 |---|---|
 | "Yerel sunucu açılamadı" | `~/Library/Logs/tr.com.erbaabilgi.kurs/php-server.log`, `php-error.log`, `local/storage/logs/laravel-*.log` (Yardım › Günlük klasörünü aç). |
 | Açılışta Anahtar Zinciri parolası soruluyor | İmza değişti (farklı Team ID ya da ad-hoc derleme). "Her Zaman İzin Ver" deyin; kalıcı çözüm aynı Developer ID ile imzalamak. |
-| "Uygulama hasarlı / açılamıyor" | Notarization yok ya da zımba eksik: CI'da "DMG imzala, notarize et" adımı ve `spctl` çıktısı. İmzasız deneme DMG'si için sağ tık › Aç. |
+| "Uygulama hasarlı / açılamıyor" | Notarization yok ya da zımba eksik: CI'da "DMG + ince .app'leri paralel notarize et" adımı ve `spctl` çıktısı. İmzasız deneme DMG'si için sağ tık › Aç. |
 | Notarization "Invalid" | `xcrun notarytool log <id> --key … --key-id … --issuer …`; genellikle imzasız bir ikili (gömülü php) ya da hardened runtime eksik. |
 | `tauri build`: "resource path … doesn't exist" | `build/laravel` yapıtı inmedi (laravel işi başarısız). |
 | `tauri build`: externalBin bulunamadı | `src-tauri/binaries/php-universal-apple-darwin` yok (lipo adımı). |
@@ -342,6 +386,8 @@ bash scripts/local-smoke.sh serve 18743 <jeton>     # http://127.0.0.1:18743/__d
 | Kurulum "sync.use yetkisi yok" | Personel rolüne "Masaüstü/mobil uygulamayla eşitleme" yetkisi verin. |
 | İlk eşitleme yarıda kaldı | "Yeniden dene" kaldığı yerden sürdürür (yeniden eşleştirmez). |
 | Güncelleme gelmiyor | Sunucuda `kurs:desktop-release-sync --dry-run`; `https://…/desktop/latest.json` sürümü; `.env` `DESKTOP_GITHUB_TOKEN`. |
+| Güncelleme indirmesi 403 | `desktop/.htaccess` izin satırı yeni arşiv adını kapsamıyor (`curl -I https://…/desktop/<s>/ErbaaKurs_<s>_aarch64.app.tar.gz`); `kurs:desktop-release-sync --force` satırı düzeltir. |
+| Güncelleme sonrası "hasarlı" / açılmıyor | İnce arşivde `._*` dosyası ya da bozuk imza: CI "İşlemciye özel güncelleme arşivleri" ve "İmza doğrulaması" adımları; acil geri dönüş için `latest.json`'da `darwin-aarch64`/`darwin-x86_64` url+signature'ını `darwin-universal` değerleriyle değiştirin. |
 | "Gönderilmemiş değişiklik var" (sıfırlama) | İnternete bağlanıp tepsi › Şimdi eşitle; reddedilenler web'de Eşitleme çakışmaları sayfasında. |
 | PDF'lerde yazı tipi hatası | `local/storage/fonts` yazılabilir olmalı (uygulama oluşturur). |
 

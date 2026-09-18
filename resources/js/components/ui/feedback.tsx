@@ -88,15 +88,26 @@ export function EmptyState({
   )
 }
 
-/** Tek nötr ton: rengârenk baş harf daireleri ekranı kalabalıklaştırıyordu. */
-export function Avatar({ name, src, size = 32, className }: { name?: string | null; src?: string | null; size?: number; className?: string }) {
+/** Ada göre sabit, hafif renk: listede kişileri ayırt etmeyi kolaylaştırır; kurumsal kalsın diye düşük doygunluk. */
+function nameTint(name?: string | null) {
+  let h = 0
+  for (const ch of (name ?? '').toLocaleLowerCase('tr')) h = (h * 31 + ch.charCodeAt(0)) >>> 0
+  const hue = h % 360
+  return {
+    background: `color-mix(in srgb, hsl(${hue} 55% 45%) 16%, var(--surface))`,
+    color: `color-mix(in srgb, hsl(${hue} 60% 35%) 78%, var(--ink))`,
+  }
+}
+
+/** Varsayılan tek nötr ton (rengârenk baş harfler ekranı kalabalıklaştırıyordu); `tinted` ile ada göre hafif renk. */
+export function Avatar({ name, src, size = 32, className, tinted }: { name?: string | null; src?: string | null; size?: number; className?: string; tinted?: boolean }) {
   if (src) {
     return <img src={src} alt={name ?? ''} width={size} height={size} loading="lazy" className={cn('rounded-full object-cover shrink-0 bg-surface-2', className)} style={{ width: size, height: size }} />
   }
   return (
     <span
-      className={cn('grid place-items-center rounded-full shrink-0 font-semibold bg-surface-3 text-ink-2 ring-1 ring-inset ring-line', className)}
-      style={{ width: size, height: size, fontSize: Math.max(10, size * 0.36) }}
+      className={cn('grid place-items-center rounded-full shrink-0 font-semibold ring-1 ring-inset ring-line', !tinted && 'bg-surface-3 text-ink-2', className)}
+      style={{ width: size, height: size, fontSize: Math.max(10, size * 0.36), ...(tinted ? nameTint(name) : {}) }}
       aria-hidden
     >
       {initials(name)}

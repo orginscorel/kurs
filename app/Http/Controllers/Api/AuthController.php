@@ -5,10 +5,13 @@ namespace App\Http\Controllers\Api;
 use App\Models\LoginEvent;
 use App\Models\User;
 use App\Services\Auth\Impersonation;
+use App\Services\Auth\SessionDirectory;
 use App\Services\Guardians\GuardianAccountService;
 use App\Support\Audit;
 use App\Support\Permissions;
 use App\Support\Settings;
+use App\Sync\Local\LocalPasswordProxy;
+use App\Sync\Local\LocalSessionDirectory;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -17,6 +20,8 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rules\Password;
 use Illuminate\Validation\ValidationException;
+use Laravel\Sanctum\PersonalAccessToken;
+use Laravel\Sanctum\TransientToken;
 
 class AuthController extends ApiController
 {
@@ -69,7 +74,7 @@ class AuthController extends ApiController
         $user = $request->user();
         $token = $user->currentAccessToken();
 
-        if ($token && ! $token instanceof \Laravel\Sanctum\TransientToken) {
+        if ($token && ! $token instanceof TransientToken) {
             $token->delete();
         } else {
             Auth::guard('web')->logout();
@@ -103,11 +108,11 @@ class AuthController extends ApiController
 
         $currentSession = $request->hasSession() ? $request->session()->getId() : null;
         $currentToken = $user->currentAccessToken();
-        $currentTokenId = $currentToken instanceof \Laravel\Sanctum\PersonalAccessToken ? $currentToken->getKey() : null;
+        $currentTokenId = $currentToken instanceof PersonalAccessToken ? $currentToken->getKey() : null;
 
         if (config('kurs.node') === 'local') {
             // Yerel kurulum: parola sunucu-otoriteli; yalnız çevrimiçi, sunucuda doğrulanarak değişir (docs/SYNC.md)
-            app(\App\Sync\Local\LocalPasswordProxy::class)->change($user, $data['current_password'], $data['password']);
+            app(LocalPasswordProxy::class)->change($user, $data['current_password'], $data['password']);
             DB::table('sessions')->where('user_id', $user->id)->when($currentSession, fn ($q) => $q->where('id', '!=', $currentSession))->delete();
 
             return $this->ok('Parolanız sunucuda güncellendi. Diğer cihazlar bir sonraki eşitlemede yeni parolayı alır.');
@@ -127,50 +132,47 @@ class AuthController extends ApiController
         return $this->ok('Parolanız güncellendi. Diğer cihazlardaki oturumlar kapatıldı.');
     }
 
-    /** Açık oturumlar (web) ve mobil cihazlar. */
+    /**
+     * Açık oturumlar ve cihazlar — TEK LİSTE: tarayıcı (web:), Mac uygulaması (app:), mobil jeton (token:).
+     * Yerel kurulumda (Mac) yerel oturumlar + çevrimiçiyse sunucudaki tam liste (LocalSessionDirectory).
+     */
     public function sessions(Request $request): JsonResponse
     {
         $user = $request->user();
-        $currentId = $request->hasSession() ? $request->session()->getId() : null;
-
-        $web = DB::table('sessions')->where('user_id', $user->id)->orderByDesc('last_activity')->get()
-            ->map(fn ($s) => [
-                'id' => 'web:'.hash('sha256', $s->id),
-                'kind' => 'web',
-                'device' => $this->describeAgent((string) $s->user_agent),
-                'ip_address' => $s->ip_address,
-                'last_active_at' => date(DATE_ATOM, $s->last_activity),
-                'is_current' => $s->id === $currentId,
-            ]);
-
-        $mobile = $user->tokens()->orderByDesc('last_used_at')->get()->map(fn ($t) => [
-            'id' => 'token:'.$t->id,
-            'kind' => 'mobile',
-            'device' => $t->name,
-            'ip_address' => null,
-            'last_active_at' => $t->last_used_at?->toAtomString(),
-            'is_current' => false,
-        ]);
+        if (config('kurs.node') === 'local') {
+            return response()->json(app(LocalSessionDirectory::class)->list($user, $request));
+        }
 
         $logins = LoginEvent::query()->where('user_id', $user->id)->latest('created_at')->limit(15)->get();
 
-        return response()->json(['data' => $web->concat($mobile)->values(), 'recent_logins' => $logins]);
+        return response()->json([
+            'data' => app(SessionDirectory::class)->forUser($user, SessionDirectory::currentOf($request)),
+            'recent_logins' => $logins,
+            'node' => 'server',
+            'scope' => 'all',
+            'notice' => null,
+        ]);
     }
 
     public function revokeSession(Request $request, string $id): JsonResponse
     {
         $user = $request->user();
-
-        if (str_starts_with($id, 'token:')) {
-            $user->tokens()->whereKey((int) substr($id, 6))->delete();
-        } elseif (str_starts_with($id, 'web:')) {
-            $hash = substr($id, 4);
-            DB::table('sessions')->where('user_id', $user->id)->get(['id'])
-                ->filter(fn ($s) => hash_equals(hash('sha256', $s->id), $hash))
-                ->each(fn ($s) => DB::table('sessions')->where('id', $s->id)->delete());
+        if (config('kurs.node') === 'local') {
+            return $this->ok(app(LocalSessionDirectory::class)->revoke($user, $id, $request));
         }
 
-        return $this->ok('Oturum kapatıldı.');
+        return $this->ok(app(SessionDirectory::class)->revoke($user, $id, $user, SessionDirectory::currentOf($request)));
+    }
+
+    /** "Diğer tüm oturumları kapat": web + uygulama + mobil (mevcut oturum hariç). */
+    public function revokeOtherSessions(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        if (config('kurs.node') === 'local') {
+            return response()->json(app(LocalSessionDirectory::class)->revokeOthers($user, $request));
+        }
+
+        return response()->json(app(SessionDirectory::class)->revokeOthers($user, $user, SessionDirectory::currentOf($request)));
     }
 
     private function attempt(string $login, string $password, string $channel, Request $request): User
@@ -247,26 +249,5 @@ class AuthController extends ApiController
                 'onboarding_completed' => (bool) $institution['onboarding_completed'],
             ],
         ];
-    }
-
-    private function describeAgent(string $ua): string
-    {
-        $browser = match (true) {
-            str_contains($ua, 'Edg/') => 'Edge',
-            str_contains($ua, 'Chrome/') => 'Chrome',
-            str_contains($ua, 'Firefox/') => 'Firefox',
-            str_contains($ua, 'Safari/') => 'Safari',
-            default => 'Tarayıcı',
-        };
-        $os = match (true) {
-            str_contains($ua, 'iPhone') || str_contains($ua, 'iPad') => 'iOS',
-            str_contains($ua, 'Android') => 'Android',
-            str_contains($ua, 'Windows') => 'Windows',
-            str_contains($ua, 'Mac OS') => 'macOS',
-            str_contains($ua, 'Linux') => 'Linux',
-            default => '',
-        };
-
-        return trim("$browser $os");
     }
 }

@@ -4,6 +4,7 @@ namespace App\Console\Commands\Sync;
 
 use App\Sync\Local\LocalState;
 use App\Sync\Local\LocalSyncEngine;
+use App\Sync\Local\RejectedRetry;
 use Illuminate\Console\Command;
 
 /**
@@ -34,6 +35,8 @@ class SyncRun extends Command
         }
         if ($this->option('reset-locks')) {
             $released = $engine->releaseStaleLock();
+            // Açılış/uyanma sonrası ilk turda reddedilenler bir kez yeniden denenir (RejectedRetry)
+            app(RejectedRetry::class)->markStartup();
             $this->callSilently('schedule:clear-cache');
 
             return $this->out(['status' => 'ok', 'cycle_lock_released' => $released, 'schedule_mutex_cleared' => true]);

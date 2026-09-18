@@ -1,3 +1,4 @@
+import type { SessionRow } from '@/modules/core/SessionList'
 export type Institution = {
   name: string
   short_name: string
@@ -68,7 +69,8 @@ export type AdminUserRow = {
 export type AdminUserDetail = AdminUserRow & {
   email: string | null
   recent_logins: { id: number; username: string; successful: boolean; channel: string; ip_address: string | null; created_at: string }[]
-  sessions: { kind: string; device?: string; ip_address?: string | null; last_active_at: string | null }[]
+  sessions: SessionRow[]
+  sessions_notice?: string | null
 }
 
 export type UserOptions = { roles: string[]; role_labels?: Record<string, string>; branches: { id: number; name: string }[]; user_types: Record<string, string> }

@@ -5,6 +5,7 @@ import { api, isLocalNode } from '@/lib/api'
 import { cn } from '@/lib/cn'
 import { dateTime, num, relative } from '@/lib/format'
 import { Button } from '@/components/ui/Button'
+import { RejectedChangesDrawer } from './RejectedChanges'
 
 /**
  * Yerel kurulum (KURS_NODE=local) eşitleme göstergesi: Çevrimdışı / Eşitleniyor / Eşitlendi · N bekleyen.
@@ -41,6 +42,7 @@ export function SyncStatus() {
 function SyncStatusInner() {
   const qc = useQueryClient()
   const [open, setOpen] = useState(false)
+  const [rejectedOpen, setRejectedOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
   const [, tick] = useState(0)
 
@@ -123,6 +125,11 @@ function SyncStatusInner() {
             {num(pending)}<span className="hidden sm:inline"> bekleyen</span>
           </span>
         )}
+        {(data.rejected ?? 0) > 0 && (
+          <span className="rounded-[4px] bg-danger-soft px-1.5 text-[11px] leading-[18px] tabular text-danger ring-1 ring-danger/25">
+            {num(data.rejected ?? 0)}<span className="hidden sm:inline"> reddedilen</span>
+          </span>
+        )}
       </button>
       {open && (
         <div className="fixed inset-x-3 top-[60px] z-40 rounded-[var(--radius-md)] bg-surface p-3.5 text-[13px] shadow-[var(--shadow-pop,0_8px_24px_rgb(0_0_0/0.12))] ring-1 ring-line sm:absolute sm:inset-x-auto sm:right-0 sm:top-full sm:mt-1.5 sm:w-[320px]">
@@ -136,7 +143,11 @@ function SyncStatusInner() {
             {(data.rejected ?? 0) > 0 && (
               <>
                 <dt className="text-ink-3">Reddedilen</dt>
-                <dd className="text-danger tabular">{num(data.rejected ?? 0)} değişiklik</dd>
+                <dd>
+                  <button type="button" className="text-danger tabular underline decoration-dotted underline-offset-2 hover:decoration-solid" onClick={() => { setRejectedOpen(true); setOpen(false) }}>
+                    {num(data.rejected ?? 0)} değişiklik — incele / yeniden dene
+                  </button>
+                </dd>
               </>
             )}
             {data.open_conflicts != null && (
@@ -179,6 +190,7 @@ function SyncStatusInner() {
           )}
         </div>
       )}
+      <RejectedChangesDrawer open={rejectedOpen} onClose={() => setRejectedOpen(false)} />
     </div>
   )
 }

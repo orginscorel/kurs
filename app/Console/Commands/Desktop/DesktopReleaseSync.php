@@ -15,11 +15,22 @@ use Illuminate\Support\Facades\Log;
  *   /desktop/latest.json            Tauri güncelleyici bildirimi (url'ler bu sunucuya çevrilir)
  *   /desktop/release.json           /uygulamalar sayfası için özet (sürüm, DMG, boyut, özet, notlar)
  *   /desktop/changelog.json         masaüstü değişiklik günlüğü
- *   /desktop/<sürüm>/<dosya>        DMG, .app.tar.gz, .sig
+ *   /desktop/<sürüm>/<dosya>        DMG (universal), güncelleme arşivleri + .sig:
+ *                                   ErbaaKurs_<sürüm>_{aarch64,x86_64}.app.tar.gz (işlemciye özel, ~40 MB)
+ *                                   ErbaaKurs_<sürüm>_universal.app.tar.gz (geri uyumluluk)
  * CI ayrıca bir şey yapmaz; zamanlayıcı 15 dakikada bir yoklar (yapılandırılmamışsa sessizce çıkar).
  */
 class DesktopReleaseSync extends Command
 {
+    /** Güncelleme arşivleri ve imzaları: universal (eski) + işlemciye özel ince paketler. */
+    public const ARCHIVE_PATTERN = '/^ErbaaKurs_[0-9.]+_(universal|aarch64|x86_64)\.app\.tar\.gz(\.sig)?$/';
+
+    /** /desktop/.htaccess izin satırı (kök .htaccess .tar/.gz'yi kapatıyor; yalnız bu dosyalar açılır). */
+    public const HTACCESS_ALLOW = '<FilesMatch "^ErbaaKurs_[0-9.]+_(universal|aarch64|x86_64)\.app\.tar\.gz(\.sig)?$">';
+
+    /** 1.12.x öncesi şablonun yalnız universal arşive izin veren satırı (yerinde yükseltilir). */
+    private const HTACCESS_ALLOW_OLD = '<FilesMatch "^ErbaaKurs_[0-9.]+_universal\.app\.tar\.gz(\.sig)?$">';
+
     protected $signature = 'kurs:desktop-release-sync
         {--tag= : belirli bir etiketi çek (ör. desktop-v0.2.0)}
         {--force : aynı sürüm olsa da yeniden indir}
@@ -95,7 +106,7 @@ class DesktopReleaseSync extends Command
 
             return self::FAILURE;
         }
-        $wanted = $assets->filter(fn ($a, $name) => preg_match('/\.(dmg|app\.tar\.gz|app\.tar\.gz\.sig)$/', $name) || in_array($name, ['latest.json', 'CHANGELOG.json'], true));
+        $wanted = $assets->filter(fn ($a, $name) => self::isWantedAsset((string) $name));
 
         if ($this->option('dry-run')) {
             $this->info("Çekilecek: v{$version} (şu an: ".($current ?? 'yok').')');
@@ -152,6 +163,12 @@ class DesktopReleaseSync extends Command
 
             $dmg = collect($files)->keys()->first(fn ($n) => str_ends_with($n, '.dmg'));
             $changelog = isset($files['CHANGELOG.json']) ? json_decode((string) file_get_contents("$tmp/CHANGELOG.json"), true) : null;
+            // İşlemciye göre güncelleme paketi boyutları (/uygulamalar ve denetim için bilgi)
+            $updater = [];
+            foreach ($manifest['platforms'] as $platform => $p) {
+                $name = rawurldecode(basename((string) parse_url((string) $p['url'], PHP_URL_PATH)));
+                $updater[$platform] = ['name' => $name, 'size' => $files[$name]['size']];
+            }
             $summary = [
                 'version' => $version,
                 'tag' => $release['tag_name'],
@@ -160,6 +177,7 @@ class DesktopReleaseSync extends Command
                 'arch' => 'universal',
                 'min_os' => $manifest['minimum_system_version'] ?? '12.0',
                 'dmg' => $dmg ? ['name' => $dmg, 'url' => $publicUrl($dmg), 'size' => $files[$dmg]['size'], 'sha256' => $files[$dmg]['sha256']] : null,
+                'updater' => $updater,
                 'notes' => is_array($changelog) ? array_slice($changelog, 0, 5) : null,
                 'synced_at' => now()->toIso8601String(),
             ];
@@ -169,12 +187,13 @@ class DesktopReleaseSync extends Command
                 File::deleteDirectory($dir);
             }
             rename($tmp, $dir);
+            // İzin satırı bildirimden ÖNCE: yeni arşiv adları latest.json yayına girdiğinde 403 almasın
+            self::ensureHtaccess($base);
             $this->writeAtomic("$base/latest.json", json_encode($manifest, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
             $this->writeAtomic("$base/release.json", json_encode($summary, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
             if (is_array($changelog)) {
                 $this->writeAtomic("$base/changelog.json", json_encode($changelog, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
             }
-            $this->ensureHtaccess($base);
             $this->prune($base, $version);
         } catch (\Throwable $e) {
             File::deleteDirectory($tmp);
@@ -204,13 +223,24 @@ class DesktopReleaseSync extends Command
         rename($tmp, $path);
     }
 
-    private function ensureHtaccess(string $base): void
+    /** Sürümde çekilecek dosya: DMG, güncelleme arşivleri/imzaları, bildirim ve değişiklik günlüğü. */
+    public static function isWantedAsset(string $name): bool
+    {
+        return str_ends_with($name, '.dmg')
+            || preg_match(self::ARCHIVE_PATTERN, $name) === 1
+            || in_array($name, ['latest.json', 'CHANGELOG.json'], true);
+    }
+
+    /**
+     * /desktop/.htaccess: yoksa şablonu yazar; varsa elle yapılmış ayarlara dokunmadan yalnız arşiv izin
+     * satırını güncel tutar (eski universal-yalnız satır yerinde değiştirilir, hiç yoksa blok sona eklenir).
+     */
+    public static function ensureHtaccess(string $base): void
     {
         $file = "$base/.htaccess";
-        if (is_file($file)) {
-            return;
-        }
-        file_put_contents($file, <<<'HT'
+        $allow = self::HTACCESS_ALLOW;
+        if (! is_file($file)) {
+            file_put_contents($file, <<<HT
 # Masaüstü sürümleri (kurs:desktop-release-sync yazar)
 Options -Indexes
 <FilesMatch "\.(json)$">
@@ -223,11 +253,29 @@ Options -Indexes
 <FilesMatch "\.(tar\.gz|sig)$">
     Header set Cache-Control "public, max-age=86400"
 </FilesMatch>
-# Kök .htaccess arşiv uzantılarını kapatıyor; güncelleyicinin indirdiği paket burada açık olmalı
-<FilesMatch "^ErbaaKurs_[0-9.]+_universal\.app\.tar\.gz(\.sig)?$">
+# Kök .htaccess arşiv uzantılarını kapatıyor; güncelleyicinin indirdiği paketler burada açık olmalı
+# (universal + işlemciye özel aarch64 / x86_64 arşivleri ve imzaları)
+$allow
     Require all granted
 </FilesMatch>
+
 HT);
+
+            return;
+        }
+        $content = (string) file_get_contents($file);
+        if (str_contains($content, $allow)) {
+            return;
+        }
+        if (str_contains($content, self::HTACCESS_ALLOW_OLD)) {
+            $content = str_replace(self::HTACCESS_ALLOW_OLD, $allow, $content);
+        } else {
+            $content = rtrim($content)."\n# Güncelleme arşivleri (universal + aarch64 / x86_64) ve imzaları\n$allow\n    Require all granted\n</FilesMatch>\n";
+        }
+        $tmp = $file.'.tmp-'.bin2hex(random_bytes(3));
+        file_put_contents($tmp, $content);
+        @chmod($tmp, 0644);
+        rename($tmp, $file);
     }
 
     private function prune(string $base, string $keep): void

@@ -84,7 +84,7 @@ export default function StudentList() {
           return (
             <div className="flex items-center gap-3">
               <div className="relative shrink-0">
-                <Avatar name={s.full_name} src={s.photo_url} size={34} />
+                <Avatar name={s.full_name} src={s.photo_url} size={34} tinted />
                 {s.is_inside && <span className="absolute -right-0.5 -bottom-0.5 size-3 rounded-full bg-success ring-2 ring-surface" title="Şu an kurumda" />}
               </div>
               <div className="min-w-0">

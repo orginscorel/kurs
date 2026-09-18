@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\DeviceGatewayController;
+use App\Http\Controllers\Api\Portal\ImpersonationController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -32,9 +33,10 @@ Route::prefix('v1')->group(function () {
         Route::post('auth/logout', [AuthController::class, 'logout']);
         Route::post('auth/change-password', [AuthController::class, 'changePassword'])->middleware('throttle:login');
         Route::get('auth/sessions', [AuthController::class, 'sessions']);
+        Route::delete('auth/sessions', [AuthController::class, 'revokeOtherSessions']);
         Route::delete('auth/sessions/{id}', [AuthController::class, 'revokeSession']);
         // Önizlemeden ("öğrenci/veli olarak giriş") yönetime dönüş — oturumdaki portal hesabıyla çağrılır
-        Route::post('auth/impersonation/leave', [\App\Http\Controllers\Api\Portal\ImpersonationController::class, 'leave']);
+        Route::post('auth/impersonation/leave', [ImpersonationController::class, 'leave']);
 
         /*
          * Öğrenci/veli/öğretmen-portal hesapları yalnız PORTAL_FILES'a girer; diğer tüm modül dosyaları

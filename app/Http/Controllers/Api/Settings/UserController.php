@@ -2,15 +2,21 @@
 
 namespace App\Http\Controllers\Api\Settings;
 
+use App\Exceptions\BusinessRuleException;
 use App\Http\Controllers\Api\ApiController;
 use App\Models\Branch;
 use App\Models\LoginEvent;
 use App\Models\User;
+use App\Services\Auth\SessionDirectory;
 use App\Services\Settings\UserAdminService;
+use App\Support\Audit;
+use App\Support\Permissions;
+use App\Sync\Local\LocalSessionDirectory;
+use App\Sync\Local\LocalSessionStore;
+use App\Sync\Local\SessionReporter;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Spatie\Permission\Models\Role;
 
@@ -32,25 +38,73 @@ class UserController extends ApiController
     {
         return response()->json([
             'roles' => Role::query()->orderBy('name')->pluck('name'),
-            'role_labels' => collect(\App\Support\Permissions::defaultRoles())->map(fn ($r) => $r['label']),
+            'role_labels' => collect(Permissions::defaultRoles())->map(fn ($r) => $r['label']),
             'branches' => Branch::query()->where('is_active', true)->orderBy('name')->get(['id', 'name']),
             'user_types' => self::USER_TYPES,
         ]);
     }
 
-    public function show(User $user): JsonResponse
+    public function show(Request $request, User $user): JsonResponse
     {
         $user->load('roles:id,name', 'branch:id,name');
         $logins = LoginEvent::query()->where('user_id', $user->id)->latest('created_at')->limit(20)->get();
-        $sessions = DB::table('sessions')->where('user_id', $user->id)->orderByDesc('last_activity')
-            ->get(['id', 'ip_address', 'last_activity'])
-            ->map(fn ($s) => ['kind' => 'web', 'ip_address' => $s->ip_address, 'last_active_at' => date(DATE_ATOM, $s->last_activity)]);
-        $tokens = $user->tokens()->orderByDesc('last_used_at')->get(['id', 'name', 'last_used_at', 'created_at'])
-            ->map(fn ($t) => ['kind' => 'mobile', 'device' => $t->name, 'last_active_at' => $t->last_used_at?->toAtomString()]);
+        $notice = null;
+        if (config('kurs.node') === 'local') {
+            // Yerel kurulum: yalnız bu Mac'teki oturumlar (tüm cihazlar web panelinde)
+            $sessions = collect(app(LocalSessionDirectory::class)->localRows($user->id,
+                (int) $request->user()->id === (int) $user->id && $request->hasSession() ? LocalSessionStore::hashOf($request->session()->getId()) : null));
+            $notice = 'Yalnız bu Mac\'teki oturumlar görünüyor. Kullanıcının tüm cihazlarını web panelinden görüp kapatabilirsiniz.';
+        } else {
+            $current = (int) $request->user()->id === (int) $user->id ? SessionDirectory::currentOf($request) : [];
+            $sessions = app(SessionDirectory::class)->forUser($user, $current);
+        }
 
         return response()->json($this->row($user) + [
-            'email' => $user->email, 'recent_logins' => $logins, 'sessions' => $sessions->concat($tokens)->values(),
+            'email' => $user->email, 'recent_logins' => $logins, 'sessions' => $sessions->values(), 'sessions_notice' => $notice,
         ]);
+    }
+
+    /** Yönetici: kullanıcının bir oturumunu kapatır (web / Mac uygulaması / mobil). */
+    public function revokeSession(Request $request, User $user, string $id): JsonResponse
+    {
+        if (config('kurs.node') === 'local') {
+            return $this->ok($this->revokeLocal($request, $user, [$id]));
+        }
+        $current = (int) $request->user()->id === (int) $user->id ? SessionDirectory::currentOf($request) : [];
+
+        return $this->ok(app(SessionDirectory::class)->revoke($user, $id, $request->user(), $current));
+    }
+
+    /** Yönetici: kullanıcının tüm oturumları (kendisiyse mevcut oturumu hariç). */
+    public function revokeAllSessions(Request $request, User $user): JsonResponse
+    {
+        if (config('kurs.node') === 'local') {
+            $ids = array_map(fn ($r) => $r['id'], app(LocalSessionDirectory::class)->localRows($user->id));
+
+            return $this->ok($this->revokeLocal($request, $user, $ids));
+        }
+        $current = (int) $request->user()->id === (int) $user->id ? SessionDirectory::currentOf($request) : [];
+        $res = app(SessionDirectory::class)->revokeOthers($user, $request->user(), $current);
+
+        return response()->json($res);
+    }
+
+    /** Yerel kurulumda yönetici yalnız bu Mac'teki oturumları kapatabilir. */
+    private function revokeLocal(Request $request, User $user, array $ids): string
+    {
+        $store = app(LocalSessionStore::class);
+        $hashes = [];
+        foreach ($ids as $id) {
+            if (! str_starts_with($id, 'app:') || ! app(LocalSessionDirectory::class)->isLocal($user->id, substr($id, 4))) {
+                throw new BusinessRuleException('Bu oturum başka bir cihazda. Kullanıcının diğer oturumlarını web panelinden kapatın.', 'remote_session', [], 409);
+            }
+            $hashes[] = substr($id, 4);
+        }
+        $store->deleteByHashes($hashes, $user->id, $request->hasSession() ? $request->session()->getId() : null);
+        Audit::log('auth.session_revoked', sprintf('%s kullanıcısının bu cihazdaki %d oturumunu kapattı.', $user->name, count($hashes)), $user);
+        app(SessionReporter::class)->runSafely(true);
+
+        return $hashes ? 'Oturum kapatıldı.' : 'Kapatılacak oturum yok.';
     }
 
     public function store(Request $request): JsonResponse

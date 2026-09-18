@@ -1,5 +1,28 @@
 [
   {
+    "version": "1.12.2",
+    "date": "2026-09-18",
+    "title": "Oturum yönetimi ve daha küçük güncellemeler",
+    "items": [
+      {
+        "type": "yeni",
+        "text": "Hesabım'da web ve Mac uygulaması oturumları tek listede; oturumları uzaktan kapatabilirsiniz"
+      },
+      {
+        "type": "yeni",
+        "text": "Yöneticiler Kullanıcılar ekranından bir kişinin tüm oturumlarını görüp kapatabilir"
+      },
+      {
+        "type": "iyilestirme",
+        "text": "Reddedilen eşitleme değişiklikleri listeleniyor ve kendiliğinden yeniden deneniyor; finans işlemleri yalnız elle"
+      },
+      {
+        "type": "iyilestirme",
+        "text": "Ön kayıt ve öğrenci listelerinde isim yanında renkli baş harf avatarı"
+      }
+    ]
+  },
+  {
     "version": "1.12.1",
     "date": "2026-09-18",
     "title": "Güvenilir eşitleme",

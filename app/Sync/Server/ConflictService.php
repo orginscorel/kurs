@@ -55,6 +55,28 @@ class ConflictService
         ]);
     }
 
+    /** Yeniden denemede tekrar reddedildi: açık kaydın notu güncellenir; açık kayıt yoksa yenisi açılır. */
+    public function rejectedAgain(SyncDevice $device, array $change, array $result): void
+    {
+        $open = isset($change['id']) ? SyncConflict::query()->where('device_id', $device->id)->where('kind', 'rejected')
+            ->where('change_uuid', (string) $change['id'])->where('status', 'open')->latest('id')->first() : null;
+        if (! $open) {
+            $this->rejected($device, $change, $result);
+
+            return;
+        }
+        $open->forceFill(['note' => mb_substr(($result['message'] ?? 'Reddedildi').' ('.($result['code'] ?? '').') · yeniden denendi '.now()->format('d.m.Y H:i'), 0, 500)])->save();
+    }
+
+    /** Reddedilmiş değişiklik yeniden denemede kabul edildi: açık "reddedildi" kaydı kendiliğinden kapanır. */
+    public function resolveRejected(SyncDevice $device, string $changeUuid): void
+    {
+        SyncConflict::query()->where('device_id', $device->id)->where('kind', 'rejected')->where('change_uuid', $changeUuid)
+            ->where('status', 'open')->update([
+                'status' => 'resolved', 'resolution' => 'retried_accepted', 'resolved_at' => now(), 'updated_at' => now(),
+            ]);
+    }
+
     /** İnsan okunur satır etiketi. */
     public function label(string $table, int $id): ?string
     {

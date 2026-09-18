@@ -1,5 +1,24 @@
 [
   {
+    "version": "1.12.2",
+    "date": "2026-09-18",
+    "title": "Daha küçük güncellemeler ve oturum yönetimi",
+    "items": [
+      {
+        "type": "iyilestirme",
+        "text": "Güncellemeler işlemcinize özel paketleniyor: 73 MB yerine yaklaşık 42 MB, indirme o oranda hızlı"
+      },
+      {
+        "type": "yeni",
+        "text": "Bu Mac'teki oturumlar web'deki oturum listesinde görünüyor; web'den ya da başka bir cihazdan uzaktan kapatılabiliyor"
+      },
+      {
+        "type": "yeni",
+        "text": "Reddedilen eşitleme değişiklikleri üst çubuktaki rozetten listelenip yeniden denenebiliyor; çoğu kendiliğinden yeniden deneniyor"
+      }
+    ]
+  },
+  {
     "version": "1.12.1",
     "date": "2026-09-18",
     "title": "Güvenilir eşitleme",

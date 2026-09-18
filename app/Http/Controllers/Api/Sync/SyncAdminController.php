@@ -3,11 +3,14 @@
 namespace App\Http\Controllers\Api\Sync;
 
 use App\Http\Controllers\Api\ApiController;
+use App\Support\Audit;
 use App\Support\BranchContext;
+use App\Sync\Commands\CommandRegistry;
 use App\Sync\Models\SyncConflict;
 use App\Sync\Models\SyncDevice;
 use App\Sync\Server\ConflictService;
 use App\Sync\Server\DeviceService;
+use App\Sync\Server\DeviceSessionService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -51,8 +54,10 @@ class SyncAdminController extends ApiController
             $q->where('status', 'active');
         }
         $devices = $q->orderByDesc('last_seen_at')->orderByDesc('id')->get();
+        // Cihazda şu an açık uygulama oturumları (cihazın son oturum raporundan)
+        $sessions = app(DeviceSessionService::class)->byDevice($devices->where('status', 'active')->pluck('id')->all());
 
-        return response()->json(['data' => $devices->map(fn (SyncDevice $d) => $service->present($d))->values()]);
+        return response()->json(['data' => $devices->map(fn (SyncDevice $d) => $service->present($d) + ['open_sessions' => $sessions[$d->id] ?? []])->values()]);
     }
 
     public function revoke(Request $request, DeviceService $service, int $device): JsonResponse
@@ -74,7 +79,7 @@ class SyncAdminController extends ApiController
     public function rotatePairingCode(DeviceService $service): JsonResponse
     {
         $code = $service->pairingCode($this->branchId(), true);
-        \App\Support\Audit::log('sync.pairing_code_rotated', 'cihaz eşleştirme kurum kodunu yeniledi.');
+        Audit::log('sync.pairing_code_rotated', 'cihaz eşleştirme kurum kodunu yeniledi.');
 
         return response()->json(['code' => $code, 'message' => 'Kurum kodu yenilendi. Eşleşmiş cihazlar etkilenmez.']);
     }
@@ -168,7 +173,7 @@ class SyncAdminController extends ApiController
         if ($c->kind === 'rejected' && $c->device_value && str_starts_with($c->device_value, '{')) {
             $name = json_decode($c->device_value, true)['command'] ?? null;
 
-            return is_string($name) ? \App\Sync\Commands\CommandRegistry::label($name) : null;
+            return is_string($name) ? CommandRegistry::label($name) : null;
         }
 
         return null;

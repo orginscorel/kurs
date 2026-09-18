@@ -3,17 +3,19 @@ import { MailText, PhoneText } from '@/components/ui/contact'
 import { useSearchParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { KeyRound, Laptop, ShieldCheck, Smartphone } from 'lucide-react'
+import { KeyRound, LogOut, ShieldCheck } from 'lucide-react'
 import { api, ApiError } from '@/lib/api'
-import { dateTime, relative } from '@/lib/format'
+import { dateTime } from '@/lib/format'
 import { useAuth } from '@/app/auth'
 import { DescriptionList, PageHeader, Panel } from '@/components/ui/layout'
 import { Alert, Avatar, Badge, Skeleton } from '@/components/ui/feedback'
 import { Field, Input } from '@/components/ui/form'
 import { Button } from '@/components/ui/Button'
+import { ConfirmDialog } from '@/components/ui/overlay'
+import { SessionList, type SessionRow } from './SessionList'
 
-type SessionRow = { id: string; kind: 'web' | 'mobile'; device: string; ip_address: string | null; last_active_at: string | null; is_current: boolean }
 type LoginRow = { id: number; successful: boolean; channel: string; ip_address: string | null; user_agent: string | null; created_at: string }
+type SessionsResponse = { data: SessionRow[]; recent_logins: LoginRow[]; node?: 'server' | 'local'; scope?: 'all' | 'local'; notice?: string | null }
 
 /** Rol kodlarının görünen adları (App\Support\Permissions::defaultRoles ile aynı) */
 const ROLE_LABEL: Record<string, string> = {
@@ -31,7 +33,8 @@ export default function Account() {
   const [form, setForm] = useState({ current_password: '', password: '', password_confirmation: '' })
   const [errors, setErrors] = useState<Record<string, string[]>>({})
 
-  const sessions = useQuery({ queryKey: ['auth', 'sessions'], queryFn: () => api.get<{ data: SessionRow[]; recent_logins: LoginRow[] }>('/auth/sessions') })
+  const sessions = useQuery({ queryKey: ['auth', 'sessions'], queryFn: () => api.get<SessionsResponse>('/auth/sessions'), refetchInterval: 60_000 })
+  const [confirmAll, setConfirmAll] = useState(false)
 
   const changePassword = useMutation({
     mutationFn: () => api.post<{ message: string }>('/auth/change-password', form),
@@ -51,12 +54,30 @@ export default function Account() {
   })
 
   const revoke = useMutation({
-    mutationFn: (id: string) => api.delete(`/auth/sessions/${encodeURIComponent(id)}`),
-    onSuccess: () => {
-      toast.success('Oturum kapatıldı.')
+    mutationFn: (id: string) => api.delete<{ message: string }>(`/auth/sessions/${encodeURIComponent(id)}`),
+    onSuccess: (r) => {
+      toast.success(r?.message || 'Oturum kapatıldı.')
+      qc.invalidateQueries({ queryKey: ['auth', 'sessions'] })
+    },
+    onError: (e) => {
+      toast.error(e instanceof ApiError ? e.firstError() : 'Oturum kapatılamadı.')
       qc.invalidateQueries({ queryKey: ['auth', 'sessions'] })
     },
   })
+
+  const revokeAll = useMutation({
+    mutationFn: () => api.delete<{ message: string; warning?: boolean }>('/auth/sessions'),
+    onSuccess: (r) => {
+      if (r?.warning) toast.warning(r.message)
+      else toast.success(r?.message || 'Diğer oturumlar kapatıldı.')
+      setConfirmAll(false)
+      qc.invalidateQueries({ queryKey: ['auth', 'sessions'] })
+    },
+    onError: (e) => toast.error(e instanceof ApiError ? e.firstError() : 'Oturumlar kapatılamadı.'),
+  })
+
+  const rows = sessions.data?.data ?? []
+  const others = rows.filter((s) => !s.is_current && s.status !== 'closing')
 
   const submit = (e: FormEvent) => {
     e.preventDefault()
@@ -112,39 +133,33 @@ export default function Account() {
           </form>
         </Panel>
 
-        <Panel className="lg:col-span-3" title="Açık oturumlar ve cihazlar" flush>
+        <Panel
+          className="lg:col-span-3"
+          title="Açık oturumlar ve cihazlar"
+          description="Tarayıcılar, Mac uygulaması ve mobil uygulamadaki oturumlarınız."
+          actions={others.length > 0 && (
+            <Button size="sm" variant="danger-soft" icon={<LogOut className="size-3.5" />} onClick={() => setConfirmAll(true)}>
+              <span className="hidden sm:inline">Diğer tüm oturumları kapat</span><span className="sm:hidden">Tümünü kapat</span>
+            </Button>
+          )}
+          flush
+        >
+          {sessions.data?.notice && (
+            <div className="px-4 pb-3">
+              <Alert tone={sessions.data.scope === 'local' ? 'info' : 'warning'}>{sessions.data.notice}</Alert>
+            </div>
+          )}
           {sessions.isLoading ? (
             <div className="p-4"><Skeleton className="h-32" /></div>
           ) : (
-            <ul>
-              {sessions.data?.data.map((s) => (
-                <li key={s.id} className="flex items-center gap-3 border-t border-line px-4 py-3">
-                  <span className="grid size-9 place-items-center rounded-[var(--radius-sm)] bg-surface-2 text-ink-2">
-                    {s.kind === 'mobile' ? <Smartphone className="size-4" /> : <Laptop className="size-4" />}
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-[13.5px] font-medium">
-                      {s.device || 'Bilinmeyen cihaz'} {s.is_current && <Badge tone="success" className="ml-1">Bu cihaz</Badge>}
-                    </p>
-                    <p className="text-[12px] text-ink-3">
-                      {s.ip_address ?? 'Mobil uygulama'} · son etkinlik {relative(s.last_active_at)}
-                    </p>
-                  </div>
-                  {!s.is_current && (
-                    <Button size="sm" variant="ghost" loading={revoke.isPending && revoke.variables === s.id} onClick={() => revoke.mutate(s.id)}>
-                      Oturumu kapat
-                    </Button>
-                  )}
-                </li>
-              ))}
-            </ul>
+            <SessionList rows={rows} pendingId={revoke.isPending ? revoke.variables : null} onRevoke={(s) => revoke.mutate(s.id)} />
           )}
         </Panel>
 
         <Panel className="lg:col-span-2" title="Son giriş denemeleri" flush>
           <ul>
-            {sessions.data?.recent_logins.map((l) => (
-              <li key={l.id} className="flex items-center gap-3 border-t border-line px-4 py-2.5">
+            {sessions.data?.recent_logins.map((l, i) => (
+              <li key={`${i}-${l.id}`} className="flex items-center gap-3 border-t border-line px-4 py-2.5">
                 <ShieldCheck className={l.successful ? 'size-4 text-success' : 'size-4 text-danger'} />
                 <div className="min-w-0 flex-1">
                   <p className="text-[13px]">{l.successful ? 'Başarılı giriş' : 'Başarısız deneme'}</p>
@@ -155,6 +170,17 @@ export default function Account() {
           </ul>
         </Panel>
       </div>
+
+      <ConfirmDialog
+        open={confirmAll}
+        onClose={() => setConfirmAll(false)}
+        onConfirm={() => revokeAll.mutate()}
+        loading={revokeAll.isPending}
+        danger
+        title="Diğer tüm oturumlar kapatılsın mı?"
+        confirmLabel="Hepsini kapat"
+        description="Bu cihaz dışındaki tarayıcı, Mac uygulaması ve mobil uygulama oturumlarınız kapanır. Çevrimdışı bir Mac'teki oturum, o Mac sunucuya bağlandığında kapanır."
+      />
     </div>
   )
 }

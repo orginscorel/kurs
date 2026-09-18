@@ -46,59 +46,12 @@ env:
   KURS_APP_SOURCE: ${{ vars.KURS_APP_SOURCE || 'repo' }}
 
 jobs:
-  # ------------------------------------------------------------------ 1) hızlı denetim: sürüm + ön yüz + cargo check
-  check:
-    name: Denetim (cargo check, tip denetimi)
-    runs-on: macos-14
-    timeout-minutes: 40
-    outputs:
-      desktop_dir: ${{ steps.dirs.outputs.desktop_dir }}
-      version: ${{ steps.version.outputs.version }}
-    steps:
-      - uses: actions/checkout@v4
+  # Ayrı "Denetim" işi (cargo check + tsc) kaldırıldı: aynı denetimler build işinde zaten koşuyor (sürüm tutarlılığı
+  # ilk adımda, tsc + vite `tauri build`'in beforeBuildCommand'ında, derleme cargo check'i kapsar). Her macOS işi en az
+  # 1 dk (özel depoda ×10) faturalandığından ayrı iş yalnız dakika harcıyordu. clippy yalnız uyarıydı; yerelde çalıştırın.
 
-      - id: dirs
-        name: Masaüstü klasörü
-        run: |
-          if [ -f desktop/src-tauri/tauri.conf.json ]; then echo "desktop_dir=desktop" >> "$GITHUB_OUTPUT"
-          else echo "desktop_dir=." >> "$GITHUB_OUTPUT"; fi
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: npm
-          cache-dependency-path: ${{ steps.dirs.outputs.desktop_dir }}/package-lock.json
-
-      - id: version
-        name: Sürüm tutarlılığı
-        working-directory: ${{ steps.dirs.outputs.desktop_dir }}
-        run: echo "version=$(node scripts/release.mjs check)" >> "$GITHUB_OUTPUT"
-
-      - name: Ön yüz (tsc + vite)
-        working-directory: ${{ steps.dirs.outputs.desktop_dir }}
-        run: npm ci && npm run build
-
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          components: clippy
-
-      - uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: ${{ steps.dirs.outputs.desktop_dir }}/src-tauri -> target
-
-      - name: cargo check (yer tutucu paket içeriğiyle)
-        working-directory: ${{ steps.dirs.outputs.desktop_dir }}
-        run: |
-          # tauri-build externalBin ve resources yollarının var olmasını ister
-          mkdir -p build/laravel src-tauri/binaries
-          touch build/laravel/.placeholder
-          triple="$(rustc -vV | sed -n 's/^host: //p')"
-          [ -f "src-tauri/binaries/php-$triple" ] || { printf '#!/bin/sh\n' > "src-tauri/binaries/php-$triple"; chmod +x "src-tauri/binaries/php-$triple"; }
-          cd src-tauri
-          cargo check --locked
-          cargo clippy --no-deps -- -D warnings -A clippy::too_many_arguments || echo "::warning::clippy uyarıları var"
-
-  # ------------------------------------------------------------------ 2) statik PHP (mimari başına, önbellekli)
+  # ------------------------------------------------------------------ 1) statik PHP (mimari başına, önbellekli)
+  # Önbellek isabetinde iş ~10 sn sürer (derleme adımı atlanır); x86_64 PHP Intel koşucu gerektirdiği için ayrı iş.
   php:
     name: Statik PHP ${{ matrix.arch }}
     strategy:
@@ -136,7 +89,7 @@ jobs:
           out/php-${{ matrix.arch }}-apple-darwin -v
           out/php-${{ matrix.arch }}-apple-darwin -r 'exit(extension_loaded("intl") && extension_loaded("pdo_sqlite") && extension_loaded("sodium") ? 0 : 1);'
 
-  # ------------------------------------------------------------------ 3) Laravel paketi (vendor --no-dev + derlenmiş ön yüz)
+  # ------------------------------------------------------------------ 2) Laravel paketi (vendor --no-dev + derlenmiş ön yüz)
   laravel:
     name: Laravel paketi
     runs-on: ubuntu-latest
@@ -176,6 +129,10 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
 
+      # Erken ve ucuz (Linux) sürüm denetimi: tutarsızsa macOS dakikası harcanmadan durur; build işi yine denetler
+      - name: Masaüstü sürüm tutarlılığı
+        run: node "${{ steps.dirs.outputs.desktop }}/scripts/release.mjs" check
+
       - name: Web testleri
         if: env.KURS_APP_SOURCE != 'tarball' && (github.event_name == 'push' || inputs.run_web_tests)
         working-directory: ${{ steps.dirs.outputs.web }}
@@ -205,20 +162,26 @@ jobs:
           key: laravel-bundle-${{ github.run_id }}
           enableCrossOsArchive: true
 
-  # ------------------------------------------------------------------ 4) Tauri derleme + imza + notarization + yayın
+  # ------------------------------------------------------------------ 3) Tauri derleme + imza + notarization + yayın
+  # DMG universal kalır; güncelleyici için ayrıca işlemciye özel (aarch64 / x86_64) ince .app arşivleri üretilir
+  # (universal güncelleme 73 MB → ince ~40 MB). Süre: derleme ~11 dk + paralel notarization ~2-4 dk.
   build:
-    name: macOS paketi (universal)
-    needs: [check, php, laravel]
+    name: macOS paketi (universal + işlemciye özel güncellemeler)
+    needs: [php, laravel]
     runs-on: macos-14
     timeout-minutes: 90
     permissions:
       contents: write
+    # DESKTOP_DIR ve VERSION ilk adımlarda $GITHUB_ENV'e yazılır (sonraki adımlarda ${{ env.* }} ile okunur)
     env:
-      DESKTOP_DIR: ${{ needs.check.outputs.desktop_dir }}
-      VERSION: ${{ needs.check.outputs.version }}
       UNSIGNED: ${{ github.event_name == 'workflow_dispatch' && inputs.unsigned && 'true' || 'false' }}
     steps:
       - uses: actions/checkout@v4
+
+      - name: Masaüstü klasörü
+        run: |
+          if [ -f desktop/src-tauri/tauri.conf.json ]; then d=desktop; else d=.; fi
+          echo "DESKTOP_DIR=$d" >> "$GITHUB_ENV"
 
       # Release yüklemesi: uploads.github.com büyük DMG'de ara sıra 504 veriyor → dosya başına yeniden dene
       - name: Yükleme yardımcısı
@@ -243,6 +206,14 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
           cache-dependency-path: ${{ env.DESKTOP_DIR }}/package-lock.json
+
+      - name: Sürüm tutarlılığı (package.json = tauri.conf = Cargo.toml = CHANGELOG)
+        working-directory: ${{ env.DESKTOP_DIR }}
+        run: |
+          v="$(node scripts/release.mjs check)" # etiket ≠ sürüm de burada yakalanır
+          [ -n "$v" ] || { echo "::error::Sürüm okunamadı"; exit 1; }
+          echo "VERSION=$v" >> "$GITHUB_ENV"
+          echo "Sürüm: $v"
 
       - uses: dtolnay/rust-toolchain@stable
         with:
@@ -430,23 +401,68 @@ jobs:
           cp CHANGELOG.json "$D/CHANGELOG.json"
           {
             echo "app=$APP"
+            echo "app_name=$(basename "$APP")"
             echo "dir=$D"
             echo "dmg=$D/ErbaaKurs_${VERSION}_universal.dmg"
+            echo "thin=$RUNNER_TEMP/thin"
           } >> "$GITHUB_OUTPUT"
 
-      - name: DMG imzala, notarize et, zımbala
+      # İmzalı + zımbalı universal .app'in kopyası: Mach-O dilimleri ayrılır (lipo -thin), imza içten dışa yeniden
+      # atılır (önce Contents/MacOS/php, sonra paket; --deep yalnız doğrulamada). Gerekçe: scripts/thin-macos-app.sh
+      - name: İşlemciye özel .app'ler (incelt + yeniden imzala)
+        working-directory: ${{ env.DESKTOP_DIR }}
+        env:
+          SIGN_IDENTITY: ${{ env.UNSIGNED != 'true' && secrets.APPLE_SIGNING_IDENTITY || '-' }}
+          ENTITLEMENTS: src-tauri/Entitlements.plist
+        run: bash scripts/thin-macos-app.sh "${{ steps.out.outputs.app }}" "${{ steps.out.outputs.thin }}"
+
+      # DMG + iki ince .app aynı anda gönderilir (--no-wait), hepsi beklenir, sonra zımbalanır
+      - name: DMG imzala; DMG + ince .app'leri paralel notarize et, zımbala
         if: env.UNSIGNED != 'true'
+        working-directory: ${{ env.DESKTOP_DIR }}
         env:
           APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
           APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
           APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
         run: |
           DMG="${{ steps.out.outputs.dmg }}"
+          THIN="${{ steps.out.outputs.thin }}"
+          NAME="${{ steps.out.outputs.app_name }}"
           codesign --force --timestamp --sign "$APPLE_SIGNING_IDENTITY" "$DMG"
-          xcrun notarytool submit "$DMG" --key "$APPLE_API_KEY_PATH" --key-id "$APPLE_API_KEY_ID" --issuer "$APPLE_API_ISSUER" --wait --timeout 60m --output-format json | tee "$RUNNER_TEMP/notary.json"
-          grep -q '"status" *: *"Accepted"' "$RUNNER_TEMP/notary.json" || { echo "::error::Notarization reddedildi"; exit 1; }
-          xcrun stapler staple "$DMG"
-          xcrun stapler validate "$DMG"
+          bash scripts/notarize-parallel.sh "$DMG" "$THIN/aarch64/$NAME" "$THIN/x86_64/$NAME"
+
+      # Tauri'nin universal arşiviyle aynı iç yapı: kökte "<Ad>.app/" (güncelleyici ilk bileşeni atlayıp açar).
+      # macOS tar'ı AppleDouble (._*) / xattr eklemesin: açılan ._ dosyaları paketin imzasını bozar.
+      - name: İşlemciye özel güncelleme arşivleri (.app.tar.gz + .sig)
+        working-directory: ${{ env.DESKTOP_DIR }}
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: |
+          set -o pipefail # arka plandaki tar | gzip hattında tar hatası da yakalansın
+          D="${{ steps.out.outputs.dir }}"
+          THIN="${{ steps.out.outputs.thin }}"
+          NAME="${{ steps.out.outputs.app_name }}"
+          pids=()
+          for arch in aarch64 x86_64; do
+            ( cd "$THIN/$arch" && COPYFILE_DISABLE=1 tar --no-mac-metadata --no-xattrs -cf - "$NAME" ) | gzip -9n > "$D/ErbaaKurs_${VERSION}_${arch}.app.tar.gz" &
+            pids+=($!)
+          done
+          for p in "${pids[@]}"; do wait "$p"; done
+          for arch in aarch64 x86_64; do
+            TGZ="$D/ErbaaKurs_${VERSION}_${arch}.app.tar.gz"
+            L="$RUNNER_TEMP/$arch.list"; tar -tzf "$TGZ" > "$L"
+            first="$(head -1 "$L")"
+            [ "${first%/}" = "$NAME" ] || { echo "::error::$arch arşiv kökü beklenmedik: $first"; exit 1; }
+            if grep -q '/\._' "$L"; then echo "::error::$arch arşivinde AppleDouble (._) dosyası var"; exit 1; fi
+            # imza: tauri'nin universal arşiv için kullandığı araç ve anahtar (minisign, base64) — --help ÇAĞIRMA (anahtarı yazdırır)
+            npx --no-install tauri signer sign "$TGZ" > /dev/null
+            [ -s "$TGZ.sig" ] || { echo "::error::$arch imzası oluşmadı"; exit 1; }
+            base64 --decode < "$TGZ.sig" | head -1 | grep -q '^untrusted comment:' || { echo "::error::$arch imza biçimi beklenmedik"; exit 1; }
+          done
+          ls -la "$D"
+          echo "### Güncelleme paketleri" >> "$GITHUB_STEP_SUMMARY"
+          (cd "$D" && du -h ./*.app.tar.gz ./*.dmg) | sed 's/^/    /' >> "$GITHUB_STEP_SUMMARY"
 
       - name: İmza doğrulaması
         if: env.UNSIGNED != 'true'
@@ -456,13 +472,24 @@ jobs:
           codesign -dv --verbose=4 "$APP/Contents/MacOS/php" 2>&1 | grep -E "Authority|flags|TeamIdentifier"
           spctl --assess --type execute --verbose=4 "$APP"
           spctl --assess --type open --context context:primary-signature --verbose=4 "${{ steps.out.outputs.dmg }}"
+          for arch in aarch64 x86_64; do
+            T="${{ steps.out.outputs.thin }}/$arch/${{ steps.out.outputs.app_name }}"
+            echo "== $arch: $(lipo -archs "$T/Contents/MacOS/php") / $(lipo -archs "$T/Contents/MacOS/erbaa-kurs")"
+            codesign --verify --deep --strict --verbose=2 "$T"
+            codesign -dv --verbose=4 "$T/Contents/MacOS/php" 2>&1 | grep -E "Identifier|Authority|flags|TeamIdentifier"
+            xcrun stapler validate "$T"
+            spctl --assess --type execute --verbose=4 "$T"
+          done
 
       - name: Güncelleme bildirimi (latest.json)
         working-directory: ${{ env.DESKTOP_DIR }}
         run: |
           D="${{ steps.out.outputs.dir }}"
           node scripts/make-latest-json.mjs --version "$VERSION" --tag "desktop-v$VERSION" --repo "$GITHUB_REPOSITORY" \
-            --archive "$D/ErbaaKurs_${VERSION}_universal.app.tar.gz" --sig "$D/ErbaaKurs_${VERSION}_universal.app.tar.gz.sig" --out "$D/latest.json"
+            --archive "$D/ErbaaKurs_${VERSION}_universal.app.tar.gz" --sig "$D/ErbaaKurs_${VERSION}_universal.app.tar.gz.sig" \
+            --archive-aarch64 "$D/ErbaaKurs_${VERSION}_aarch64.app.tar.gz" --sig-aarch64 "$D/ErbaaKurs_${VERSION}_aarch64.app.tar.gz.sig" \
+            --archive-x86_64 "$D/ErbaaKurs_${VERSION}_x86_64.app.tar.gz" --sig-x86_64 "$D/ErbaaKurs_${VERSION}_x86_64.app.tar.gz.sig" \
+            --out "$D/latest.json"
           (cd "$D" && shasum -a 256 ./*.dmg ./*.tar.gz > SHA256SUMS.txt && cat SHA256SUMS.txt)
 
       # Artifact kotasına girmemek için deneme çıktıları taslak (draft) Release'e konur; taslaklar

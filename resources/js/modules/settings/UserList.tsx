@@ -15,6 +15,7 @@ import { ConfirmDialog, Drawer, Menu } from '@/components/ui/overlay'
 import type { AdminUserDetail, AdminUserRow, UserOptions } from './types'
 import { UserFormDrawer } from './UserFormDrawer'
 import { MailText, PhoneText } from '@/components/ui/contact'
+import { SessionList } from '@/modules/core/SessionList'
 
 export default function UserList() {
   const can = useCan()
@@ -152,24 +153,38 @@ export default function UserList() {
 }
 
 function UserDetailDrawer({ user, onClose }: { user: AdminUserRow | null; onClose: () => void }) {
+  const qc = useQueryClient()
+  const [confirmAll, setConfirmAll] = useState(false)
   const { data } = useQuery({ queryKey: ['admin-users', user?.id], queryFn: () => api.get<AdminUserDetail>(`/admin-users/${user!.id}`), enabled: !!user })
+  const refresh = () => qc.invalidateQueries({ queryKey: ['admin-users', user?.id] })
+
+  const revoke = useMutation({
+    mutationFn: (id: string) => api.delete<{ message: string }>(`/admin-users/${user!.id}/sessions/${encodeURIComponent(id)}`),
+    onSuccess: (r) => { toast.success(r?.message || 'Oturum kapatıldı.'); refresh() },
+    onError: (e) => { toast.error(e instanceof ApiError ? e.firstError() : 'Oturum kapatılamadı.'); refresh() },
+  })
+  const revokeAll = useMutation({
+    mutationFn: () => api.delete<{ message: string }>(`/admin-users/${user!.id}/sessions`),
+    onSuccess: (r) => { toast.success(r?.message || 'Oturumlar kapatıldı.'); setConfirmAll(false); refresh() },
+    onError: (e) => toast.error(e instanceof ApiError ? e.firstError() : 'Oturumlar kapatılamadı.'),
+  })
+  const open = (data?.sessions ?? []).filter((s) => !s.is_current && s.status !== 'closing')
 
   return (
-    <Drawer open={!!user} onClose={onClose} width={480} title={user?.name} description="Giriş denemeleri ve oturumlar">
+    <Drawer open={!!user} onClose={onClose} width={520} title={user?.name} description="Giriş denemeleri ve oturumlar">
       {!data ? null : (
         <div className="flex flex-col gap-5">
           <div>
-            <h3 className="mb-2 text-[13px] font-semibold uppercase tracking-[0.05em] text-ink-3">Açık oturumlar</h3>
-            {data.sessions.length === 0 ? <p className="text-[13px] text-ink-3">Açık oturum yok.</p> : (
-              <div className="flex flex-col divide-y divide-line">
-                {data.sessions.map((s, i) => (
-                  <div key={i} className="flex items-center justify-between py-2 text-[13px]">
-                    <span className="text-ink-2">{s.kind === 'web' ? 'Tarayıcı' : s.device ?? 'Mobil'} {s.ip_address ? `· ${s.ip_address}` : ''}</span>
-                    <span className="text-ink-3">{s.last_active_at ? relative(s.last_active_at) : '—'}</span>
-                  </div>
-                ))}
-              </div>
-            )}
+            <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+              <h3 className="text-[13px] font-semibold uppercase tracking-[0.05em] text-ink-3">Açık oturumlar ve cihazlar</h3>
+              {open.length > 0 && (
+                <Button size="xs" variant="danger-soft" onClick={() => setConfirmAll(true)}>Tümünü kapat</Button>
+              )}
+            </div>
+            {data.sessions_notice && <Alert tone="info" className="mb-2">{data.sessions_notice}</Alert>}
+            <div className="-mx-5 border-b border-line">
+              <SessionList rows={data.sessions} pendingId={revoke.isPending ? revoke.variables : null} onRevoke={(s) => revoke.mutate(s.id)} />
+            </div>
           </div>
           <div>
             <h3 className="mb-2 text-[13px] font-semibold uppercase tracking-[0.05em] text-ink-3">Son giriş denemeleri</h3>
@@ -189,6 +204,16 @@ function UserDetailDrawer({ user, onClose }: { user: AdminUserRow | null; onClos
           </div>
         </div>
       )}
+      <ConfirmDialog
+        open={confirmAll}
+        onClose={() => setConfirmAll(false)}
+        onConfirm={() => revokeAll.mutate()}
+        loading={revokeAll.isPending}
+        danger
+        title="Tüm oturumlar kapatılsın mı?"
+        confirmLabel="Hepsini kapat"
+        description={`${user?.name ?? 'Kullanıcı'} için tarayıcı, Mac uygulaması ve mobil uygulama oturumlarının hepsi kapanır. Çevrimdışı Mac'teki oturum, cihaz bağlandığında kapanır.`}
+      />
     </Drawer>
   )
 }

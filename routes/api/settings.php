@@ -34,6 +34,8 @@ Route::middleware('permission:users.manage')->group(function () {
     Route::put('admin-users/{user}', [UserController::class, 'update']);
     Route::post('admin-users/{user}/active', [UserController::class, 'toggleActive']);
     Route::post('admin-users/{user}/reset-password', [UserController::class, 'resetPassword']);
+    Route::delete('admin-users/{user}/sessions', [UserController::class, 'revokeAllSessions']);
+    Route::delete('admin-users/{user}/sessions/{id}', [UserController::class, 'revokeSession']);
 
     Route::get('roles', [RoleController::class, 'index']);
     Route::post('roles', [RoleController::class, 'store']);

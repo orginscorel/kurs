@@ -22,6 +22,8 @@ export type SyncDevice = {
   paired_at: string | null
   revoked_at: string | null
   open_conflicts: number
+  /** Cihazda şu an açık uygulama oturumları (cihazın son raporundan) */
+  open_sessions?: { user_id: number; name: string | null; last_active_at: string | null; closing: boolean }[]
 }
 
 export type SyncOverview = {

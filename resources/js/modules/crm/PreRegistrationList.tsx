@@ -10,7 +10,7 @@ import { useCan } from '@/app/auth'
 import { useDebounced, useListState } from '@/hooks/useListState'
 import { PageHeader, Stat } from '@/components/ui/layout'
 import { DataTable, type Column } from '@/components/ui/DataTable'
-import { Badge, EmptyState } from '@/components/ui/feedback'
+import { Avatar, Badge, EmptyState } from '@/components/ui/feedback'
 import { Button, ButtonLink } from '@/components/ui/Button'
 import { Field, Input, Segmented, Select, Textarea } from '@/components/ui/form'
 import { Modal } from '@/components/ui/overlay'
@@ -101,9 +101,12 @@ export default function PreRegistrationList() {
         // Okul adı uzun olabiliyor; ilk sütun 440'a kadar açılıp işlem sütununu taşırmasın diye üst sınır daraltıldı
         key: 'name', header: 'Öğrenci', sortKey: 'full_name', maxWidth: 240,
         cell: (l) => (
-          <div className="min-w-0">
-            <p className="truncate font-medium text-ink">{l.full_name}</p>
-            <p className="truncate text-[12px] text-ink-3">{[sinifMetni(l.school_grade), l.school_name, date(l.created_at)].filter(Boolean).join(' · ')}</p>
+          <div className="flex min-w-0 items-center gap-2.5">
+            <Avatar name={l.full_name} size={34} tinted />
+            <div className="min-w-0">
+              <p className="truncate font-medium text-ink">{l.full_name}</p>
+              <p className="truncate text-[12px] text-ink-3">{[sinifMetni(l.school_grade), l.school_name, date(l.created_at)].filter(Boolean).join(' · ')}</p>
+            </div>
           </div>
         ),
       },

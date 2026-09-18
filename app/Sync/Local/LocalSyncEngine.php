@@ -2,6 +2,7 @@
 
 namespace App\Sync\Local;
 
+use App\Support\Sensitive;
 use App\Sync\RecomputeService;
 use App\Sync\RowCodec;
 use App\Sync\Sweeper;
@@ -9,10 +10,14 @@ use App\Sync\SyncContext;
 use App\Sync\SyncNumbers;
 use App\Sync\SyncRegistry;
 use App\Sync\SyncSchema;
+use Carbon\CarbonImmutable;
+use Illuminate\Contracts\Cache\Lock;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Spatie\Permission\PermissionRegistrar;
 
 /**
  * Yerel düğüm eşitleme döngüsü: süpür → numara bloğu → GÖNDER → ÇEK → yeniden hesapla.
@@ -181,6 +186,8 @@ class LocalSyncEngine
             $out['sweep'] = $this->sweeper->sweep();
             // ÖNCE gönder: bekleyen değişiklikler ikincil adımların (numara bloğu, dosya) hatasına takılmasın.
             $out['push'] = $this->pushAll();
+            // Reddedilenleri yeniden dene (açılış / geri çekilme süresi dolan / elle istenen / zincir): RejectedRetry
+            $out['retry'] = $this->retryRejected((int) ($out['push']['accepted'] ?? 0));
             $out['pull'] = $this->pullAll();
             // Numara bloğu ikincildir (yalnız yeni öğrenci numarası içindir): hatası turu düşürmez.
             $out['blocks'] = $this->refillBlocksSafely();
@@ -193,6 +200,8 @@ class LocalSyncEngine
                 Log::warning('Dosya eşitleme hatası', ['e' => $e->getMessage(), 'at' => $e->getFile().':'.$e->getLine()]);
                 $out['files'] = ['error' => $e->getMessage()];
             }
+            // Açık oturum raporu + bekleyen uzaktan kapatmalar (en fazla dakikada bir; hatası turu düşürmez)
+            $out['sessions'] = app(SessionReporter::class)->runSafely();
             // Gönderme ve çekme bitti: tur başarılıdır. Durum yoklaması yalnız gösterge bilgisidir;
             // hatası (ör. bu sırada bağlantının kopması) başarılı turu geri almasın.
             $status = [];
@@ -236,7 +245,7 @@ class LocalSyncEngine
      * Tur kilidi. Sahibinin PID'i ayrıca yazılır: süreç öldüyse (uyku sonrası sonlandırma, uygulama kapanışı)
      * `--force` kilidi süresinin dolmasını beklemeden devralır. Canlı bir sahip varsa kilide dokunulmaz.
      */
-    private function acquireCycleLock(bool $force): ?\Illuminate\Contracts\Cache\Lock
+    private function acquireCycleLock(bool $force): ?Lock
     {
         $seconds = max(30, (int) config('sync.cycle_lock_seconds', 180));
         $lock = Cache::lock(self::LOCK_NAME, $seconds);
@@ -318,7 +327,7 @@ class LocalSyncEngine
     {
         $this->state->put('data_key', Crypt::encryptString($key));
         config(['kurs.data_key' => $key]);
-        $this->state->put('data_key_fp', \App\Support\Sensitive::dataKeyFingerprint());
+        $this->state->put('data_key_fp', Sensitive::dataKeyFingerprint());
     }
 
     private function fail(string $phase, string $message, string $detail = ''): void
@@ -349,28 +358,10 @@ class LocalSyncEngine
                 break;
             }
             $pending = $rows->whereNull('status');
-            $payload = [
-                'base_cursor' => $this->state->serverCursor(),
-                'device_time' => now()->toIso8601String(),
-                'changes' => $pending->map(fn ($r) => $this->wire($r))->values()->all(),
-            ];
-            $res = $payload['changes'] === [] ? ['results' => []] : $this->client->push($payload);
-            $byId = collect($res['results'] ?? [])->keyBy('id');
-
-            DB::transaction(function () use ($pending, $byId, $rows) {
-                $this->deferForeignKeys();
-                foreach ($pending as $r) {
-                    $result = $byId[$r->change_uuid] ?? null;
-                    if (! $result) {
-                        continue;
-                    }
-                    $this->handleResult($r, $result);
-                }
-                $this->state->put('pushed_up_to', (int) $rows->last()->id);
-            });
+            $res = $this->sendChanges($pending, fn () => $this->state->put('pushed_up_to', (int) $rows->last()->id));
 
             $total['batches']++;
-            $total['sent'] += count($payload['changes']);
+            $total['sent'] += $pending->count();
             foreach (['accepted', 'rejected', 'conflicts', 'duplicates'] as $k) {
                 $total[$k] += (int) ($res[$k] ?? 0);
             }
@@ -379,10 +370,88 @@ class LocalSyncEngine
         return $total;
     }
 
+    /**
+     * Değişiklikleri gönderir ve sonuçları aynı transaction'da uygular.
+     *
+     * @param  Collection<int, object>  $pending
+     * @return array<string, mixed> sunucu yanıtı
+     */
+    private function sendChanges(Collection $pending, ?callable $after = null, bool $retry = false): array
+    {
+        $changes = $pending->map(fn ($r) => $this->wire($r))->values()->all();
+        $res = $changes === [] ? ['results' => []] : $this->client->push([
+            'base_cursor' => $this->state->serverCursor(),
+            'device_time' => now()->toIso8601String(),
+            'changes' => $changes,
+        ]);
+        $byId = collect($res['results'] ?? [])->keyBy('id');
+
+        DB::transaction(function () use ($pending, $byId, $after, $retry) {
+            $this->deferForeignKeys();
+            foreach ($pending as $r) {
+                $result = $byId[$r->change_uuid] ?? null;
+                if (! $result) {
+                    continue;
+                }
+                $this->handleResult($r, $result, $retry);
+            }
+            if ($after) {
+                $after();
+            }
+        });
+
+        return $res;
+    }
+
+    /**
+     * Reddedilen değişiklikleri yeniden dene (kurallar: RejectedRetry). Zincir: bir geçişte kabul olursa
+     * 'missing_reference' ile reddedilenler aynı turda tekrar gönderilir; ilerleme yoksa durur.
+     *
+     * @return array{sent: int, accepted: int, rejected: int, passes: int}
+     */
+    public function retryRejected(int $acceptedThisCycle = 0): array
+    {
+        $plan = app(RejectedRetry::class);
+        $triggers = $plan->takeTriggers();
+        $out = ['sent' => 0, 'accepted' => 0, 'rejected' => 0, 'passes' => 0];
+        $progress = $acceptedThisCycle > 0;
+        $tried = [];
+        for ($pass = 0; $pass < RejectedRetry::MAX_PASSES; $pass++) {
+            $rows = $plan->due($pass === 0 ? $triggers['manual'] : null, $pass === 0 && $triggers['startup'], $progress, $tried);
+            if ($rows->isEmpty()) {
+                break;
+            }
+            try {
+                $this->sendChanges($rows, null, true);
+            } catch (SyncHttpException $e) {
+                if ($pass === 0 && $triggers['manual'] !== null) {
+                    // elle istenen deneme bağlantı hatasında kaybolmasın
+                    $plan->requestManual($triggers['manual'] === '*' ? null : $triggers['manual']);
+                }
+                throw $e;
+            }
+            $after = DB::table('sync_changes')->whereIn('id', $rows->pluck('id'))->pluck('status', 'id');
+            $accepted = $after->filter(fn ($st) => $st !== 'rejected')->count();
+            foreach ($rows as $r) {
+                $tried[(int) $r->id] = true;
+            }
+            $out['passes']++;
+            $out['sent'] += $rows->count();
+            $out['accepted'] += $accepted;
+            $out['rejected'] += $rows->count() - $accepted;
+            $progress = $accepted > 0;
+            if (! $progress) {
+                break;
+            }
+        }
+
+        return $out;
+    }
+
     private function wire(object $r): array
     {
         $fields = $r->fields === null ? null : json_decode($r->fields, true);
-        $at = \Carbon\CarbonImmutable::parse($r->created_at)->toIso8601String();
+        $at = CarbonImmutable::parse($r->created_at)->toIso8601String();
         if ($r->op === 'command') {
             return ['id' => $r->change_uuid, 'command' => $fields['name'], 'args' => $fields['args'] ?? [],
                 'uuids' => $fields['uuids'] ?? [], 'numbers' => $fields['numbers'] ?? [], 'at' => $at];
@@ -391,7 +460,7 @@ class LocalSyncEngine
         return ['id' => $r->change_uuid, 'table' => $r->table_name, 'op' => $r->op, 'row' => $r->row_uuid, 'fields' => $fields, 'at' => $at];
     }
 
-    private function handleResult(object $r, array $result): void
+    private function handleResult(object $r, array $result, bool $retry = false): void
     {
         $status = $result['status'] ?? 'rejected';
         if ($status === 'duplicate') {
@@ -401,6 +470,7 @@ class LocalSyncEngine
 
         if ($status === 'rejected') {
             DB::table('sync_changes')->where('id', $r->id)->update(['status' => 'rejected', 'error' => mb_substr((string) ($result['message'] ?? ''), 0, 300)]);
+            app(RejectedRetry::class)->noteRejected((int) $r->id, isset($result['code']) ? (string) $result['code'] : null, $retry);
             if ($r->op === 'command') {
                 $this->rollbackCommand($fields);
             } elseif ($r->op === 'insert') {
@@ -409,7 +479,15 @@ class LocalSyncEngine
 
             return;
         }
-        DB::table('sync_changes')->where('id', $r->id)->update(['status' => 'pushed']);
+        DB::table('sync_changes')->where('id', $r->id)->update(['status' => 'pushed', 'error' => null]);
+        if ($retry) {
+            app(RejectedRetry::class)->forget([(int) $r->id]);
+            if ($r->op === 'command') {
+                // Ret anında yerelde geri alınan komut artık sunucuda yürüdü: oluşan/değişen satırları sunucudan al
+                // (kaynak cihaza yankı gönderilmediği için çekmeyle gelmezler).
+                $this->restoreCommandRows($fields);
+            }
+        }
 
         if (! empty($result['unused_uuids']) && is_array($result['unused_uuids'])) {
             $this->deleteLocal($result['unused_uuids']);
@@ -423,6 +501,30 @@ class LocalSyncEngine
         foreach ((array) ($fields['touched'] ?? []) as $table => $uuids) {
             try {
                 $res = $this->client->rows((string) $table, (array) $uuids);
+            } catch (SyncHttpException) {
+                continue;
+            }
+            foreach ($res['rows'] ?? [] as $row) {
+                if ($row['fields'] !== null) {
+                    $this->applier->apply(['table' => $table, 'row' => $row['row'], 'op' => 'upsert', 'fields' => $row['fields']]);
+                }
+            }
+        }
+        $this->recompute->run();
+    }
+
+    /** Yeniden denemede kabul edilen komutun satırları (oluşturduğu + dokunduğu) sunucudan alınır. */
+    private function restoreCommandRows(array $fields): void
+    {
+        $byTable = [];
+        foreach (['uuids', 'touched'] as $k) {
+            foreach ((array) ($fields[$k] ?? []) as $table => $uuids) {
+                $byTable[$table] = array_values(array_unique(array_merge($byTable[$table] ?? [], (array) $uuids)));
+            }
+        }
+        foreach ($byTable as $table => $uuids) {
+            try {
+                $res = $this->client->rows((string) $table, $uuids);
             } catch (SyncHttpException) {
                 continue;
             }
@@ -584,7 +686,7 @@ class LocalSyncEngine
             $this->recompute->run($targets);
         }
         if (array_intersect($tables, ['roles', 'permissions', 'role_has_permissions', 'model_has_roles', 'model_has_permissions'])) {
-            app(\Spatie\Permission\PermissionRegistrar::class)->forgetCachedPermissions();
+            app(PermissionRegistrar::class)->forgetCachedPermissions();
         }
         if (in_array('settings', $tables, true)) {
             foreach (DB::table('settings')->select('branch_id', 'group')->distinct()->get() as $s) {

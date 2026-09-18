@@ -80,6 +80,27 @@ export default function DevicesPage() {
       },
       { key: 'user', header: 'Eşleştiren', mobileLabel: 'Kullanıcı', cell: (d) => <span className="text-ink-2">{d.user?.name ?? '—'}</span> },
       {
+        key: 'sessions',
+        header: 'Açık oturumlar',
+        mobileLabel: 'Oturumlar',
+        cell: (d) => {
+          if (d.status !== 'active') return <span className="text-ink-3">—</span>
+          const list = d.open_sessions ?? []
+          if (!list.length) return <span className="text-ink-3">Oturum yok</span>
+          const names = Array.from(new Set(list.map((s) => s.name ?? '?')))
+          const closing = list.filter((s) => s.closing).length
+          return (
+            <div className="min-w-0 text-[12.5px] leading-tight">
+              <div className="flex flex-wrap items-center gap-1">
+                <Badge tone="primary">{num(list.length)} oturum</Badge>
+                {closing > 0 && <Badge tone="warning">{num(closing)} kapatılıyor</Badge>}
+              </div>
+              <div className="mt-1 break-words text-ink-2">{names.join(', ')}</div>
+            </div>
+          )
+        },
+      },
+      {
         key: 'seen',
         header: 'Son görülme',
         cell: (d) =>
@@ -136,8 +157,8 @@ export default function DevicesPage() {
         align: 'right',
         cell: (d) =>
           d.status === 'active' && can('sync.manage') ? (
-            <Button size="xs" variant="danger-soft" title="Cihazın eşitleme erişimini iptal et" icon={<ShieldOff className="size-3.5" />} onClick={(e) => { e.stopPropagation(); setRevoking(d) }}>
-              İptal et
+            <Button size="xs" variant="danger-soft" title="Cihazın eşleşmesini kaldır (eşitleme erişimini iptal et)" icon={<ShieldOff className="size-3.5" />} onClick={(e) => { e.stopPropagation(); setRevoking(d) }}>
+              Eşleşmeyi kaldır
             </Button>
           ) : null,
       },
@@ -251,6 +272,9 @@ export default function DevicesPage() {
             <>
               <span className="font-medium text-ink">{revoking.name}</span> ({revoking.code}) artık eşitleme yapamaz. Cihazda gönderilmemiş
               {revoking.pending_reported > 0 ? ` ${num(revoking.pending_reported)} ` : ' '}değişiklik varsa web'e ulaşmaz; tekrar kullanmak için yeniden eşleştirilmesi gerekir.
+              {(revoking.open_sessions?.length ?? 0) > 0 && (
+                <> Cihazda şu an {num(revoking.open_sessions!.length)} açık uygulama oturumu var; eşleşme kaldırıldıktan sonra bu oturumlar uzaktan kapatılamaz. Önce Kullanıcılar › Giriş ve oturumlar'dan kapatıp cihazın bağlanmasını bekleyin.</>
+              )}
             </>
           ) : undefined
         }
