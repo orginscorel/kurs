@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\Attendance;
 use App\Http\Controllers\Api\ApiController;
 use App\Models\Device;
 use App\Services\Attendance\PdksService;
+use App\Services\Attendance\TerminalEnrollmentService;
 use App\Services\Devices\Terminal\TerminalStateStore;
 use App\Support\Audit;
 use App\Support\BranchContext;
@@ -42,6 +43,42 @@ class PdksController extends ApiController
         $type = $request->query('tur');
 
         return response()->json(['data' => $this->pdks->searchPeople($this->branch(), (string) $request->query('q', ''), in_array($type, ['student', 'teacher', 'employee'], true) ? $type : null)]);
+    }
+
+    // ------------------------------------------------------------ terminale kayıt sihirbazı
+
+    public function enrollStart(Request $request, TerminalEnrollmentService $enroll): JsonResponse
+    {
+        $data = $request->validate([
+            'kisi_turu' => ['required', Rule::in(array_keys(PdksService::PERSON_TYPES))],
+            'kisi_id' => ['required', 'integer', 'min:1'],
+        ], ['kisi_id.required' => 'Kişi seçilmelidir.'], ['kisi_turu' => 'Kişi türü', 'kisi_id' => 'Kişi']);
+
+        return response()->json(['data' => $enroll->start($this->branch(), $data['kisi_turu'], (int) $data['kisi_id'])], 201);
+    }
+
+    public function enrollStatus(int $session, TerminalEnrollmentService $enroll): JsonResponse
+    {
+        return response()->json(['data' => $enroll->status($this->branch(), $session)]);
+    }
+
+    public function enrollExtend(int $session, TerminalEnrollmentService $enroll): JsonResponse
+    {
+        return response()->json(['data' => $enroll->extend($this->branch(), $session)]);
+    }
+
+    public function enrollCancel(int $session, TerminalEnrollmentService $enroll): JsonResponse
+    {
+        $enroll->cancel($this->branch(), $session);
+
+        return response()->json(['message' => 'Kayıt iptal edildi.']);
+    }
+
+    public function unenrolled(Request $request, TerminalEnrollmentService $enroll): JsonResponse
+    {
+        $type = $request->query('tur');
+
+        return response()->json($enroll->unenrolled($this->branch(), in_array($type, ['student', 'teacher', 'employee'], true) ? $type : null, $request->query('q')));
     }
 
     public function link(Request $request): JsonResponse

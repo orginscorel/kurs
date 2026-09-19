@@ -1,5 +1,24 @@
 [
   {
+    "version": "1.15.3",
+    "date": "2026-09-19",
+    "title": "Terminale kayıt sihirbazı",
+    "items": [
+      {
+        "type": "yeni",
+        "text": "PDKS › Terminale kaydet: kursa kayıtlı öğrenci ve personeli seçin, sistem cihaz numarası versin; kişi parmağını, kartını ya da yüzünü okutunca kayıt kendiliğinden bu kişiye bağlansın"
+      },
+      {
+        "type": "yeni",
+        "text": "Terminale kaydı olmayanlar listesi ve toplu kayıt gününde Sıradaki kişi ile hızlı ilerleme"
+      },
+      {
+        "type": "iyilestirme",
+        "text": "Kişiler listesinde her kişinin terminalde kaç parmak, kart ve yüz kaydı olduğu görünüyor"
+      }
+    ]
+  },
+  {
     "version": "1.15.2",
     "date": "2026-09-19",
     "title": "Terminal okutmaları otomatik işleniyor",

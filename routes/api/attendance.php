@@ -126,6 +126,11 @@ Route::prefix('attendance')->group(function () {
             Route::get('kisiler', [PdksController::class, 'people']);
             Route::get('kisi-ara', [PdksController::class, 'search']);
             Route::post('eslestir', [PdksController::class, 'link'])->middleware(['terminal.desktop', 'throttle:writes']);
+            Route::get('kayitsiz', [PdksController::class, 'unenrolled']);
+            Route::post('terminal-kayit', [PdksController::class, 'enrollStart'])->middleware(['terminal.desktop', 'throttle:writes']);
+            Route::get('terminal-kayit/{session}', [PdksController::class, 'enrollStatus'])->whereNumber('session')->middleware('terminal.desktop');
+            Route::post('terminal-kayit/{session}/uzat', [PdksController::class, 'enrollExtend'])->whereNumber('session')->middleware('terminal.desktop');
+            Route::delete('terminal-kayit/{session}', [PdksController::class, 'enrollCancel'])->whereNumber('session')->middleware('terminal.desktop');
             Route::post('csv/onizle', [PdksController::class, 'csvPreview'])->middleware('terminal.desktop');
             Route::post('csv/uygula', [PdksController::class, 'csvApply'])->middleware(['terminal.desktop', 'throttle:writes']);
             Route::get('kayitlar', [PdksController::class, 'events']);

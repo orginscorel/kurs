@@ -200,4 +200,83 @@ class Yt33PushTest extends TestCase
         $this->assertSame('{"ioMode":10,"userId":"986"}', $same);
         $this->assertNull($none);
     }
+
+    // ============================================================ terminale kayıt sihirbazı
+
+    private function wizard(): \App\Services\Attendance\TerminalEnrollmentService
+    {
+        return app(\App\Services\Attendance\TerminalEnrollmentService::class);
+    }
+
+    public function test_wizard_reserves_sequential_number_and_device_enroll_completes_it(): void
+    {
+        $ali = $this->student('Ali Kaya');
+        $this->student('Veli Can', '1005');
+
+        $session = $this->wizard()->start($this->branch->id, 'student', $ali->id);
+        $this->assertSame('1006', $session['cihaz_no']);
+        $this->assertSame('bekliyor', $session['durum']);
+
+        // Cihaz, ad olmadan ayrılan numarayla kaydeder
+        $this->send(self::request('realtime_enroll_data', 'RTEnrollData', ['card' => '0012345678', 'fps' => [self::TEMPLATE], 'name' => '', 'userId' => '1006']));
+
+        $done = $this->wizard()->status($this->branch->id, $session['id']);
+        $this->assertSame('kaydedildi', $done['durum']);
+        $this->assertSame(['parmak' => 1, 'kart' => true], ['parmak' => $done['terminal']['parmak'], 'kart' => $done['terminal']['kart']]);
+        $this->assertSame(1, DeviceIdentity::query()->withoutGlobalScopes()->where('person_id', $ali->id)->where('identifier', '1006')->count());
+        $this->assertSame([], array_filter($this->wizard()->unenrolled($this->branch->id)['kisiler'], fn ($p) => $p['kisi_id'] === $ali->id));
+    }
+
+    public function test_wizard_follows_number_chosen_by_device_but_never_steals_anothers(): void
+    {
+        $ali = $this->student('Ali Kaya');
+        $this->student('Veli Can', '77');
+        $session = $this->wizard()->start($this->branch->id, 'student', $ali->id);
+
+        // Başka birinin numarasıyla gelen kayıt oturumu tamamlamaz
+        $this->send(self::request('realtime_enroll_data', 'RTEnrollData', ['fps' => [], 'userId' => '77']));
+        $this->assertSame('bekliyor', $this->wizard()->status($this->branch->id, $session['id'])['durum']);
+
+        // Cihaz kendi boş numarasını verdi → eşleme oraya taşınır, ayrılan numara bırakılır
+        $this->send(self::request('realtime_enroll_data', 'RTEnrollData', ['fps' => [self::TEMPLATE], 'userId' => '5']));
+        $done = $this->wizard()->status($this->branch->id, $session['id']);
+        $this->assertSame('kaydedildi', $done['durum']);
+        $this->assertSame('5', $done['cihaz_no']);
+        $this->assertSame(['5'], DeviceIdentity::query()->withoutGlobalScopes()->where('person_id', $ali->id)->pluck('identifier')->all());
+    }
+
+    public function test_cancelled_wizard_releases_unused_number(): void
+    {
+        $ali = $this->student('Ali Kaya');
+        $session = $this->wizard()->start($this->branch->id, 'student', $ali->id);
+        $this->assertSame('1001', $session['cihaz_no']);
+
+        $this->wizard()->cancel($this->branch->id, $session['id']);
+
+        $this->assertSame(0, DeviceIdentity::query()->withoutGlobalScopes()->count());
+        $this->assertSame('suresi_doldu', $this->wizard()->status($this->branch->id, $session['id'])['durum']);
+    }
+
+    public function test_wizard_api_is_desktop_only_and_returns_session(): void
+    {
+        $ali = $this->student('Ali Kaya');
+        config(['kurs.node' => 'server']);   // kullanıcı hesabı yalnız sunucuda açılır
+        $admin = \App\Models\User::query()->create(['branch_id' => $this->branch->id, 'name' => 'Müdür', 'username' => 'mudur9',
+            'user_type' => 'staff', 'password' => 'Parola123!', 'is_active' => true]);
+        foreach (\App\Support\Permissions::all() as $permission) {
+            \Spatie\Permission\Models\Permission::findOrCreate($permission, 'web');
+        }
+        \Spatie\Permission\Models\Role::findOrCreate('yonetici', 'web')->syncPermissions(\App\Support\Permissions::all());
+        app(\Spatie\Permission\PermissionRegistrar::class)->forgetCachedPermissions();
+        $admin->assignRole('yonetici');
+        \Laravel\Sanctum\Sanctum::actingAs($admin);
+        config(['kurs.node' => 'local']);
+
+        $this->postJson('/api/v1/attendance/pdks/terminal-kayit', ['kisi_turu' => 'student', 'kisi_id' => $ali->id])
+            ->assertCreated()->assertJsonPath('data.cihaz_no', '1001');
+        $this->getJson('/api/v1/attendance/pdks/kayitsiz')->assertOk()->assertJsonPath('toplam', 0);
+
+        config(['kurs.node' => 'server']);
+        $this->postJson('/api/v1/attendance/pdks/terminal-kayit', ['kisi_turu' => 'student', 'kisi_id' => $ali->id])->assertStatus(409);
+    }
 }

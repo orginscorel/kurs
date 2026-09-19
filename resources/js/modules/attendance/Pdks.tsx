@@ -1,7 +1,7 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { Activity, Clock, Download, FileSpreadsheet, Fingerprint, Link2, Lock, Search, Upload, UserPlus, X } from 'lucide-react'
+import { Activity, CheckCircle2, Clock, CreditCard, Download, FileSpreadsheet, Fingerprint, Link2, Loader2, Lock, ScanFace, Search, Upload, UserPlus, X } from 'lucide-react'
 import { api, ApiError, isLocalNode, type Paginated } from '@/lib/api'
 import { dateTime, relative } from '@/lib/format'
 import { useDebounced } from '@/hooks/useListState'
@@ -33,6 +33,21 @@ type PersonRow = {
   son_okutma: string | null
   eslesmeyen_okutma: number
   cihazdaki_ad?: string | null
+  terminal?: TerminalInfo | null
+}
+type TerminalInfo = { ad?: string | null; parmak: number | null; yuz: number; kart: boolean; zaman: string | null }
+type EnrollSession = {
+  id: number
+  durum: 'bekliyor' | 'kaydedildi' | 'suresi_doldu'
+  kisi: string
+  kisi_no: string | null
+  kisi_turu_etiketi: string
+  cihaz_no: string
+  ayrilan_no: string
+  yeni_numara: boolean
+  bitis: string
+  terminal: TerminalInfo | null
+  son_okutma: string | null
 }
 type PendingRow = { kullanici_no: string; son_okutma: string | null; eslesmeyen_okutma: number; cihazdaki_ad?: string | null; oto_eslesme?: string | null }
 
@@ -155,6 +170,229 @@ function LinkModal({ open, onClose, initialNo }: { open: boolean; onClose: () =>
   )
 }
 
+// ---------------------------------------------------------------- terminale kayıt sihirbazı
+
+function TerminalBadges({ t }: { t?: TerminalInfo | null }) {
+  if (!t) return <span className="text-[12.5px] text-ink-3">Kayıt bilgisi yok</span>
+  const none = !t.parmak && !t.yuz && !t.kart
+  return (
+    <span className="inline-flex flex-wrap items-center gap-1">
+      {!!t.parmak && <Badge tone="success"><Fingerprint className="size-3" /> {t.parmak} parmak</Badge>}
+      {!!t.yuz && <Badge tone="success"><ScanFace className="size-3" /> Yüz</Badge>}
+      {t.kart && <Badge tone="success"><CreditCard className="size-3" /> Kart</Badge>}
+      {none && <Badge tone="warning">Okutma kaydı yok</Badge>}
+    </span>
+  )
+}
+
+function EnrollModal({ person, onClose, onNext }: { person: Hit | null; onClose: () => void; onNext?: () => void }) {
+  const qc = useQueryClient()
+  const [picked, setPicked] = useState<Hit | null>(person)
+  const [q, setQ] = useState('')
+  const [session, setSession] = useState<EnrollSession | null>(null)
+  const dq = useDebounced(q, 250)
+
+  const search = useQuery({
+    queryKey: ['pdks', 'search', dq, ''],
+    queryFn: () => api.get<{ data: Hit[] }>('/attendance/pdks/kisi-ara', { q: dq }),
+    enabled: !picked && dq.trim().length >= 2,
+  })
+
+  const start = useMutation({
+    mutationFn: (h: Hit) => api.post<{ data: EnrollSession }>('/attendance/pdks/terminal-kayit', { kisi_turu: h.kisi_turu, kisi_id: h.kisi_id }),
+    onSuccess: (r) => setSession(r.data),
+    onError: (e) => toast.error(err(e, 'Kayıt başlatılamadı.')),
+  })
+
+  // Kişi hazırsa oturumu hemen aç
+  useEffect(() => {
+    if (picked && !session && !start.isPending && !start.isError) start.mutate(picked)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [picked])
+
+  const poll = useQuery({
+    queryKey: ['pdks', 'enroll', session?.id],
+    queryFn: () => api.get<{ data: EnrollSession }>(`/attendance/pdks/terminal-kayit/${session!.id}`),
+    enabled: !!session,
+    refetchInterval: (query) => (query.state.data?.data.durum ?? session?.durum) === 'bekliyor' ? 2000 : false,
+  })
+  const s = poll.data?.data ?? session
+  const done = s?.durum === 'kaydedildi'
+
+  useEffect(() => {
+    if (done) {
+      qc.invalidateQueries({ queryKey: ['pdks', 'people'] })
+      qc.invalidateQueries({ queryKey: ['pdks', 'unenrolled'] })
+    }
+  }, [done, qc])
+
+  const extend = useMutation({
+    mutationFn: () => api.post<{ data: EnrollSession }>(`/attendance/pdks/terminal-kayit/${s!.id}/uzat`, {}),
+    onSuccess: (r) => { setSession(r.data); poll.refetch() },
+  })
+
+  const close = async () => {
+    if (s && s.durum !== 'kaydedildi') {
+      try { await api.delete(`/attendance/pdks/terminal-kayit/${s.id}`) } catch { /* oturum kendiliğinden düşer */ }
+    }
+    qc.invalidateQueries({ queryKey: ['pdks'] })
+    onClose()
+  }
+
+  return (
+    <Modal
+      open
+      onClose={close}
+      size="lg"
+      title="Terminale kaydet"
+      description="Kişi cihazın başındayken parmak izi, kart ya da yüz kaydı yapın; sistem kaydı kendiliğinden bu kişiye bağlar."
+      footer={
+        <>
+          <Button variant="ghost" onClick={close}>{done ? 'Kapat' : 'Vazgeç'}</Button>
+          {done && onNext && <Button variant="primary" icon={<UserPlus className="size-4" />} onClick={onNext}>Sıradaki kişi</Button>}
+        </>
+      }
+    >
+      {!picked ? (
+        <div className="space-y-2">
+          <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Kaydedilecek kişi: ad, soyad ya da öğrenci no" leading={<Search className="size-4" />} autoFocus />
+          <ul className="max-h-72 overflow-y-auto scroll-thin divide-y divide-line rounded-[var(--radius-md)] ring-1 ring-line">
+            {dq.trim().length < 2 && <li className="px-3 py-2 text-[12.5px] text-ink-3">En az 2 harf yazın.</li>}
+            {search.isFetching && <li className="px-3 py-2 text-[12.5px] text-ink-3">Aranıyor…</li>}
+            {!search.isFetching && dq.trim().length >= 2 && !search.data?.data.length && <li className="px-3 py-2 text-[12.5px] text-ink-3">Sonuç yok.</li>}
+            {search.data?.data.map((h) => (
+              <li key={`${h.kisi_turu}-${h.kisi_id}`}>
+                <button type="button" className="flex w-full items-center gap-2 px-3 py-2 text-left hover:bg-surface-2" onClick={() => setPicked(h)}>
+                  <Badge tone={h.kisi_turu === 'student' ? 'info' : 'accent'}>{h.etiket}</Badge>
+                  <span className="truncate text-[13px]">{h.ad}</span>
+                  {h.no && <span className="text-[12px] text-ink-3 tabular">{h.no}</span>}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : !s ? (
+        start.isError ? (
+          <Alert tone="danger" title="Kayıt başlatılamadı">{err(start.error, 'Tekrar deneyin.')}</Alert>
+        ) : (
+          <div className="flex items-center gap-2 py-6 text-ink-3"><Loader2 className="size-4 animate-spin" /> Cihaz numarası ayrılıyor…</div>
+        )
+      ) : (
+        <div className="space-y-4">
+          <div className="flex flex-wrap items-center gap-4 rounded-[var(--radius-md)] bg-surface-2 p-4 ring-1 ring-line">
+            <div className="min-w-0 flex-1">
+              <p className="text-[12px] text-ink-3">{s.kisi_turu_etiketi}{s.kisi_no ? ` · ${s.kisi_no}` : ''}</p>
+              <p className="truncate text-[17px] font-semibold">{s.kisi}</p>
+            </div>
+            <div className="text-center">
+              <p className="text-[12px] text-ink-3">Cihaz kullanıcı no</p>
+              <p className="tabular text-[34px] font-bold leading-none tracking-wide">{s.cihaz_no}</p>
+            </div>
+          </div>
+
+          {done ? (
+            <Alert tone="success" title="Terminale kaydedildi" icon={<CheckCircle2 className="size-4" />}>
+              <div className="space-y-1.5">
+                <TerminalBadges t={s.terminal} />
+                <p>Bu kişinin okutmaları artık {s.kisi_turu_etiketi === 'Öğrenci' ? 'yoklamaya' : 'PDKS giriş-çıkışına'} işlenecek.
+                  {s.cihaz_no !== s.ayrilan_no && ` Cihaz ${s.cihaz_no} numarasını verdi; eşleme bu numaraya taşındı.`}</p>
+              </div>
+            </Alert>
+          ) : (
+            <>
+              <ol className="list-decimal space-y-1.5 pl-5 text-[13.5px] text-ink-2">
+                {s.yeni_numara ? (
+                  <li>Cihazda <strong>Menü › Kullanıcı Yönetimi › Yeni Kullanıcı</strong> açın, <strong>Kullanıcı No</strong> alanına <strong className="tabular">{s.cihaz_no}</strong> yazın (ad girmeniz gerekmez).</li>
+                ) : (
+                  <li>Bu kişi cihazda zaten <strong className="tabular">{s.cihaz_no}</strong> numarasıyla tanımlı. Cihazda <strong>Menü › Kullanıcı Yönetimi</strong> içinden bu kullanıcıyı açın.</li>
+                )}
+                <li><strong>Parmak izi:</strong> aynı parmağı istendiği kadar (genelde 3 kez) okutun; yedek olarak ikinci bir parmak da kaydedin.</li>
+                <li><strong>Kart:</strong> kartı okuyucuya yaklaştırın. <strong>Yüz:</strong> kişi ekrana bakarak yüz kaydını tamamlasın.</li>
+                <li>Cihazda <strong>Kaydet</strong>'e basın. Bu pencere kaydı kendiliğinden görecek.</li>
+              </ol>
+              {s.durum === 'bekliyor' ? (
+                <div className="flex items-center gap-2 rounded-[var(--radius-md)] px-3 py-2.5 ring-1 ring-line text-[13px] text-ink-2">
+                  <Loader2 className="size-4 animate-spin text-info" /> Cihazdan kayıt bekleniyor…
+                  <span className="ml-auto text-[12px] text-ink-3">süre {relative(s.bitis)} doluyor</span>
+                </div>
+              ) : (
+                <Alert tone="warning" title="Süre doldu">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span>Cihazdan kayıt gelmedi. Kişi hâlâ cihazın başındaysa süreyi uzatın.</span>
+                    <Button size="sm" loading={extend.isPending} onClick={() => extend.mutate()}>15 dk uzat</Button>
+                  </div>
+                </Alert>
+              )}
+              <p className="text-[12px] text-ink-3">
+                Cihaz başka bir numara önerirse de olur: kayıt geldiği anda bu kişiye bağlanır. Kayıt gelmiyorsa Terminal Köprüsü'nde push dinleyicisinin
+                "Aktif" olduğunu kontrol edin. Parmak izi ve yüz verisi cihazda kalır; bu sisteme yalnız kaç parmak kaydedildiği bilgisi gelir.
+              </p>
+            </>
+          )}
+        </div>
+      )}
+    </Modal>
+  )
+}
+
+function EnrollTab({ local }: { local: boolean }) {
+  const [type, setType] = useState<PersonType | ''>('')
+  const [q, setQ] = useState('')
+  const dq = useDebounced(q, 300)
+  const [current, setCurrent] = useState<{ person: Hit | null; key: number } | null>(null)
+
+  const { data, isLoading } = useQuery({
+    queryKey: ['pdks', 'unenrolled', type, dq],
+    queryFn: () => api.get<{ toplam: number; kisiler: Hit[] }>('/attendance/pdks/kayitsiz', { tur: type || undefined, q: dq || undefined }),
+    placeholderData: keepPreviousData,
+  })
+  const list = data?.kisiler ?? []
+
+  const next = () => {
+    const idx = current?.person ? list.findIndex((h) => h.kisi_turu === current.person!.kisi_turu && h.kisi_id === current.person!.kisi_id) : -1
+    const candidate = list.find((h, i) => i !== idx && !(current?.person && h.kisi_turu === current.person.kisi_turu && h.kisi_id === current.person.kisi_id))
+    setCurrent(candidate ? { person: candidate, key: Date.now() } : null)
+  }
+
+  return (
+    <div className="space-y-3">
+      <Alert tone="info" title="Kursa kayıtlı kişileri terminale nasıl kaydederim?" icon={<Fingerprint className="size-4" />}>
+        Listeden kişiyi seçip <strong>Kaydet</strong>'e basın. Sistem ona bir cihaz numarası verir; kişi cihazın başında parmağını, kartını ya da yüzünü okutur
+        ve kayıt kendiliğinden bu kişiye bağlanır. Toplu kayıt gününde <strong>Sıradaki kişi</strong> ile listede ilerleyin.
+      </Alert>
+      {!local && <Alert tone="warning" title="Yalnız Mac uygulamasında">Terminale kayıt, cihazın bağlı olduğu kurumdaki Mac uygulamasından yapılır.</Alert>}
+      <Panel
+        title={`Terminale kaydı olmayanlar${data ? ` · ${data.toplam}` : ''}`}
+        description="Etkin öğrenci, öğretmen ve çalışanlardan henüz bir cihaz numarasına bağlı olmayanlar."
+        actions={local ? <Button size="sm" variant="primary" icon={<UserPlus className="size-3.5" />} onClick={() => setCurrent({ person: null, key: Date.now() })}>Kişi ara ve kaydet</Button> : undefined}
+      >
+        <div className="mb-2 grid grid-cols-1 gap-2 sm:grid-cols-3">
+          <Select value={type} onChange={(e) => setType(e.target.value as PersonType | '')} options={[{ value: '', label: 'Tüm kişiler' }, { value: 'student', label: 'Öğrenciler' }, { value: 'teacher', label: 'Öğretmenler' }, { value: 'employee', label: 'Çalışanlar' }]} />
+          <div className="sm:col-span-2"><Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Ad ya da öğrenci no" leading={<Search className="size-4" />} /></div>
+        </div>
+        {isLoading ? (
+          <Skeleton className="h-40" />
+        ) : list.length === 0 ? (
+          <EmptyState icon={<CheckCircle2 />} title="Herkes terminale kayıtlı" description="Bu süzgeçte terminal numarası olmayan kişi yok." />
+        ) : (
+          <ul className="divide-y divide-line">
+            {list.map((h) => (
+              <li key={`${h.kisi_turu}-${h.kisi_id}`} className="flex flex-wrap items-center gap-2 py-2">
+                <Badge tone={h.kisi_turu === 'student' ? 'info' : 'accent'}>{h.etiket}</Badge>
+                <span className="font-medium">{h.ad}</span>
+                {h.no && <span className="text-[12px] text-ink-3 tabular">{h.no}</span>}
+                {local && <Button className="ml-auto" size="sm" icon={<Fingerprint className="size-3.5" />} onClick={() => setCurrent({ person: h, key: Date.now() })}>Kaydet</Button>}
+              </li>
+            ))}
+          </ul>
+        )}
+        {data && data.toplam > list.length && <p className="mt-2 text-[12px] text-ink-3">İlk {list.length} kişi gösteriliyor; aramayla daraltın.</p>}
+      </Panel>
+      {current && <EnrollModal key={current.key} person={current.person} onClose={() => setCurrent(null)} onNext={current.person ? next : undefined} />}
+    </div>
+  )
+}
+
 // ---------------------------------------------------------------- CSV toplu eşleştirme
 
 function CsvModal({ open, onClose }: { open: boolean; onClose: () => void }) {
@@ -247,7 +485,7 @@ function PeopleTab({ local }: { local: boolean }) {
     { key: 'kisi', header: 'Kişi', cell: (r) => <span><span className="font-medium">{r.kisi}</span>{r.kisi_no && <span className="text-[12px] text-ink-3 tabular"> · {r.kisi_no}</span>}</span> },
     { key: 'cihaz_ad', header: 'Cihazdaki ad', mobileHidden: true, cell: (r) => (r.cihazdaki_ad ? r.cihazdaki_ad : <span className="text-ink-3">—</span>) },
     { key: 'tur', header: 'Tür', cell: (r) => <Badge tone={r.kisi_turu === 'student' ? 'info' : 'accent'}>{r.kisi_turu_etiketi}</Badge> },
-    { key: 'kimlik', header: 'Kimlik', cell: (r) => (r.tur === 'card' ? 'Kart' : 'Parmak / yüz') },
+    { key: 'terminal', header: 'Terminal kaydı', cell: (r) => <TerminalBadges t={r.terminal} /> },
     { key: 'son', header: 'Son okutma', cell: (r) => (r.son_okutma ? relative(r.son_okutma) : <span className="text-ink-3">—</span>) },
   ]
 
@@ -427,8 +665,8 @@ function HealthTab() {
 }
 
 const DEVICE_OPS: { label: string; how: string }[] = [
-  { label: 'Cihaza kullanıcı ekle', how: 'Cihaz menüsü › Kullanıcı Yönetimi › Yeni Kullanıcı → bir Kullanıcı No verin. Sonra bu ekranda "Kişi eşleştir" ile o numarayı öğrenci/personelle bağlayın.' },
-  { label: 'Parmak izi / yüz kaydı başlat', how: 'Cihazda kullanıcıyı açın › Parmak İzi (ya da Yüz) Kaydet → kişiye okutun. Kayıt cihazda kalır; biyometrik veri bu sisteme hiç gelmez.' },
+  { label: 'Cihaza kullanıcı ekle', how: '"Terminale kaydet" sekmesinden kişiyi seçin: sistem numara verir, cihazda o numarayla Yeni Kullanıcı açıp okutun; kayıt kendiliğinden bağlanır.' },
+  { label: 'Parmak izi / kart / yüz kaydı', how: '"Terminale kaydet" sekmesinden kişiyi seçin ve cihazda okutun. Biyometrik veri cihazda kalır; bu sisteme yalnız kaç parmak kaydedildiği gelir.' },
   { label: 'Cihazdan kullanıcı sil', how: 'Cihaz menüsü › Kullanıcı Yönetimi › kullanıcıyı seçin › Sil. Buradaki eşleşmeyi de "Kişiler" listesinden kaldırın.' },
   { label: 'Cihazdan kullanıcı / kayıt indir', how: 'Okutmalar push (Terminal Köprüsü › Push) ya da doğrulanmış protokolle otomatik gelir. Şimdilik cihaz web panelinden (Dynamic Face) dışa aktarabilirsiniz.' },
   { label: 'Cihaz saatini eşitle', how: 'Cihaz menüsü ya da web paneli › Sistem › Tarih/Saat. Saat yanlışsa giriş-çıkış saatleri de yanlış kaydedilir.' },
@@ -455,7 +693,7 @@ function DeviceOpsTab() {
 
 export default function Pdks() {
   const local = isLocalNode()
-  const [tab, setTab] = useState<'kisiler' | 'kayitlar' | 'ozet' | 'saglik' | 'cihaz'>('kisiler')
+  const [tab, setTab] = useState<'kisiler' | 'kayit' | 'kayitlar' | 'ozet' | 'saglik' | 'cihaz'>('kisiler')
 
   return (
     <div className="animate-fade-in">
@@ -473,6 +711,7 @@ export default function Pdks() {
         onChange={setTab}
         tabs={[
           { value: 'kisiler', label: 'Kişiler ve eşleştirme' },
+          { value: 'kayit', label: 'Terminale kaydet' },
           { value: 'kayitlar', label: 'Giriş-çıkış' },
           { value: 'ozet', label: 'Günlük / aylık özet' },
           { value: 'saglik', label: 'Terminal sağlığı' },
@@ -480,6 +719,7 @@ export default function Pdks() {
         ]}
       />
       {tab === 'kisiler' && <PeopleTab local={local} />}
+      {tab === 'kayit' && <EnrollTab local={local} />}
       {tab === 'kayitlar' && <EventsTab />}
       {tab === 'ozet' && <SummaryTab />}
       {tab === 'saglik' && <HealthTab />}

@@ -9,6 +9,7 @@ use App\Models\Student;
 use App\Models\Teacher;
 use App\Services\Attendance\PdksService;
 use App\Services\Attendance\PresenceService;
+use App\Services\Attendance\TerminalEnrollmentService;
 use App\Services\Devices\Terminal\Data\AttendanceEvent;
 use App\Services\Devices\Terminal\Data\Direction;
 use App\Services\Devices\Terminal\Data\VerificationMethod;
@@ -36,6 +37,7 @@ class RealtimeIngest
     public function __construct(
         private readonly PresenceService $presence,
         private readonly PdksService $pdks,
+        private readonly TerminalEnrollmentService $enrollment,
     ) {}
 
     /** @return array{status:string, note:string} */
@@ -169,6 +171,7 @@ class RealtimeIngest
 
         $name = trim(preg_replace('/\s+/u', ' ', (string) ($d['name'] ?? '')) ?? '');
         $fps = $d['fps'] ?? null;
+        $face = $d['face'] ?? $d['faces'] ?? $d['face_data'] ?? $d['facedata'] ?? null;
         $now = now();
 
         DB::table('terminal_device_users')->updateOrInsert(
@@ -180,6 +183,7 @@ class RealtimeIngest
                 'privilege' => is_numeric($d['privilege'] ?? null) ? (int) $d['privilege'] : null,
                 // Şablon sayısı gizlemeden önce okunur; şablonun kendisi saklanmaz
                 'fingerprint_count' => is_array($fps) ? count(array_filter($fps, fn ($f) => $f !== null && $f !== '')) : null,
+                'face_count' => is_array($face) ? count(array_filter($face)) : ($face !== null && $face !== '' ? 1 : 0),
                 'valid_from' => mb_substr((string) ($d['vaildStart'] ?? $d['validStart'] ?? ''), 0, 20) ?: null,
                 'valid_until' => mb_substr((string) ($d['vaildEnd'] ?? $d['validEnd'] ?? ''), 0, 20) ?: null,
                 'last_enrolled_at' => $now,
@@ -187,7 +191,9 @@ class RealtimeIngest
             ],
         );
 
-        $link = $this->autoLink($device, $user, $name);
+        // Açık "Terminale kaydet" oturumu varsa kayıt o kişiye bağlanır (ada bakılmaz); yoksa adla tekil eşleme denenir
+        $wizard = app(BranchContext::class)->run((int) $device->branch_id, fn () => $this->enrollment->onEnroll($device, $user));
+        $link = $wizard !== null ? ['status' => 'linked', 'note' => $wizard] : $this->autoLink($device, $user, $name);
 
         DB::table('terminal_device_users')->where('device_id', $device->id)->where('user_no', $user)
             ->update(['link_status' => $link['status'], 'created_at' => DB::raw('COALESCE(created_at, updated_at)')]);

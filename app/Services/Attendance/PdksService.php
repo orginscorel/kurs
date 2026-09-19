@@ -57,7 +57,8 @@ class PdksService
 
         // Terminaldeki kullanıcı adları (YT33 push kaydı; yalnız cihazı dinleyen Mac'te dolu)
         $deviceNames = Schema::hasTable('terminal_device_users')
-            ? DB::table('terminal_device_users')->where('branch_id', $branchId)->orderBy('updated_at')->get(['user_no', 'name', 'link_status'])->keyBy('user_no')
+            ? DB::table('terminal_device_users')->where('branch_id', $branchId)->orderBy('updated_at')
+                ->get(['user_no', 'name', 'link_status', 'fingerprint_count', 'face_count', 'card_no', 'last_enrolled_at'])->keyBy('user_no')
             : collect();
 
         $mapped = $identities->pluck('identifier')->all();
@@ -76,7 +77,16 @@ class PdksService
             'cihazdaki_ad' => $deviceNames[$r['kullanici_no']]->name ?? null,
             'oto_eslesme' => $deviceNames[$r['kullanici_no']]->link_status ?? null,
         ])->values();
-        $rows = $rows->map(fn ($r) => $r + ['cihazdaki_ad' => $deviceNames[$r['kullanici_no']]->name ?? null])->values();
+        $rows = $rows->map(function ($r) use ($deviceNames) {
+            $u = $deviceNames[$r['kullanici_no']] ?? null;
+
+            return $r + [
+                'cihazdaki_ad' => $u->name ?? null,
+                // Terminal kaydı (YT33 push): null = bu Mac'e hiç kayıt bilgisi gelmedi
+                'terminal' => $u ? ['parmak' => $u->fingerprint_count !== null ? (int) $u->fingerprint_count : null, 'yuz' => (int) ($u->face_count ?? 0),
+                    'kart' => $u->card_no !== null && $u->card_no !== '' && $u->card_no !== '0', 'zaman' => $u->last_enrolled_at] : null,
+            ];
+        })->values();
 
         if ($q = trim((string) $q)) {
             $needle = mb_strtolower($q);
@@ -366,7 +376,7 @@ class PdksService
     }
 
     /** @return array{ad:string, no:?string} */
-    private function findPerson(int $branchId, string $type, int $id): array
+    public function findPerson(int $branchId, string $type, int $id): array
     {
         $person = $this->names(collect([[$type, $id]]), $branchId)[$type.':'.$id] ?? null;
 
