@@ -8,6 +8,8 @@ use App\Http\Controllers\Api\Attendance\DeviceIdentityController;
 use App\Http\Controllers\Api\Attendance\LivePresenceController;
 use App\Http\Controllers\Api\Attendance\StudentQrController;
 use App\Http\Controllers\Api\Attendance\TerminalController;
+use App\Http\Controllers\Api\Attendance\TerminalDevController;
+use App\Http\Controllers\Api\Attendance\PdksController;
 use App\Http\Controllers\Api\Attendance\ZkDeviceController;
 use Illuminate\Support\Facades\Route;
 
@@ -93,10 +95,41 @@ Route::prefix('attendance')->group(function () {
             Route::get('ham-tani/{id}/indir', [TerminalController::class, 'downloadDiagnostic'])->middleware('terminal.desktop')->where('id', '[0-9a-f]{12}');
             Route::get('teshis', [TerminalController::class, 'diagnostics'])->middleware('terminal.desktop');
             Route::get('push', [TerminalController::class, 'push'])->middleware('terminal.desktop');
+
+            // Geliştirici araçları (ham TCP oturumu, RAW log, protokol analizi) — ayrıca "geliştirici modu" anahtarı
+            Route::get('gelistirici', [TerminalDevController::class, 'mode'])->middleware('terminal.desktop');
+            Route::post('gelistirici', [TerminalDevController::class, 'setMode'])->middleware(['terminal.desktop', 'throttle:writes']);
+            Route::post('oturum', [TerminalDevController::class, 'session'])->middleware(['terminal.desktop', 'throttle:writes']);
+            Route::get('raw-log', [TerminalDevController::class, 'rawLog'])->middleware('terminal.desktop');
+            Route::get('raw-log/indir', [TerminalDevController::class, 'rawLogExport'])->middleware('terminal.desktop');
+            Route::delete('raw-log', [TerminalDevController::class, 'clearRawLog'])->middleware(['terminal.desktop', 'throttle:writes']);
+            Route::get('ornekler', [TerminalDevController::class, 'samples'])->middleware('terminal.desktop');
+            Route::post('ornekler', [TerminalDevController::class, 'storeSample'])->middleware(['terminal.desktop', 'throttle:writes']);
+            Route::put('ornekler/{id}', [TerminalDevController::class, 'storeSample'])->middleware(['terminal.desktop', 'throttle:writes'])->whereNumber('id');
+            Route::delete('ornekler/{id}', [TerminalDevController::class, 'deleteSample'])->middleware(['terminal.desktop', 'throttle:writes'])->whereNumber('id');
+            Route::post('ornekler/log/{logId}', [TerminalDevController::class, 'sampleFromLog'])->middleware(['terminal.desktop', 'throttle:writes'])->whereNumber('logId');
+            Route::post('ornekler/karsilastir', [TerminalDevController::class, 'compare'])->middleware('terminal.desktop');
+            Route::post('ornekler/har', [TerminalDevController::class, 'importHar'])->middleware(['terminal.desktop', 'throttle:writes']);
             Route::post('push', [TerminalController::class, 'savePush'])->middleware(['terminal.desktop', 'throttle:writes']);
             Route::get('paketler', [TerminalController::class, 'packets'])->middleware('terminal.desktop');
             Route::get('paketler/{id}', [TerminalController::class, 'packet'])->middleware('terminal.desktop')->whereNumber('id');
             Route::get('paketler/{id}/indir', [TerminalController::class, 'downloadPacket'])->middleware('terminal.desktop')->whereNumber('id');
+        });
+
+        /*
+         | PDKS — kurumun kendi devam kontrol sistemi (öğrenci + personel). Okuma web'de de açık (salt okunur);
+         | eşleştirme yazma uçları yalnız masaüstünde.
+         */
+        Route::prefix('pdks')->group(function () {
+            Route::get('kisiler', [PdksController::class, 'people']);
+            Route::get('kisi-ara', [PdksController::class, 'search']);
+            Route::post('eslestir', [PdksController::class, 'link'])->middleware(['terminal.desktop', 'throttle:writes']);
+            Route::post('csv/onizle', [PdksController::class, 'csvPreview'])->middleware('terminal.desktop');
+            Route::post('csv/uygula', [PdksController::class, 'csvApply'])->middleware(['terminal.desktop', 'throttle:writes']);
+            Route::get('kayitlar', [PdksController::class, 'events']);
+            Route::get('kayitlar/excel', [PdksController::class, 'export']);
+            Route::get('ozet', [PdksController::class, 'summary']);
+            Route::get('saglik', [PdksController::class, 'health']);
         });
 
         Route::get('identities', [DeviceIdentityController::class, 'index']);

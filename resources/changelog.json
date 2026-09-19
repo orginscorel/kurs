@@ -1,5 +1,32 @@
 [
   {
+    "version": "1.15.0",
+    "date": "2026-09-19",
+    "title": "PDKS",
+    "items": [
+      {
+        "type": "yeni",
+        "text": "PDKS: kurumun kendi giriş-çıkış sistemi; parmak izi/yüz terminalindeki kişileri öğrenci ya da personelle eşleştirin"
+      },
+      {
+        "type": "yeni",
+        "text": "Personel giriş-çıkışı: günlük ilk giriş, son çıkış, çalışma süresi, geç kalma; aylık özet ve Excel"
+      },
+      {
+        "type": "yeni",
+        "text": "Giriş-çıkış kayıtları ve terminal sağlığı ekranı; toplu eşleştirme (CSV)"
+      },
+      {
+        "type": "iyilestirme",
+        "text": "Masaüstünde yalnız web'de çalışan bölümler menüden kaldırıldı; ekran sadeleşti"
+      },
+      {
+        "type": "iyilestirme",
+        "text": "Terminal teşhis araçları (ham TCP log, HEX gönderici, protokol analizi) geliştirici modunda"
+      }
+    ]
+  },
+  {
     "version": "1.14.1",
     "date": "2026-09-19",
     "title": "Terminal push dinleyicisi",

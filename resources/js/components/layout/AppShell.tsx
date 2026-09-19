@@ -45,7 +45,8 @@ function useVisibleNavigation(): NavGroup[] {
   return useMemo(
     () =>
       navigation
-        .map((g) => ({ ...g, items: g.items.filter((i) => can(i.permission) && (!i.userTypes || i.userTypes.includes(userType))) }))
+        // Masaüstünde (yerel düğüm) yalnız-web bölümleri menüde HİÇ görünmez; adrese doğrudan gelinirse "Web'de aç" bildirimi kalır.
+        .map((g) => ({ ...g, items: g.items.filter((i) => can(i.permission) && (!i.userTypes || i.userTypes.includes(userType)) && !webOnlyFor(i.to)) }))
         .filter((g) => g.items.length > 0),
     [can, userType],
   )

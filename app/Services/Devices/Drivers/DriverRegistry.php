@@ -18,7 +18,7 @@ class DriverRegistry
     public function __construct(
         private readonly ZkTecoDriver $zk,
         private readonly AdmsDriver $adms,
-        private readonly PerkotekYT33Driver $perkotek,
+        private readonly Yt33\Yt33Driver $perkotek,
         private readonly GenericTcpTerminalDriver $generic,
     ) {}
 

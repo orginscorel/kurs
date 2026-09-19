@@ -97,7 +97,7 @@ class ZkPullService
             ], $device);
 
             match ($result['status']) {
-                'accepted' => $stats['islenen']++,
+                'accepted', 'staff' => $stats['islenen']++,
                 'duplicate' => $stats['yinelenen']++,
                 'unmatched' => $stats['eslesmeyen']++,
                 default => $stats['yoksayilan']++,

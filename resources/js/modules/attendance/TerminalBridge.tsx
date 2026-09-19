@@ -12,10 +12,11 @@ import { Panel, DescriptionList } from '@/components/ui/layout'
 import { DataTable, type Column } from '@/components/ui/DataTable'
 import { Alert, Badge, EmptyState, Skeleton, type Tone } from '@/components/ui/feedback'
 import { Button } from '@/components/ui/Button'
-import { Field, Input, Select, Switch, Textarea } from '@/components/ui/form'
+import { Field, Input, Select, Switch } from '@/components/ui/form'
 import { Modal } from '@/components/ui/overlay'
 import { StudentSearch, type StudentHit } from './LivePresence'
 import type { DeviceRow } from './types'
+import DevTools from './TerminalDevTools'
 
 /*
 | TERMİNAL KÖPRÜSÜ (sürücü bağımsız) — docs/CIHAZ-KOPRUSU.md
@@ -25,7 +26,7 @@ import type { DeviceRow } from './types'
 | okunur durumu gösterir (sunucu kurumun yerel ağındaki cihaza ulaşamaz ve denemez).
 */
 
-type StageStatus = 'basarili' | 'basarisiz' | 'denenmedi' | 'dogrulanamadi'
+type StageStatus = 'basarili' | 'basarisiz' | 'denenmedi' | 'dogrulama_bekliyor' | 'bekliyor'
 type Stage = { etiket: string; durum: StageStatus; ayrinti: string; oneri: string | null }
 
 type Socket = {
@@ -52,6 +53,7 @@ type TestReport = {
   surucu: { anahtar: string; etiket: string }
   kopru_ip: string | null
   asamalar: Record<'ag' | 'tcp' | 'protokol' | 'kimlik', Stage>
+  teknik?: string
   soket: Socket | null
   cihaz: Record<string, string | number | null> | null
 }
@@ -78,6 +80,8 @@ type TerminalDevice = {
   ip: string | null
   port: number | null
   aktarim: string | null
+  makine_id?: number
+  baglanti_tipi?: 'pull' | 'push'
   sifre_tanimli: boolean
   son_cekme: string | null
   son_cekme_durumu: string | null
@@ -224,7 +228,8 @@ const CIHAZ_ETIKET: Record<string, string> = {
 const STAGE_META: Record<StageStatus, { tone: Tone; label: string; icon: ReactNode }> = {
   basarili: { tone: 'success', label: 'Başarılı', icon: <CheckCircle2 className="size-4 text-success" /> },
   basarisiz: { tone: 'danger', label: 'Başarısız', icon: <XCircle className="size-4 text-danger" /> },
-  dogrulanamadi: { tone: 'warning', label: 'Doğrulanamadı', icon: <CircleSlash className="size-4 text-warning" /> },
+  dogrulama_bekliyor: { tone: 'warning', label: 'Doğrulama bekliyor', icon: <CircleSlash className="size-4 text-warning" /> },
+  bekliyor: { tone: 'neutral', label: 'Bekliyor', icon: <CircleDashed className="size-4 text-ink-3" /> },
   denenmedi: { tone: 'neutral', label: 'Denenmedi', icon: <CircleDashed className="size-4 text-ink-3" /> },
 }
 
@@ -252,6 +257,8 @@ function StageTable({ report }: { report: TestReport }) {
           </span>
         )}
       </Alert>
+
+      {report.teknik && <p className="break-words rounded-[var(--radius-sm)] bg-surface-2 px-2.5 py-1.5 font-mono text-[11.5px] text-ink-2">{report.teknik}</p>}
 
       <ul className="divide-y divide-line rounded-[var(--radius-md)] ring-1 ring-line">
         {rows.map(([key, title]) => {
@@ -296,7 +303,7 @@ function StageTable({ report }: { report: TestReport }) {
 
 function ConnectionPanel({ device, drivers }: { device: DeviceRow; drivers: DriverInfo[] }) {
   const qc = useQueryClient()
-  const [form, setForm] = useState({ surucu: 'zk', ip: '', port: '', transport: 'tcp', comm_key: '', marka: '', model: '' })
+  const [form, setForm] = useState({ surucu: 'zk', ip: '', port: '', transport: 'tcp', comm_key: '', marka: '', model: '', makine_id: '1', baglanti_tipi: 'pull' })
   const [keyTouched, setKeyTouched] = useState(false)
   const [report, setReport] = useState<TestReport | null>(null)
 
@@ -316,6 +323,8 @@ function ConnectionPanel({ device, drivers }: { device: DeviceRow; drivers: Driv
       comm_key: '',
       marka: info.marka ?? '',
       model: info.model ?? '',
+      makine_id: String(info.makine_id ?? 1),
+      baglanti_tipi: info.baglanti_tipi ?? 'pull',
     })
     setKeyTouched(false)
   }, [info?.surucu, info?.ip, info?.port, info?.aktarim, info?.marka, info?.model, device.id])
@@ -329,6 +338,8 @@ function ConnectionPanel({ device, drivers }: { device: DeviceRow; drivers: Driv
     transport: form.transport,
     marka: form.marka || null,
     model: form.model || null,
+    makine_id: Number(form.makine_id) || 1,
+    baglanti_tipi: form.baglanti_tipi,
     ...(keyTouched ? { comm_key: form.comm_key } : {}),
   })
 
@@ -402,6 +413,19 @@ function ConnectionPanel({ device, drivers }: { device: DeviceRow; drivers: Driv
             </Field>
           </div>
 
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <Field label="Bağlantı tipi" hint={form.baglanti_tipi === 'push' ? 'Cihaz bu Mac\'e bağlanır; ayar Push sekmesinde.' : 'Bu Mac cihaza bağlanır (IP + port).'}>
+              <Select
+                value={form.baglanti_tipi}
+                onChange={(e) => setForm({ ...form, baglanti_tipi: e.target.value })}
+                options={[{ value: 'pull', label: 'LAN / TCP Pull' }, { value: 'push', label: 'Server / Push' }]}
+              />
+            </Field>
+            <Field label="Cihaz / Machine ID" hint="Cihaz menüsündeki makine numarası (fabrika değeri 1).">
+              <Input value={form.makine_id} onChange={(e) => setForm({ ...form, makine_id: e.target.value })} inputMode="numeric" />
+            </Field>
+          </div>
+
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             <div className="sm:col-span-2">
               <Field label="IP adresi" required>
@@ -424,7 +448,7 @@ function ConnectionPanel({ device, drivers }: { device: DeviceRow; drivers: Driv
             <Field
               label="İletişim şifresi"
               optional
-              hint={info?.sifre_tanimli ? 'Kayıtlı (gösterilmez). Değiştirmek için yeni değeri yazın.' : 'Yalnız rakam. Cihazın web arayüzü şifresi (admin) değildir.'}
+              hint={info?.sifre_tanimli ? 'Kayıtlı (gösterilmez). Değiştirmek için yeni değeri yazın.' : 'Yalnız rakam; fabrika değeri 0. Cihazın web arayüzü şifresi (admin) değildir.'}
             >
               <Input
                 value={form.comm_key}
@@ -534,7 +558,7 @@ function RawRunCard({ run }: { run: RawRun }) {
 
 function DiagnosticsPanel({ device }: { device: DeviceRow }) {
   const qc = useQueryClient()
-  const [raw, setRaw] = useState({ ip: '', port: '', hex: '', sn: '5' })
+  const [raw, setRaw] = useState({ ip: '', port: '', sn: '5' })
   const [last, setLast] = useState<RawRun | null>(null)
 
   const { data, isLoading } = useQuery({
@@ -551,7 +575,7 @@ function DiagnosticsPanel({ device }: { device: DeviceRow }) {
 
   const run = useMutation({
     mutationFn: () => api.post<RawRun>('/attendance/terminal/ham-tani', {
-      ip: raw.ip.trim(), port: Number(raw.port), gonderilecek_hex: raw.hex.trim() || null, dinleme_sn: Number(raw.sn) || 5, cihaz_id: device.id,
+      ip: raw.ip.trim(), port: Number(raw.port), dinleme_sn: Number(raw.sn) || 5, cihaz_id: device.id,
     }),
     onSuccess: (res) => { setLast(res); qc.invalidateQueries({ queryKey: ['terminal'] }) },
     onError: (e) => toast.error(errorText(e, 'Tanılama yapılamadı.')),
@@ -608,7 +632,7 @@ function DiagnosticsPanel({ device }: { device: DeviceRow }) {
 
       <PacketsPanel packets={data?.push_paketleri ?? []} />
 
-      <Panel title="Ham TCP tanılaması" description="Geliştirici modu: soketi açar, isteğe bağlı HEX gönderir, gelen baytları kaydeder.">
+      <Panel title="Bağlantıda dinle" description="Soketi açar, HİÇBİR ŞEY göndermez, cihazın kendiliğinden gönderdiği baytları kaydeder.">
         <div className="space-y-3">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-4">
             <div className="sm:col-span-2">
@@ -617,10 +641,7 @@ function DiagnosticsPanel({ device }: { device: DeviceRow }) {
             <Field label="Port" required><Input value={raw.port} onChange={(e) => setRaw({ ...raw, port: e.target.value })} inputMode="numeric" /></Field>
             <Field label="Dinleme (sn)"><Input value={raw.sn} onChange={(e) => setRaw({ ...raw, sn: e.target.value })} inputMode="decimal" /></Field>
           </div>
-          <Field label="Gönderilecek HEX" optional hint="Boş bırakın: hiçbir şey gönderilmez, yalnız dinlenir (cihaz bağlantıda kendiliğinden bir şey gönderiyor mu?). Uygulama kendisi paket uydurmaz.">
-            <Textarea rows={2} value={raw.hex} onChange={(e) => setRaw({ ...raw, hex: e.target.value })} placeholder="ör. 50 00 00 00" className="font-mono" />
-          </Field>
-          <Button variant="primary" icon={<Activity className="size-4" />} disabled={!raw.ip || !raw.port} loading={run.isPending} onClick={() => run.mutate()}>Tanılamayı çalıştır</Button>
+          <Button variant="primary" icon={<Activity className="size-4" />} disabled={!raw.ip || !raw.port} loading={run.isPending} onClick={() => run.mutate()}>Dinlemeyi başlat</Button>
           {last && <RawRunCard run={last} />}
         </div>
       </Panel>
@@ -639,6 +660,8 @@ function DiagnosticsPanel({ device }: { device: DeviceRow }) {
           </ul>
         )}
       </Panel>
+
+      <DevTools device={device} ip={current?.ip ?? ''} port={current?.port ?? null} machineId={current?.makine_id ?? 1} keySet={!!current?.sifre_tanimli} />
     </div>
   )
 }
@@ -715,11 +738,10 @@ function PushPanel() {
           </Field>
 
           <div className="rounded-[var(--radius-md)] ring-1 ring-line p-3 space-y-3">
-            <Switch checked={form.aktar} onChange={(v) => setForm({ ...form, aktar: v })} label="Gelen veriyi mevcut PDKS programına da aktar (şeffaf köprü)" />
-            <p className="text-[12.5px] text-ink-2">
-              Cihaz tek bir push adresi destekliyorsa ve veriyi şu an başka bir bilgisayardaki PDKS programı alıyorsa bu kipi açın:
-              <strong> mevcut PDKS programınız çalışmaya devam eder.</strong> Cihazdan gelen her bayt değiştirilmeden oraya iletilir,
-              programın yanıtı cihaza geri döner; iki yön de burada ayrı ayrı kaydedilir.
+            <Switch checked={form.aktar} onChange={(v) => setForm({ ...form, aktar: v })} label="Gelişmiş: gelen veriyi başka bir sunucuya da aktar (isteğe bağlı)" />
+            <p className="text-[12.5px] text-ink-3">
+              Normalde kapalı kalır — PDKS bu uygulamanın içindedir. Yalnız başka bir sistemin de aynı veriyi alması gerekiyorsa açın:
+              cihazdan gelen baytlar değiştirilmeden o adrese iletilir, yanıtı cihaza döner, iki yön ayrı kaydedilir.
             </p>
             {form.aktar && (
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
@@ -751,7 +773,6 @@ function PushPanel() {
         )}
         <ul className="mt-3 list-disc space-y-1.5 pl-5 text-[12.5px] text-ink-2">
           <li>Köprü IP'si bu Mac'in yerel ağ adresidir (soket testindeki yerel kaynak IP). Mac'in IP'si değişirse cihazdaki adres de güncellenmeli; yönlendiricide bu Mac'e sabit IP verin.</li>
-          <li>Aktarma açıksa cihazdaki adres yine bu Mac olur; eski PDKS programı veriyi köprü üzerinden almaya devam eder.</li>
           <li>macOS ilk dinlemede “Erbaa Kurs gelen ağ bağlantılarını kabul etsin mi?” diye sorabilir → <strong>İzin Ver</strong>. Sorulmadıysa: Sistem Ayarları › Ağ › Güvenlik Duvarı › Seçenekler'de Erbaa Kurs “Gelen bağlantılara izin ver” olmalı.</li>
           <li>Cihaz bu Mac'e bağlandığında Teşhis bölümünde paketler görünür.</li>
         </ul>

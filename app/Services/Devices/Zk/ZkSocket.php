@@ -131,7 +131,7 @@ class ZkSocket
                 if (! empty($meta['timed_out']) || microtime(true) >= $deadline) {
                     throw new ZkTimeoutException(
                         'Cihaz yanıt vermedi (süre doldu).',
-                        'Cihaz meşgul olabilir (biri parmak okutuyor) ya da başka bir program cihaza bağlı olabilir. Birkaç saniye sonra tekrar deneyin.',
+                        'Soket açık ama cihaz beklenen süre içinde yanıt vermedi. Seçili sürücünün cihazın protokolüyle uyumlu olduğunu doğrulayın.',
                         ['beklenen' => $length, 'alinan' => strlen($buffer)],
                     );
                 }

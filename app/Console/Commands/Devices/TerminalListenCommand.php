@@ -2,7 +2,7 @@
 
 namespace App\Console\Commands\Devices;
 
-use App\Services\Devices\Terminal\PushListener;
+use App\Services\Devices\Drivers\Yt33\Push\Server as PushListener;
 use App\Services\Devices\Terminal\PushListenerException;
 use App\Services\Devices\Terminal\TerminalStateStore;
 use Illuminate\Console\Command;
@@ -86,6 +86,8 @@ class TerminalListenCommand extends Command
                         'kalp' => now()->toIso8601String(), 'baglanti_sayisi' => $listener->connections, 'paket_sayisi' => $listener->packets,
                         'acik_baglanti' => $listener->activeConnections(), 'son_ip' => $listener->lastIp, 'son_zaman' => $listener->lastAt,
                         'aktarma_hatasi' => $listener->lastRelayError,
+                        'rx_bayt' => $listener->rxBytes, 'tx_bayt' => $listener->txBytes, 'son_veri' => $listener->lastDataAt,
+                        'dinleme_ip' => '0.0.0.0',
                     ]);
                     $lastPackets = $listener->packets;
 

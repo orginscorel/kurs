@@ -34,7 +34,9 @@ class TerminalConnectionTester
             $hostReached = $probe->connected || $probe->failure === SocketFailure::Refused;
 
             $stages['ag'] = $hostReached
-                ? TestStage::pass('Ağ yolu', "{$endpoint->host} adresine ulaşıldı".($probe->localIp ? " (köprü IP'si {$probe->localIp})" : '').'.')
+                ? TestStage::pass('Ağ yolu', $probe->connected
+                    ? "Cihaza ağ üzerinden erişiliyor ve TCP {$endpoint->port} portu açık.".($probe->localIp ? " Köprü IP'si {$probe->localIp}." : '')
+                    : "{$endpoint->host} adresine ulaşıldı; TCP {$endpoint->port} portu bağlantıyı reddetti.")
                 : TestStage::fail('Ağ yolu', $probe->message, $probe->hint);
             $stages['tcp'] = $probe->connected
                 ? TestStage::pass("TCP {$endpoint->port}", "Bağlantı açıldı · {$probe->durationMs} ms")
@@ -53,8 +55,8 @@ class TerminalConnectionTester
             $protocol = $driver->identifyDevice($endpoint);
             $stages['protokol'] = match ($protocol->status) {
                 DriverStatus::Ok => TestStage::pass('Protokol el sıkışması', $driver->label().' yanıt verdi.'),
-                DriverStatus::ProtocolNotImplemented => TestStage::notVerified('Protokol el sıkışması', $protocol->message, $protocol->hint),
-                DriverStatus::Unsupported => TestStage::notVerified('Protokol el sıkışması', $protocol->message, $protocol->hint),
+                DriverStatus::ProtocolNotImplemented => TestStage::notVerified('Protokol el sıkışması', 'Protokol sürücüsü henüz doğrulanmadı. '.$protocol->message, $protocol->hint),
+                DriverStatus::Unsupported => TestStage::notVerified('Protokol el sıkışması', 'Protokol sürücüsü yok. '.$protocol->message, $protocol->hint),
                 DriverStatus::AuthError => TestStage::fail('Protokol el sıkışması', $protocol->message, $protocol->hint),
                 default => TestStage::fail('Protokol el sıkışması', $protocol->message, $protocol->hint),
             };
@@ -65,7 +67,7 @@ class TerminalConnectionTester
                     ? TestStage::pass('Cihaz tanıma', trim(($identity['cihaz_adi'] ?? '').' '.($identity['seri_no'] ?? '')))
                     : TestStage::fail('Cihaz tanıma', 'Cihaz yanıt verdi ama künye (seri no/model) okunamadı.');
             } else {
-                $stages['kimlik'] = TestStage::skip('Cihaz tanıma', 'Protokol doğrulanmadan cihaz tanınamaz.');
+                $stages['kimlik'] = TestStage::waiting('Cihaz tanıma', 'Cihaz tanıma yalnız geçerli bir protokol yanıtıyla yapılır.');
             }
         }
 
@@ -97,12 +99,20 @@ class TerminalConnectionTester
             default => 'protokol',
         };
 
-        $prefix = $endpoint->transport === 'udp'
-            ? 'Cihaz protokolü doğrulanamadı.'
-            : 'Ağ bağlantısı başarılı fakat cihaz protokolü doğrulanamadı.';
+        $what = $driver->key() === 'perkotek_fk' ? 'YT33 uygulama protokolü' : 'cihaz uygulama protokolü';
 
-        // Ayrıntı (sürücüye özgü neden) aşama tablosunda; özet tek cümle + seçili sürücü — metin iki kez yazılmaz.
-        return new TerminalTestReport('kismi', $code, $prefix.' Seçili sürücü: '.$driver->label().'.', $proto->hint ?? '', $driver, $endpoint, $stages, $socket, $identity);
+        if (in_array($protocol?->status, [DriverStatus::ProtocolNotImplemented, DriverStatus::Unsupported], true)) {
+            $message = $endpoint->transport === 'udp'
+                ? "UDP {$endpoint->port} üzerinden {$what} henüz doğrulanmadı."
+                : "Ağ bağlantısı başarılı. TCP {$endpoint->port} portuna bağlantı kurulabiliyor ancak {$what} henüz doğrulanmadı. Bu durum ağ arızası anlamına gelmez.";
+        } else {
+            $message = $endpoint->transport === 'udp'
+                ? 'Cihaz protokolü yanıt vermedi. Seçili sürücü: '.$driver->label().'.'
+                : "Ağ bağlantısı başarılı. TCP {$endpoint->port} portuna bağlantı kurulabiliyor ancak cihaz seçili sürücünün protokolüne yanıt vermedi (".$driver->label().'). Bu durum ağ arızası anlamına gelmez.';
+        }
+
+        // Ayrıntı (sürücüye özgü neden) aşama tablosunda; özet tek cümle — metin iki kez yazılmaz.
+        return new TerminalTestReport('kismi', $code, $message, $proto->hint ?? '', $driver, $endpoint, $stages, $socket, $identity);
     }
 
     private function remember(TerminalDriver $driver, TerminalEndpoint $endpoint, TerminalTestReport $report): void

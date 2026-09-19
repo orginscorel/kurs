@@ -91,6 +91,21 @@ class TerminalStateStore
         });
     }
 
+    /** Geliştirici modu (manuel HEX gönderici, protokol analizi) — düğüme özel, varsayılan kapalı. */
+    public function developerMode(): bool
+    {
+        return (bool) ($this->read()['gelistirici_modu'] ?? false);
+    }
+
+    public function setDeveloperMode(bool $on): void
+    {
+        $this->mutate(function (array $state) use ($on) {
+            $state['gelistirici_modu'] = $on;
+
+            return $state;
+        });
+    }
+
     /** Dinleyici sürecinin kendi yazdığı canlı durum (kalp atışı, son bağlantı, hata). */
     public function listenerState(): array
     {

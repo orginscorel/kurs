@@ -177,3 +177,17 @@ bir HTTP sunucusuna `POST /iclock/cdata` ile kayıt gönderir. Bu durumda köpr�
 * Ham paketler `terminal_raw_packets` (LOCAL, SİLİNMEZ): yön, bağlantı kimliği, kaynak IP, bayt (base64), sha256 + tekrar işareti,
   HTTP satırı/başlık/gövde. Uçlar: `GET attendance/terminal/paketler`, `/paketler/{id}`, `/paketler/{id}/indir?bicim=txt|hex`.
 * macOS: gelen bağlantı için Uygulama Güvenlik Duvarı ilk seferde sorabilir (Yerel Ağ izni yalnız giden bağlantı içindir).
+
+## YT33 protokolünü çözmek için gereken veri (1.14.x)
+
+* Sürücü: `app/Services/Devices/Drivers/Yt33/` — Yt33Driver, Protocol (connect/disconnect/probe/getDeviceInfo/getUsers/
+  getAttendanceLogs/setUser/deleteUser/syncTime/listenEvents), Codec/Commands/Parser/Checksum (İSKELET, içerik uydurulmadı),
+  Types (yalnız bilinen değerler), Debug (`[YT33][TCP|TX|RX|TIMEOUT|SOCKET_CLOSE]` günlük satırları), Push/Server.
+  Doğrulanmamış her yöntem `ProtocolNotImplementedError` fırlatır ("Protokol verisi bekleniyor").
+* Geliştirici modu (Terminal Teşhis): ham TCP oturumu + manuel HEX gönderici (tek bağlantıda sıralı), RAW TCP log
+  (`terminal_tcp_log`, LOCAL), protokol analizi (`terminal_protocol_samples`, LOCAL; karşılaştırma + HAR içe aktarma).
+* Wireshark: filtre `ip.addr==192.168.68.60 && tcp.port==5005`; her işlemi AYRI yakalayın; Follow TCP Stream → Show as Raw → Save.
+  İşlemler: bağlan+kapat · cihaz saatini oku · saat eşitle · kullanıcı listesini indir · kayıtları indir · kullanıcı ekle · kullanıcı sil.
+  Machine ID (1→2) ve iletişim şifresi (0→1234) değiştirilerek aynı işlemler tekrar (alanların yerini ayırt etmek için).
+* Web paneli (Dynamic Face) yolu: Chrome › DevTools › Network › "Preserve log" → işlemi panelde yap → sağ tık › "Save all as HAR with content".
+  HAR, Terminal Teşhis › Protokol analizi › "HAR içe aktar" ile yüklenir; parola/çerez alanları maskelenir.

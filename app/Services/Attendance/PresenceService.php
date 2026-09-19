@@ -44,6 +44,12 @@ class PresenceService
             $occurredAt = CarbonImmutable::parse($payload['occurred_at'])->setTimezone(config('app.timezone'));
             $source = $payload['source'] ?? ($device?->kind ?? 'manual');
 
+            // PDKS: cihaz kullanıcısı bir PERSONELE (öğretmen/çalışan) eşliyse personel giriş-çıkışı olarak yazılır
+            // (öğrenci yoklaması, veli bildirimi ve daily_presences etkilenmez).
+            if (! $student && ($staff = $this->resolveStaff($payload, $device))) {
+                return $this->ingestStaff($branchId, $device, $staff, $payload, $occurredAt, $source);
+            }
+
             if (! $student) {
                 $this->storeEvent($branchId, $device, null, strtoupper($payload['event_type']), $source, $occurredAt, $payload, false);
 
@@ -207,6 +213,76 @@ class PresenceService
             ->first();
 
         return $identity ? Student::query()->find($identity->person_id) : null;
+    }
+
+    /** Cihaz kimliği öğretmen/çalışana eşli mi? */
+    private function resolveStaff(array $payload, ?Device $device): ?DeviceIdentity
+    {
+        if (empty($payload['identifier']) || ! empty($payload['student_id'])) {
+            return null;
+        }
+
+        $kind = $payload['identifier_kind'] ?? match ($device?->kind) {
+            'rfid' => 'card',
+            'qr' => 'qr',
+            default => 'fingerprint',
+        };
+
+        return DeviceIdentity::query()
+            ->where('kind', $kind)->where('identifier', $payload['identifier'])->where('is_active', true)
+            ->whereIn('person_type', ['teacher', 'employee'])
+            ->first();
+    }
+
+    /** Personel okutması: yön (AUTO ise o günkü son olaya göre), kısa aralık tekrarı yok sayılır. */
+    private function ingestStaff(int $branchId, ?Device $device, DeviceIdentity $identity, array $payload, CarbonImmutable $at, string $source): array
+    {
+        return DB::transaction(function () use ($branchId, $device, $identity, $payload, $at, $source) {
+            $last = AttendanceEvent::query()
+                ->where('person_type', $identity->person_type)->where('person_id', $identity->person_id)
+                ->whereIn('event_type', ['ENTRY', 'EXIT'])
+                ->whereBetween('occurred_at', [$at->startOfDay(), $at->endOfDay()])
+                ->orderByDesc('occurred_at')->lockForUpdate()->first();
+
+            $debounce = (int) Settings::get('attendance.min_minutes_between_events', 2);
+            $type = strtoupper($payload['event_type']);
+
+            if ($last && abs($last->occurred_at->diffInSeconds($at)) < $debounce * 60) {
+                $type = 'IGNORED';
+            } else {
+                if ($type === 'AUTO') {
+                    $type = $last && $last->event_type === 'ENTRY' ? 'EXIT' : 'ENTRY';
+                }
+                if ($device && $device->direction !== 'both') {
+                    $type = $device->direction === 'entry' ? 'ENTRY' : 'EXIT';
+                }
+            }
+
+            try {
+                $event = AttendanceEvent::query()->create([
+                    'branch_id' => $branchId,
+                    'device_id' => $device?->id,
+                    'student_id' => null,
+                    'person_type' => $identity->person_type,
+                    'person_id' => $identity->person_id,
+                    'event_type' => $type,
+                    'source' => $source,
+                    'occurred_at' => $at,
+                    'received_at' => now(),
+                    'idempotency_key' => $payload['idempotency_key'],
+                    'raw_identifier' => $payload['identifier'] ?? null,
+                    'is_matched' => true,
+                    'recorded_by' => Auth::id(),
+                ]);
+            } catch (QueryException $e) {
+                if (str_contains($e->getMessage(), 'idempotency_key')) {
+                    throw new DuplicateEventException();
+                }
+                throw $e;
+            }
+
+            return ['status' => $type === 'IGNORED' ? 'debounced' : 'staff', 'event_id' => $event->id, 'event_type' => $type, 'person_type' => $identity->person_type];
+        });
     }
 
     private function storeEvent(int $branchId, ?Device $device, ?Student $student, string $type, string $source, CarbonImmutable $at, array $payload, bool $matched): AttendanceEvent

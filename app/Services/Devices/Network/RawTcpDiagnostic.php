@@ -2,7 +2,6 @@
 
 namespace App\Services\Devices\Network;
 
-use Illuminate\Support\Facades\Log;
 
 /**
  * HAM TCP TANILAMASI (geliştirici modu) — protokol bilinmeyen cihazda "kablonun ucunda ne var?" sorusu.
@@ -16,108 +15,59 @@ class RawTcpDiagnostic
 {
     public const MAX_READ_BYTES = 65536;
 
-    public function __construct(private readonly TcpProbe $probe) {}
+    public function __construct(private readonly TcpSession $session) {}
 
     /**
-     * @param  string|null  $sendHex  gönderilecek baytlar (HEX; boşluk/iki nokta serbest). null/'' = gönderme
+     * Tek paketlik (ya da yalnız dinleme) oturum — TcpSession üzerinden; RAW log'a da düşer.
+     *
+     * @param  string|null  $sendHex  gönderilecek baytlar (HEX; boşluk/iki nokta/virgül serbest). null/'' = gönderme
      */
-    public function run(string $host, int $port, ?string $sendHex = null, float $listenSeconds = 5.0, float $connectTimeout = 3.0): array
+    public function run(string $host, int $port, ?string $sendHex = null, float $listenSeconds = 5.0, float $connectTimeout = 3.0, ?int $deviceId = null, string $tag = 'TERMINAL'): array
     {
         $listenSeconds = min(max($listenSeconds, 0.5), 30.0);
-        $startedAt = now();
-        $timeline = [['t_ms' => 0, 'olay' => "Bağlantı başlatıldı → {$host}:{$port}/tcp"]];
-        $t0 = hrtime(true);
-        $at = fn () => (int) round((hrtime(true) - $t0) / 1_000_000);
-
         $send = self::parseHex($sendHex);
+
         if ($send === false) {
-            return ['durum' => 'hata', 'mesaj' => 'Gönderilecek HEX geçersiz. Yalnız 0-9 A-F ve boşluk kullanın (ör. "50 00 00 00").'];
+            return ['durum' => 'hata', 'mesaj' => 'Gönderilecek HEX geçersiz. Yalnız 0-9 A-F ve boşluk/virgül kullanın; her bayt iki hane olmalı (ör. "50 00 0A FF").'];
         }
 
-        [$stream, $socket] = $this->probe->open($host, $port, $connectTimeout);
-        $timeline[] = ['t_ms' => $at(), 'olay' => $socket->connected ? "Bağlandı ({$socket->durationMs} ms), yerel uç {$socket->localIp}:{$socket->localPort}" : 'Bağlanamadı: '.$socket->message];
+        $startedAt = now()->toIso8601String();
+        $r = $send === ''
+            ? $this->session->run($host, $port, [], $listenSeconds, $listenSeconds, $deviceId, $tag, $connectTimeout)
+            : $this->session->run($host, $port, [$send], $listenSeconds, 0.0, $deviceId, $tag, $connectTimeout);
 
-        $received = '';
-        $sent = 0;
-        $closeReason = 'baglanti_kurulamadi';
+        $received = (string) hex2bin($r['alinan_ham_hex']);
+        $close = match ($r['kapanis']) {
+            'baglanti_kurulamadi' => 'baglanti_kurulamadi',
+            'cihaz_kapatti' => 'cihaz_kapatti',
+            'baglanti_sifirlandi' => 'baglanti_sifirlandi',
+            default => 'dinleme_suresi_doldu',
+        };
 
-        if ($stream !== null) {
-            stream_set_blocking($stream, false);
-
-            if ($send !== '') {
-                $sent = (int) @fwrite($stream, $send);
-                $timeline[] = ['t_ms' => $at(), 'olay' => "{$sent} bayt gönderildi"];
-            } else {
-                $timeline[] = ['t_ms' => $at(), 'olay' => 'Hiçbir şey gönderilmedi; yalnız dinleniyor'];
-            }
-
-            $deadline = microtime(true) + $listenSeconds;
-            $closeReason = 'dinleme_suresi_doldu';
-
-            while (microtime(true) < $deadline && strlen($received) < self::MAX_READ_BYTES) {
-                $read = [$stream];
-                $write = $except = null;
-                $left = max(0.0, $deadline - microtime(true));
-                $ready = @stream_select($read, $write, $except, (int) $left, (int) (($left - floor($left)) * 1_000_000));
-
-                if ($ready === false) {
-                    $closeReason = 'okuma_hatasi';
-                    break;
-                }
-                if ($ready === 0) {
-                    continue;
-                }
-
-                $chunk = @fread($stream, 8192);
-                if ($chunk === '' || $chunk === false) {
-                    if (feof($stream)) {
-                        $closeReason = 'cihaz_kapatti';
-                        $timeline[] = ['t_ms' => $at(), 'olay' => 'Cihaz bağlantıyı kapattı'];
-                        break;
-                    }
-
-                    continue;
-                }
-
-                $received .= $chunk;
-                $timeline[] = ['t_ms' => $at(), 'olay' => strlen($chunk).' bayt alındı'];
-            }
-
-            if (strlen($received) >= self::MAX_READ_BYTES) {
-                $closeReason = 'bayt_siniri';
-            }
-
-            @fclose($stream);
-            $timeline[] = ['t_ms' => $at(), 'olay' => 'Bağlantı kapatıldı'];
-        }
-
-        $result = [
-            'durum' => $socket->connected ? 'ok' : 'hata',
-            'baslangic' => $startedAt->toIso8601String(),
-            'hedef' => "{$host}:{$port}",
+        return [
+            'durum' => $r['durum'],
+            'oturum' => $r['oturum'],
+            'baslangic' => $startedAt,
+            'hedef' => $r['hedef'],
             'cozumleme' => filter_var($host, FILTER_VALIDATE_IP) ? 'IP adresi (çözümleme gerekmedi)' : 'Ad çözümlendi',
-            'soket' => $socket->toArray(),
-            'gonderilen_bayt' => $sent,
+            'soket' => $r['soket'],
+            'gonderilen_bayt' => $r['tx_bayt'],
             'gonderilen_hex' => $send !== '' ? self::hexDump($send) : null,
-            'alinan_bayt' => strlen($received),
+            'alinan_bayt' => $r['rx_bayt'],
             'dinleme_sn' => $listenSeconds,
-            'kapanis' => $closeReason,
-            'kapanis_metni' => self::closeText($closeReason, strlen($received)),
+            'kapanis' => $close,
+            'kapanis_metni' => self::closeText($close, $r['rx_bayt']),
             'hex' => self::hexDump($received),
             'ascii' => self::ascii($received),
-            'zaman_cizelgesi' => $timeline,
-            'sure_ms' => $at(),
+            'zaman_cizelgesi' => array_map(fn ($s) => ['t_ms' => $s['t_ms'], 'olay' => $s['durum'].($s['not'] ? ' — '.$s['not'] : '')], $r['durumlar']),
+            'sure_ms' => $r['sure_ms'],
         ];
-
-        Log::channel('terminal')->info('Ham TCP tanılaması', array_intersect_key($result, array_flip(['hedef', 'durum', 'gonderilen_bayt', 'alinan_bayt', 'kapanis', 'sure_ms'])));
-
-        return $result;
     }
 
     /** @return string|false  ham baytlar ('' = gönderme), geçersizse false */
     public static function parseHex(?string $hex): string|false
     {
-        $clean = preg_replace('/[\s:,-]|0x/i', '', (string) $hex) ?? '';
+        $clean = preg_replace('/0x|[\s:,;-]/i', '', (string) $hex) ?? '';
 
         if ($clean === '') {
             return '';
@@ -157,8 +107,7 @@ class RawTcpDiagnostic
         return match ($reason) {
             'baglanti_kurulamadi' => 'Soket açılamadı.',
             'cihaz_kapatti' => "Cihaz bağlantıyı kapattı ({$received} bayt alındıktan sonra).",
-            'bayt_siniri' => 'Okuma sınırına (64 KB) ulaşıldı.',
-            'okuma_hatasi' => 'Okuma sırasında hata oluştu.',
+            'baglanti_sifirlandi' => "Cihaz bağlantıyı sıfırladı (RST) ({$received} bayt alındıktan sonra).",
             default => $received > 0 ? "Dinleme süresi doldu; {$received} bayt alındı." : 'Dinleme süresi doldu; cihaz hiçbir şey göndermedi (bu cihazlar genelde önce istemcinin konuşmasını bekler).',
         };
     }

@@ -19,6 +19,21 @@ final class TerminalTestReport
         public readonly ?array $identity,
     ) {}
 
+    /** "Network: Başarılı · TCP 5005: Başarılı · Protocol: Doğrulama bekliyor · Device identification: Bekliyor" */
+    public function technical(): string
+    {
+        $names = ['ag' => 'Network', 'tcp' => strtoupper($this->endpoint->transport).' '.$this->endpoint->port, 'protokol' => 'Protocol', 'kimlik' => 'Device identification'];
+        $parts = [];
+
+        foreach ($names as $key => $name) {
+            if (isset($this->stages[$key])) {
+                $parts[] = $name.': '.(TestStage::TECH[$this->stages[$key]->status] ?? $this->stages[$key]->status);
+            }
+        }
+
+        return implode(' · ', $parts);
+    }
+
     public function toArray(): array
     {
         return [
@@ -30,6 +45,7 @@ final class TerminalTestReport
             'surucu' => ['anahtar' => $this->driver->key(), 'etiket' => $this->driver->label()],
             'kopru_ip' => $this->socket['yerel_ip'] ?? null,
             'asamalar' => array_map(fn (TestStage $s) => $s->toArray(), $this->stages),
+            'teknik' => $this->technical(),
             'soket' => $this->socket,
             'cihaz' => $this->identity,
         ];

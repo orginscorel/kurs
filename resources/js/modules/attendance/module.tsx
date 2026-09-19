@@ -1,4 +1,4 @@
-import { CheckSquare, QrCode, Radio, ScanLine, UserX } from 'lucide-react'
+import { CheckSquare, Fingerprint, QrCode, Radio, ScanLine, UserX } from 'lucide-react'
 import { lazyPage } from '@/app/lazy'
 import { page } from '@/app/page'
 import type { ModuleDef } from '@/app/modules'
@@ -9,6 +9,7 @@ const Absences = lazyPage(() => import('./Absences'))
 const Devices = lazyPage(() => import('./Devices'))
 const StudentQrCard = lazyPage(() => import('./StudentQrCard'))
 const KioskScan = lazyPage(() => import('./KioskScan'))
+const Pdks = lazyPage(() => import('./Pdks'))
 
 export default {
   id: 'attendance',
@@ -18,15 +19,18 @@ export default {
     { path: 'yoklama/devamsizlik', element: page(<Absences />) },
     { path: 'yoklama/cihazlar', element: page(<Devices />) },
     { path: 'yoklama/kiosk', element: page(<KioskScan />) },
+    { path: 'pdks', element: page(<Pdks />) },
     { path: 'yoklama/ogrenciler/:id/qr', element: page(<StudentQrCard />) },
   ],
   nav: [
+    { section: 'attendance', label: 'PDKS', to: '/pdks', icon: Fingerprint, permission: 'devices.manage', order: 0 },
     { section: 'attendance', label: 'Canlı Giriş/Çıkış', to: '/yoklama/canli', icon: Radio, permission: 'presence.live', order: 1 },
     { section: 'attendance', label: 'Yoklama', to: '/yoklama', end: true, icon: CheckSquare, permission: 'attendance.view', order: 2 },
     { section: 'attendance', label: 'Devamsızlık', to: '/yoklama/devamsizlik', icon: UserX, permission: 'attendance.view', order: 3 },
     { section: 'attendance', label: 'Yoklama terminalleri', to: '/yoklama/cihazlar', icon: ScanLine, permission: 'devices.manage', order: 4 },
   ],
   commands: [
+    { id: 'attendance-pdks', label: 'PDKS — personel ve öğrenci giriş-çıkış', to: '/pdks', icon: Fingerprint, permission: 'devices.manage', hint: 'Yoklama', keywords: ['pdks', 'parmak izi', 'personel', 'mesai', 'giriş', 'çıkış', 'eşleştir'] },
     { id: 'attendance-take', label: 'Yoklama Aç', to: '/yoklama', icon: CheckSquare, permission: 'attendance.view', keywords: ['yoklama', 'ders', 'var', 'yok'] },
     { id: 'attendance-live', label: 'Canlı giriş/çıkış', to: '/yoklama/canli', icon: Radio, permission: 'presence.live', hint: 'Yoklama', keywords: ['giriş', 'çıkış', 'kurumda'] },
     { id: 'attendance-absence-report', label: 'Devamsızlık raporu', to: '/yoklama/devamsizlik', icon: UserX, permission: 'attendance.view', hint: 'Yoklama', keywords: ['devamsızlık', 'rapor', 'yok'] },

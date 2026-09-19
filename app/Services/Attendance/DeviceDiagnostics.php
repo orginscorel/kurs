@@ -192,7 +192,7 @@ class DeviceDiagnostics
         return match ($code) {
             'kimlik' => 'Cihazın iletişim şifresi yanlış. Cihaz menüsü: Comm (İletişim) > İletişim Şifresi. Oradaki sayıyı cihaz kartındaki "İletişim şifresi" alanına yazın; şifre kapalıysa cihazda 0 yapın.',
             'baglanti' => 'Soket açılamadı. Sırayla kontrol edin: (1) cihazın fişi takılı ve ekranı açık mı, (2) ağ kablosu/wifi bağlı mı, (3) cihazdaki IP hâlâ aynı mı (DHCP kapalı, sabit IP), (4) bu bilgisayar cihazla aynı ağda mı — misafir ağı olmaz, (5) Mac\'te: Sistem Ayarları › Gizlilik ve Güvenlik › Yerel Ağ › Erbaa Kurs açık mı, (6) cihazın kendi programı açıksa kapatın, cihaz tek bağlantı kabul edebilir.',
-            'zaman_asimi' => 'Cihaz yanıt vermedi. O anda biri parmak okutuyor ya da başka bir program cihaza bağlı olabilir. Cihazın kendi programını kapatıp birkaç saniye sonra tekrar deneyin.',
+            'zaman_asimi' => 'Soket açıldı ama cihaz süre içinde yanıt vermedi. Seçili sürücünün cihazla uyumlu olduğunu doğrulayın; cihazın kendi programını kapatıp birkaç saniye sonra tekrar deneyin.',
             'protokol' => 'TCP bağlandı fakat cihaz protokolü beklenen yanıtı vermedi. Seçili sürücünün cihazla uyumlu olduğunu doğrulayın (ör. Perkotek YT33 / FK Dynamic Face cihazları ZKTeco protokolü konuşmaz); ZKTeco cihazda bağlantı türünü UDP yapıp tekrar deneyin.',
             default => $protocol === 'adms'
                 ? 'Cihaz kendi kayıtlarını gönderemedi. Comm > ADMS ayarlarındaki sunucu adresi ve port hâlâ doğru mu? Cihazı yeniden başlatın.'

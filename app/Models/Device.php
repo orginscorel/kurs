@@ -15,7 +15,7 @@ class Device extends Model
     protected $fillable = [
         'branch_id', 'name', 'kind', 'location', 'direction', 'serial_no', 'api_token_hash', 'api_token_prefix', 'firmware', 'is_active',
         // Biyometrik terminal köprüsü (docs/CIHAZ-KOPRUSU.md) — yalnız köprüyü çalıştıran düğümde anlamlı
-        'protocol', 'zk_ip', 'zk_port', 'zk_transport',
+        'protocol', 'zk_ip', 'zk_port', 'zk_transport', 'machine_no', 'terminal_connection',
         // Ağ keşfi / künye (docs/CIHAZ-KESIF.md)
         'device_model', 'vendor', 'discovered_at',
     ];

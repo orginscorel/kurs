@@ -21,6 +21,7 @@ final class TerminalEndpoint
         public readonly float $connectTimeout = 3.0,
         public readonly float $readTimeout = 10.0,
         public readonly ?int $deviceId = null,
+        public readonly int $machineId = 1,
     ) {}
 
     public static function fromDevice(Device $device, int $fallbackPort): self
@@ -33,6 +34,7 @@ final class TerminalEndpoint
             connectTimeout: (float) config('devices_zk.connect_timeout', 3),
             readTimeout: (float) config('devices_zk.read_timeout', 10),
             deviceId: $device->id,
+            machineId: (int) ($device->machine_no ?: 1),
         );
     }
 
@@ -48,7 +50,7 @@ final class TerminalEndpoint
 
     public function toArray(): array
     {
-        return ['ip' => $this->host, 'port' => $this->port, 'aktarim' => $this->transport, 'sifre_tanimli' => $this->commKey !== null];
+        return ['ip' => $this->host, 'port' => $this->port, 'aktarim' => $this->transport, 'makine_id' => $this->machineId, 'sifre_tanimli' => $this->commKey !== null];
     }
 
     public function __debugInfo(): array

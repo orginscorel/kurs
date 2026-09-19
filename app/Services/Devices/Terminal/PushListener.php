@@ -53,6 +53,14 @@ class PushListener
 
     public int $connections = 0;
 
+    /** Cihazlardan alınan toplam bayt. */
+    public int $rxBytes = 0;
+
+    /** Cihazlara gönderilen toplam bayt (boş 200 yanıtları + aktarmada yukarı akıştan gelenler). */
+    public int $txBytes = 0;
+
+    public ?string $lastDataAt = null;
+
     public ?string $lastIp = null;
 
     public ?string $lastAt = null;
@@ -236,6 +244,8 @@ class PushListener
                         $c['client_eof'] = true;
                     }
                 } else {
+                    $this->rxBytes += strlen($data);
+                    $this->lastDataAt = now()->toIso8601String();
                     $this->append($c, 'd', $data, $now);
                     if ($c['up_state'] === 'connecting' || $c['up_state'] === 'connected') {
                         $c['toUp'] .= $data;
@@ -297,6 +307,7 @@ class PushListener
                     $c['client_eof_write'] = true;
                     $c['toClient'] = '';
                 } elseif ($n > 0) {
+                    $this->txBytes += $n;
                     $c['toClient'] = (string) substr($c['toClient'], $n);
                 }
 

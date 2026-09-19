@@ -64,6 +64,8 @@ class TerminalController extends ApiController
             'zk_transport' => in_array($data['transport'] ?? 'tcp', $driver->transports(), true) ? ($data['transport'] ?? 'tcp') : $driver->transports()[0],
             'vendor' => $data['marka'] ?? null,
             'device_model' => $data['model'] ?? null,
+            'machine_no' => (int) ($data['makine_id'] ?? 1),
+            'terminal_connection' => $data['baglanti_tipi'] ?? 'pull',
         ]);
 
         // Alan gönderilmediyse kayıtlı şifre korunur; boş gönderildiyse kaldırılır. Günlüğe asla yazılmaz.
@@ -105,6 +107,7 @@ class TerminalController extends ApiController
             connectTimeout: (float) config('devices_zk.connect_timeout', 3),
             readTimeout: (float) config('devices_zk.read_timeout', 10),
             deviceId: $device?->id,
+            machineId: (int) ($data['makine_id'] ?? $device?->machine_no ?? 1),
         );
 
         return response()->json($this->tester->run($driver, $endpoint)->toArray());
@@ -127,7 +130,13 @@ class TerminalController extends ApiController
             'dinleme_sn.between' => 'Dinleme süresi 0,5 ile 30 saniye arasında olmalıdır.',
         ], ['ip' => 'IP adresi', 'port' => 'Port', 'gonderilecek_hex' => 'Gönderilecek HEX', 'dinleme_sn' => 'Dinleme süresi']);
 
-        $result = $diagnostic->run($data['ip'], (int) $data['port'], $data['gonderilecek_hex'] ?? null, (float) ($data['dinleme_sn'] ?? 5));
+        // Bayt GÖNDERMEK geliştirici modu ister; yalnız dinlemek her zaman serbest.
+        if (trim((string) ($data['gonderilecek_hex'] ?? '')) !== '' && ! $this->state->developerMode()) {
+            return response()->json(['message' => 'Ham bayt göndermek için Terminal Teşhis › Geliştirici modu açılmalıdır. Yalnız dinleme için HEX alanını boş bırakın.', 'error_code' => 'terminal_dev_mode_required'], 403);
+        }
+
+        $device = ! empty($data['cihaz_id']) ? Device::query()->withoutGlobalScope('branch')->find((int) $data['cihaz_id']) : null;
+        $result = $diagnostic->run($data['ip'], (int) $data['port'], $data['gonderilecek_hex'] ?? null, (float) ($data['dinleme_sn'] ?? 5), 3.0, $device?->id, $device?->protocol === 'perkotek_fk' ? 'YT33' : 'TERMINAL');
 
         if (($result['mesaj'] ?? null) && ! isset($result['soket'])) {
             return response()->json(['message' => $result['mesaj'], 'errors' => ['gonderilecek_hex' => [$result['mesaj']]]], 422);
@@ -274,6 +283,16 @@ class TerminalController extends ApiController
             'baglanti_sayisi' => (int) ($live['baglanti_sayisi'] ?? 0),
             'paket_sayisi' => $this->packets->count(),
             'kalp' => $live['kalp'] ?? null,
+            'calisiyor' => $status === 'aktif',
+            'dinleme_ip' => '0.0.0.0',
+            'rx_bayt' => (int) ($live['rx_bayt'] ?? 0),
+            'tx_bayt' => (int) ($live['tx_bayt'] ?? 0),
+            'son_veri' => $live['son_veri'] ?? null,
+            'acik_baglanti' => (int) ($live['acik_baglanti'] ?? 0),
+            'terminaller' => \Illuminate\Support\Facades\Schema::hasTable('terminal_raw_packets')
+                ? \Illuminate\Support\Facades\DB::table('terminal_raw_packets')->where('direction', '!=', 'upstream_to_device')
+                    ->selectRaw('remote_ip, MAX(received_at) AS son, COUNT(*) AS paket, SUM(byte_count) AS bayt')->groupBy('remote_ip')->orderByDesc('son')->limit(20)->get()
+                : [],
             'kopru_ip' => $bridgeIp,
             // Cihaz menüsüne kullanıcının ELLE yazacağı değerler (uygulama cihaz ayarını değiştirmez)
             'cihaz_menusu' => $bridgeIp ? ['server_ip' => $bridgeIp, 'push_address' => $bridgeIp, 'port' => $settings['port'], 'push' => 'Open'] : null,
@@ -324,6 +343,8 @@ class TerminalController extends ApiController
             'ip' => $device->zk_ip,
             'port' => $device->zk_port,
             'aktarim' => $device->zk_transport,
+            'makine_id' => (int) ($device->machine_no ?: 1),
+            'baglanti_tipi' => $device->terminal_connection ?: 'pull',
             'sifre_tanimli' => $device->zk_comm_key !== null,
             'son_cekme' => $device->zk_last_pull_at,
             'son_cekme_durumu' => $device->zk_last_status,
@@ -352,6 +373,8 @@ class TerminalController extends ApiController
             // Yalnız rakam: cihazın web arayüzü şifresi (ör. admin) iletişim şifresi olarak KABUL EDİLMEZ.
             'comm_key' => ['sometimes', 'nullable', 'string', 'max:20', 'regex:/^[0-9]*$/'],
             'marka' => [$saving ? 'nullable' : 'sometimes', 'nullable', 'string', 'max:40'],
+            'makine_id' => ['nullable', 'integer', 'between:1,65535'],
+            'baglanti_tipi' => ['nullable', Rule::in(['pull', 'push'])],
             'model' => [$saving ? 'nullable' : 'sometimes', 'nullable', 'string', 'max:60'],
         ], [
             'surucu.required' => 'Sürücü seçilmelidir.',
@@ -359,6 +382,8 @@ class TerminalController extends ApiController
             'ip.required' => 'Cihazın IP adresi zorunludur.',
             'ip.ip' => 'Geçerli bir IP adresi girin (ör. 192.168.1.50).',
             'port.between' => 'Port 1 ile 65535 arasında olmalıdır.',
+            'makine_id.between' => 'Cihaz / Machine ID 1 ile 65535 arasında olmalıdır.',
+            'baglanti_tipi.in' => 'Bağlantı tipi "LAN / TCP Pull" ya da "Server / Push" olmalıdır.',
             'comm_key.regex' => 'İletişim şifresi yalnız rakamlardan oluşur (cihazın web arayüzü şifresi değildir).',
             'comm_key.max' => 'İletişim şifresi en çok 20 hane olabilir.',
         ], ['surucu' => 'Sürücü', 'ip' => 'IP adresi', 'port' => 'Port', 'transport' => 'Bağlantı türü', 'comm_key' => 'İletişim şifresi', 'marka' => 'Üretici', 'model' => 'Model']);

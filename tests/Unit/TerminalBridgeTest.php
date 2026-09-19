@@ -6,7 +6,7 @@ use App\Models\Branch;
 use App\Models\Device;
 use App\Models\User;
 use App\Services\Devices\Drivers\DriverRegistry;
-use App\Services\Devices\Drivers\PerkotekYT33Driver;
+use App\Services\Devices\Drivers\Yt33\Yt33Driver;
 use App\Services\Devices\Drivers\ZkTecoDriver;
 use App\Services\Devices\Network\RawTcpDiagnostic;
 use App\Services\Devices\Network\SocketFailure;
@@ -145,7 +145,8 @@ class TerminalBridgeTest extends TestCase
         $this->assertSame('basarili', $report['asamalar']['ag']['durum']);
         $this->assertSame('basarili', $report['asamalar']['tcp']['durum']);
         $this->assertSame('basarisiz', $report['asamalar']['protokol']['durum']);
-        $this->assertStringStartsWith('Ağ bağlantısı başarılı fakat cihaz protokolü doğrulanamadı', $report['mesaj']);
+        $this->assertStringStartsWith('Ağ bağlantısı başarılı. TCP ', $report['mesaj']);
+        $this->assertStringContainsString('Bu durum ağ arızası anlamına gelmez', $report['mesaj']);
         $this->assertStringNotContainsString('bağlanılamadı', $report['mesaj']);
         $this->assertStringNotContainsString('ulaşılamıyor', $report['mesaj']);
         $this->assertSame('127.0.0.1', $report['kopru_ip']);
@@ -158,14 +159,21 @@ class TerminalBridgeTest extends TestCase
     {
         [$server, $port] = $this->silentServer();
 
-        $report = app(TerminalConnectionTester::class)->run(app(PerkotekYT33Driver::class), $this->endpoint($port))->toArray();
+        $report = app(TerminalConnectionTester::class)->run(app(Yt33Driver::class), $this->endpoint($port))->toArray();
 
         $this->assertSame('kismi', $report['durum']);
         $this->assertSame('protokol_dogrulanmadi', $report['kod']);
         $this->assertSame('basarili', $report['asamalar']['tcp']['durum']);
-        $this->assertSame('dogrulanamadi', $report['asamalar']['protokol']['durum']);
-        $this->assertStringContainsString('henüz doğrulanmadı', $report['asamalar']['protokol']['ayrinti']);
-        $this->assertStringContainsString('Perkotek YT33', $report['mesaj']);
+        $this->assertSame('dogrulama_bekliyor', $report['asamalar']['protokol']['durum']);
+        $this->assertSame('bekliyor', $report['asamalar']['kimlik']['durum']);
+        $this->assertStringContainsString('Protokol sürücüsü henüz doğrulanmadı', $report['asamalar']['protokol']['ayrinti']);
+        $this->assertSame(
+            "Ağ bağlantısı başarılı. TCP {$port} portuna bağlantı kurulabiliyor ancak YT33 uygulama protokolü henüz doğrulanmadı. Bu durum ağ arızası anlamına gelmez.",
+            $report['mesaj'],
+        );
+        $this->assertSame("Network: Başarılı · TCP {$port}: Başarılı · Protocol: Doğrulama bekliyor · Device identification: Bekliyor", $report['teknik']);
+        $this->assertStringStartsWith("Cihaza ağ üzerinden erişiliyor ve TCP {$port} portu açık.", $report['asamalar']['ag']['ayrinti']);
+        $this->assertStringNotContainsString('Başarısız', $report['teknik']);
 
         // Sürücü cihaza TEK BAYT göndermemeli (ZK paketi ya da uydurma başlık yok)
         $conn = stream_socket_accept($server, 1);
@@ -178,7 +186,7 @@ class TerminalBridgeTest extends TestCase
 
     public function test_unreachable_socket_is_the_only_case_that_says_could_not_connect(): void
     {
-        $report = app(TerminalConnectionTester::class)->run(app(PerkotekYT33Driver::class), $this->endpoint($this->closedPort()))->toArray();
+        $report = app(TerminalConnectionTester::class)->run(app(Yt33Driver::class), $this->endpoint($this->closedPort()))->toArray();
 
         $this->assertSame('hata', $report['durum']);
         $this->assertSame('baglanti', $report['kod']);
@@ -190,7 +198,7 @@ class TerminalBridgeTest extends TestCase
 
     public function test_unverified_driver_methods_return_typed_results_not_fake_data(): void
     {
-        $perkotek = app(PerkotekYT33Driver::class);
+        $perkotek = app(Yt33Driver::class);
         $endpoint = $this->endpoint(1);
 
         foreach ([$perkotek->identifyDevice($endpoint), $perkotek->fetchUsers($endpoint, 1), $perkotek->fetchAttendanceLogs($endpoint, 1), $perkotek->parsePush('x', 1)] as $result) {
@@ -199,7 +207,7 @@ class TerminalBridgeTest extends TestCase
         }
 
         $registry = app(DriverRegistry::class);
-        $this->assertInstanceOf(PerkotekYT33Driver::class, $registry->terminal('perkotek_fk'));
+        $this->assertInstanceOf(Yt33Driver::class, $registry->terminal('perkotek_fk'));
         $this->assertSame(DriverStatus::Unsupported, $registry->terminal('generic_tcp')->fetchUsers($endpoint, 1)->status);
         $this->assertNull($registry->terminal('adms'));
     }
@@ -536,5 +544,162 @@ class TerminalBridgeTest extends TestCase
 
         config(['kurs.node' => 'server']);
         $this->postJson('/api/v1/attendance/terminal/push', ['acik' => false, 'port' => 7005])->assertStatus(409);
+    }
+
+    // ============================================================ spec v2: geliştirici araçları, analiz, PDKS
+
+    public function test_hex_sender_requires_developer_mode_and_logs_every_byte(): void
+    {
+        $device = $this->actingAdminOnLocalNode();
+        [$server, $port] = $this->silentServer();
+        $device->forceFill(['protocol' => 'perkotek_fk', 'zk_ip' => '127.0.0.1', 'zk_port' => $port, 'zk_comm_key' => '123456'])->save();
+
+        $this->postJson('/api/v1/attendance/terminal/oturum', ['ip' => '127.0.0.1', 'port' => $port, 'paketler' => 'A5 5A'])
+            ->assertStatus(403)->assertJsonPath('error_code', 'terminal_dev_mode_required');
+        $this->postJson('/api/v1/attendance/terminal/ham-tani', ['ip' => '127.0.0.1', 'port' => $port, 'gonderilecek_hex' => 'A5'])->assertStatus(403);
+
+        $this->postJson('/api/v1/attendance/terminal/gelistirici', ['acik' => true])->assertOk();
+        $this->postJson('/api/v1/attendance/terminal/oturum', ['ip' => '127.0.0.1', 'port' => $port, 'paketler' => "zz"])->assertStatus(422);
+
+        $res = $this->postJson('/api/v1/attendance/terminal/oturum', [
+            'ip' => '127.0.0.1', 'port' => $port, 'paketler' => "A5 5A,01\n0x40 E2 01 00", 'yanit_bekleme_sn' => 0.3, 'cihaz_id' => $device->id,
+        ])->assertOk();
+
+        $res->assertJsonPath('tx_bayt', 7)->assertJsonPath('paketler.0.durum', 'zaman_asimi')->assertJsonPath('paketler.1.tx_hex', '40e20100');
+        $states = array_column($res->json('durumlar'), 'durum');
+        foreach (['Connecting', 'Connected', 'Waiting Response', 'Timeout', 'Connection Closed'] as $st) {
+            $this->assertContains($st, $states);
+        }
+
+        $conn = stream_socket_accept($server, 1);
+        stream_set_timeout($conn, 1);
+        $this->assertSame("\xA5\x5A\x01\x40\xE2\x01\x00", fread($conn, 64), 'Yalnız kullanıcının baytları gider');
+
+        $log = $this->getJson('/api/v1/attendance/terminal/raw-log')->assertOk()->json('data');
+        $this->assertSame(['40e20100', 'a55a01'], array_values(array_map(fn ($r) => $r['payload_hex'], array_filter($log, fn ($r) => $r['kind'] === 'TX'))));
+
+        // 123456 = 0x0001E240 → LE "40 e2 01 00": dışa aktarımda maskelenir
+        $text = $this->get('/api/v1/attendance/terminal/raw-log/indir?maske_sifre=1&maske_ip=1')->assertOk()->getContent();
+        $this->assertStringNotContainsString('40 e2 01 00', (string) $text);
+        $this->assertStringContainsString('** ** ** **', (string) $text);
+        $this->assertStringContainsString('127.0.x.x', (string) $text);
+
+        $this->deleteJson('/api/v1/attendance/terminal/raw-log')->assertOk();
+        $this->assertSame([], $this->getJson('/api/v1/attendance/terminal/raw-log')->json('data'));
+    }
+
+    public function test_packet_analyzer_suggests_header_length_and_checksum_but_is_only_a_guess(): void
+    {
+        $make = function (string $payload): string {
+            $body = "\xA5\x5A".chr(strlen($payload) + 5).$payload;
+
+            return $body.chr(array_sum(unpack('C*', $body)) & 0xFF).chr(0x0D);
+        };
+        $packets = [$make("\x01"), $make("\x02\x10\x20"), $make("\x03\xAA\xBB\xCC\xDD")];
+
+        $r = app(\App\Services\Devices\Analysis\PacketAnalyzer::class)->compare($packets, 1);
+
+        $this->assertSame('Otomatik analiz tahmindir; doğrulanmadan sürücüye eklenmez.', $r['uyari']);
+        $this->assertSame(2, $r['sabit_baslik'], 'a5 5a sabit; üçüncü bayt uzunluk olduğu için değişir');
+        $fields = array_column($r['oneriler'], 'aciklama', 'alan');
+        $this->assertArrayHasKey('Sabit başlık', $fields);
+        $this->assertStringContainsString('Toplam mod 256', collect($r['oneriler'])->where('alan', 'Sağlama toplamı (aday)')->pluck('aciklama')->implode(' '));
+        $this->assertNotEmpty(collect($r['oneriler'])->where('alan', 'Veri uzunluğu (aday)')->where('ofset', 2)->all());
+        $this->assertArrayHasKey('Sabit son ek', $fields);
+    }
+
+    public function test_har_import_masks_passwords_and_cookies(): void
+    {
+        $har = json_encode(['log' => ['entries' => [[
+            'startedDateTime' => '2026-09-19T10:00:00Z',
+            'request' => ['method' => 'POST', 'url' => 'http://192.168.68.60/login.cgi?user=admin&password=admin', 'httpVersion' => 'HTTP/1.1',
+                'headers' => [['name' => 'Cookie', 'value' => 'sid=SECRET'], ['name' => 'Content-Type', 'value' => 'application/x-www-form-urlencoded']],
+                'postData' => ['text' => 'username=admin&pwd=admin&x=1']],
+            'response' => ['status' => 200, 'statusText' => 'OK', 'headers' => [['name' => 'Set-Cookie', 'value' => 'sid=SECRET2']], 'content' => ['mimeType' => 'application/json', 'text' => '{"ok":1,"password":"admin"}']],
+        ], [
+            'request' => ['method' => 'GET', 'url' => 'http://192.168.68.60/logo.png', 'headers' => []], 'response' => ['status' => 200, 'headers' => [], 'content' => []],
+        ]]]]);
+
+        $rows = app(\App\Services\Devices\Analysis\HarImporter::class)->parse((string) $har);
+
+        $this->assertCount(1, $rows, 'Görsel dosyalar atlanır');
+        $all = hex2bin($rows[0]['tx_hex']).hex2bin($rows[0]['rx_hex']);
+        $this->assertStringNotContainsString('SECRET', $all);
+        $this->assertStringNotContainsString('pwd=admin', $all);
+        $this->assertStringNotContainsString('password=admin', $all);
+        $this->assertStringNotContainsString('"password":"admin"', $all);
+        $this->assertStringContainsString('POST /login.cgi', $all);
+        $this->assertStringContainsString('username=admin', $all, 'Kullanıcı adı kalır, yalnız parola maskelenir');
+    }
+
+    public function test_pdks_staff_scan_goes_to_staff_attendance_and_summary_counts_late(): void
+    {
+        $device = $this->actingAdminOnLocalNode();
+        $teacher = \App\Models\Teacher::query()->create(['branch_id' => $device->branch_id, 'first_name' => 'Ayşe', 'last_name' => 'Öğretmen']);
+
+        $this->postJson('/api/v1/attendance/pdks/eslestir', ['kullanici_no' => '77', 'kisi_turu' => 'teacher', 'kisi_id' => $teacher->id])->assertOk();
+
+        $presence = app(\App\Services\Attendance\PresenceService::class);
+        $in = $presence->ingest(['identifier' => '77', 'identifier_kind' => 'fingerprint', 'event_type' => 'AUTO', 'occurred_at' => '2026-09-18 09:20:00', 'idempotency_key' => 't:77:1'], $device);
+        $out = $presence->ingest(['identifier' => '77', 'identifier_kind' => 'fingerprint', 'event_type' => 'AUTO', 'occurred_at' => '2026-09-18 17:05:00', 'idempotency_key' => 't:77:2'], $device);
+        $dup = $presence->ingest(['identifier' => '77', 'identifier_kind' => 'fingerprint', 'event_type' => 'AUTO', 'occurred_at' => '2026-09-18 17:05:00', 'idempotency_key' => 't:77:2'], $device);
+
+        $this->assertSame(['staff', 'ENTRY'], [$in['status'], $in['event_type']]);
+        $this->assertSame('EXIT', $out['event_type']);
+        $this->assertSame('duplicate', $dup['status']);
+        $this->assertSame(0, \App\Models\DailyPresence::query()->count(), 'Personel okutması öğrenci yoklamasına yazılmaz');
+
+        $sum = $this->getJson('/api/v1/attendance/pdks/ozet?baslangic=2026-09-18&bitis=2026-09-18&kisi_turu=personel&mesai_baslangic=09:00&tolerans_dk=5')->assertOk();
+        $sum->assertJsonPath('gunluk.0.kisi', 'Ayşe Öğretmen')->assertJsonPath('gunluk.0.ilk_giris', '09:20')
+            ->assertJsonPath('gunluk.0.son_cikis', '17:05')->assertJsonPath('gunluk.0.gec', true)->assertJsonPath('toplam.0.sure', '7 sa 45 dk');
+
+        $this->getJson('/api/v1/attendance/pdks/kayitlar?baslangic=2026-09-18&bitis=2026-09-18&kisi_turu=personel')->assertOk()
+            ->assertJsonPath('meta.total', 2)->assertJsonPath('data.0.kisi_turu', 'teacher');
+    }
+
+    public function test_pdks_linking_confirms_conflicts_and_rematches_pending_scans(): void
+    {
+        $device = $this->actingAdminOnLocalNode();
+        $a = \App\Models\Student::query()->create(['branch_id' => $device->branch_id, 'student_no' => '2024001', 'first_name' => 'Ali', 'last_name' => 'Veli', 'status' => 'active']);
+        $b = \App\Models\Student::query()->create(['branch_id' => $device->branch_id, 'student_no' => '2024002', 'first_name' => 'Can', 'last_name' => 'Kaya', 'status' => 'active']);
+
+        app(\App\Services\Attendance\PresenceService::class)->ingest(['identifier' => '5', 'identifier_kind' => 'fingerprint', 'event_type' => 'AUTO', 'occurred_at' => now()->subDay()->format('Y-m-d H:i:s'), 'idempotency_key' => 'x:5:1'], $device);
+        $this->getJson('/api/v1/attendance/pdks/kisiler')->assertOk()->assertJsonPath('bekleyen.0.kullanici_no', '5');
+
+        $this->postJson('/api/v1/attendance/pdks/eslestir', ['kullanici_no' => '5', 'kisi_turu' => 'student', 'kisi_id' => $a->id])->assertOk()->assertJsonPath('baglanan_eski_okutma', 1);
+        $this->postJson('/api/v1/attendance/pdks/eslestir', ['kullanici_no' => '5', 'kisi_turu' => 'student', 'kisi_id' => $b->id])->assertStatus(409);
+        $this->postJson('/api/v1/attendance/pdks/eslestir', ['kullanici_no' => '5', 'kisi_turu' => 'student', 'kisi_id' => $b->id, 'onay' => true])->assertOk();
+
+        $rows = collect($this->postJson('/api/v1/attendance/pdks/csv/onizle', ['icerik' => "cihaz;ogrenci\n5;2024001\n6;2024002\n7;9999"])->assertOk()->json('data'))->keyBy('kullanici_no');
+        $this->assertSame('cakisma', $rows['5']['durum']);
+        $this->assertSame('yeni', $rows['6']['durum']);
+        $this->assertSame('hata', $rows['7']['durum']);
+
+        $this->postJson('/api/v1/attendance/pdks/csv/uygula', ['icerik' => "5;2024001\n6;2024002"])->assertOk()->assertJsonPath('eslenen', 1);
+        $this->assertSame($b->id, (int) \App\Models\DeviceIdentity::query()->where('identifier', '5')->value('person_id'), 'Onaysız çakışma değişmez');
+
+        config(['kurs.node' => 'server']);
+        $this->postJson('/api/v1/attendance/pdks/eslestir', ['kullanici_no' => '8', 'kisi_turu' => 'student', 'kisi_id' => $a->id])->assertStatus(409);
+        $this->getJson('/api/v1/attendance/pdks/kayitlar')->assertOk();
+    }
+
+    public function test_yt33_driver_methods_throw_typed_not_implemented_and_scheduler_skips_yt33(): void
+    {
+        $d = app(Yt33Driver::class);
+        foreach (['probe', 'getDeviceInfo', 'getUsers', 'disconnect'] as $m) {
+            try {
+                $d->{$m}();
+                $this->fail("{$m} istisna fırlatmalıydı");
+            } catch (\App\Services\Devices\Drivers\Yt33\ProtocolNotImplementedError $e) {
+                $this->assertStringStartsWith('Protokol verisi bekleniyor', $e->getMessage());
+            }
+        }
+
+        $device = $this->actingAdminOnLocalNode();
+        $device->forceFill(['protocol' => 'perkotek_fk', 'zk_ip' => '127.0.0.1', 'zk_port' => 5005])->save();
+        $event = collect(app(\Illuminate\Console\Scheduling\Schedule::class)->events())->first(fn ($e) => str_contains((string) $e->command, 'kurs:cihaz-cek'));
+        if ($event) {
+            $this->assertFalse($event->filtersPass($this->app), 'YT33 cihazı varken ZK çekme zamanlayıcısı çalışmamalı');
+        }
     }
 }

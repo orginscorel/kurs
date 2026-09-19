@@ -11,7 +11,14 @@ final class TestStage
 
     public const SKIP = 'denenmedi';
 
-    public const NOT_VERIFIED = 'dogrulanamadi';
+    /** Protokol sürücüsü henüz doğrulanmadı — "başarısız" DEĞİL. */
+    public const NOT_VERIFIED = 'dogrulama_bekliyor';
+
+    /** Önceki aşama doğrulanmadığı için bekliyor (ör. cihaz tanıma yalnız geçerli protokol yanıtıyla). */
+    public const WAITING = 'bekliyor';
+
+    /** Teknik ayrıntı satırı için İngilizce/Türkçe durum adı. */
+    public const TECH = [self::PASS => 'Başarılı', self::FAIL => 'Başarısız', self::SKIP => 'Denenmedi', self::NOT_VERIFIED => 'Doğrulama bekliyor', self::WAITING => 'Bekliyor'];
 
     public function __construct(
         public readonly string $label,
@@ -38,6 +45,11 @@ final class TestStage
     public static function notVerified(string $label, string $detail, ?string $hint = null): self
     {
         return new self($label, self::NOT_VERIFIED, $detail, $hint ?: null);
+    }
+
+    public static function waiting(string $label, string $detail): self
+    {
+        return new self($label, self::WAITING, $detail);
     }
 
     public function toArray(): array

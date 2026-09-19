@@ -23,7 +23,7 @@ use Carbon\CarbonImmutable;
  * katmanının TerminalDriver arayüzü arkasındaki yüzü. ZKTeco (ve ZK protokolü konuşan OEM) cihazlar içindir.
  *
  * DİKKAT: Her Perkotek cihazı ZK protokolü konuşmaz. Perkotek YT33 / "Dynamic Face" (FK ailesi) farklı bir
- * protokol kullanır → PerkotekYT33Driver. Bu sürücü ZK paketlerini yalnız ZK seçilmiş cihaza gönderir.
+ * protokol kullanır → Yt33\Yt33Driver. Bu sürücü ZK paketlerini yalnız ZK seçilmiş cihaza gönderir.
  */
 class ZkTecoDriver extends AbstractTerminalDriver
 {
