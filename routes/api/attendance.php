@@ -92,6 +92,11 @@ Route::prefix('attendance')->group(function () {
             Route::post('ham-tani', [TerminalController::class, 'rawDiagnostic'])->middleware(['terminal.desktop', 'throttle:writes']);
             Route::get('ham-tani/{id}/indir', [TerminalController::class, 'downloadDiagnostic'])->middleware('terminal.desktop')->where('id', '[0-9a-f]{12}');
             Route::get('teshis', [TerminalController::class, 'diagnostics'])->middleware('terminal.desktop');
+            Route::get('push', [TerminalController::class, 'push'])->middleware('terminal.desktop');
+            Route::post('push', [TerminalController::class, 'savePush'])->middleware(['terminal.desktop', 'throttle:writes']);
+            Route::get('paketler', [TerminalController::class, 'packets'])->middleware('terminal.desktop');
+            Route::get('paketler/{id}', [TerminalController::class, 'packet'])->middleware('terminal.desktop')->whereNumber('id');
+            Route::get('paketler/{id}/indir', [TerminalController::class, 'downloadPacket'])->middleware('terminal.desktop')->whereNumber('id');
         });
 
         Route::get('identities', [DeviceIdentityController::class, 'index']);

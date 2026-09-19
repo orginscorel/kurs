@@ -170,6 +170,14 @@ class ZkTecoDriver extends AbstractTerminalDriver
                 default => DriverStatus::ProtocolError,
             };
 
+            if ($status === DriverStatus::ProtocolError) {
+                // Soket açıktı ama ZK el sıkışması/okuması yanıtsız kaldı: en olası neden yanlış sürücü.
+                return new DriverResult($status, 'Cihaz ZKTeco protokolüne yanıt vermedi ('.$e->getMessage().')',
+                    'Bu cihaz ZKTeco protokolü konuşmuyor olabilir. Perkotek YT33 / FK "Dynamic Face" ise Sürücü alanından "Perkotek YT33 / FK Dynamic Face" seçin (ZKTeco komutları o cihaza gönderilmez). '
+                    .'Gerçekten ZKTeco cihazsa: cihazın kendi programı açıksa kapatın, portun doğru olduğunu (ZKTeco fabrika değeri 4370) kontrol edip tekrar deneyin.',
+                    null, ['kod' => $e->code()] + $e->context);
+            }
+
             return new DriverResult($status, $e->getMessage(), $e->hint, null, ['kod' => $e->code()] + $e->context);
         } finally {
             $terminal?->close();

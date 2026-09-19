@@ -161,3 +161,19 @@ bir HTTP sunucusuna `POST /iclock/cdata` ile kayıt gönderir. Bu durumda köpr�
 * **macOS Yerel Ağ izni:** masaüstü paketinin Info.plist'inde `NSLocalNetworkUsageDescription` (src-tauri/Info.plist).
   İzin yoksa gömülü php'nin LAN bağlantısı "No route to host"/zaman aşımı ile düşer; Terminal.app'teki `nc` başarısı
   uygulamanın iznini göstermez. Ayar: Sistem Ayarları › Gizlilik ve Güvenlik › Yerel Ağ › Erbaa Kurs.
+
+## Push dinleyicisi ve aktarma (şeffaf köprü) — 1.14.1
+
+* `kurs:terminal-dinle` (yalnız `KURS_NODE=local`): 0.0.0.0:<port> (varsayılan 7005). Masaüstü `runtime.rs › terminal_listener`
+  denetler: çıkış 0 = kapalı (20 sn sonra ayar yeniden okunur), 3 = port değişti (hemen yeniden), diğer = artan bekleme (≤60 sn);
+  kapanışta SIGTERM → 5 sn → SIGKILL.
+* Ayar düğüme özel (`storage/app/terminal/state.json › push_ayar`): açık/kapalı, port, isteğe bağlı aktarma IP/port.
+  Uç: `GET|POST attendance/terminal/push` (yalnız masaüstü). Cihazın ayarı OTOMATİK değiştirilmez; ekran cihaz menüsüne
+  yazılacak "Server IP / Push address = köprü IP'si, Port, Push: Open" değerlerini gösterir.
+* Yalnız dinle: HTTP isteğine boş `HTTP/1.1 200 OK` (Content-Length: 0); ham TCP'ye hiçbir şey gönderilmez.
+* Aktarma: her cihaz bağlantısı için yukarı akışa (ör. PDKS programı 192.168.68.5:7005) eşzamansız bağlanır, iki yönde
+  değiştirmeden aktarır, her yönü ayrı kaydeder; kendi 200'ümüzü göndermez. Yukarı akış yoksa yalnız-dinle davranışına düşer ve
+  teşhiste "Aktarılamadı: … bağlantı reddedildi" görünür.
+* Ham paketler `terminal_raw_packets` (LOCAL, SİLİNMEZ): yön, bağlantı kimliği, kaynak IP, bayt (base64), sha256 + tekrar işareti,
+  HTTP satırı/başlık/gövde. Uçlar: `GET attendance/terminal/paketler`, `/paketler/{id}`, `/paketler/{id}/indir?bicim=txt|hex`.
+* macOS: gelen bağlantı için Uygulama Güvenlik Duvarı ilk seferde sorabilir (Yerel Ağ izni yalnız giden bağlantı içindir).

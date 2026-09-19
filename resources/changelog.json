@@ -1,5 +1,24 @@
 [
   {
+    "version": "1.14.1",
+    "date": "2026-09-19",
+    "title": "Terminal push dinleyicisi",
+    "items": [
+      {
+        "type": "yeni",
+        "text": "Terminal Push dinleyicisi (Mac): cihazın gönderdiği her okutma paketi kaydediliyor ve teşhis ekranında görünüyor"
+      },
+      {
+        "type": "yeni",
+        "text": "Aktarma kipi: veri aynı anda mevcut PDKS programına da iletiliyor, eski sistem çalışmaya devam ediyor"
+      },
+      {
+        "type": "duzeltme",
+        "text": "Terminal testinde yanlış sürücüye ait uyarı metni çıkmıyor"
+      }
+    ]
+  },
+  {
     "version": "1.14.0",
     "date": "2026-09-18",
     "title": "Sınıf oturma düzeni",

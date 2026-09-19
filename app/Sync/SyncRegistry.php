@@ -221,6 +221,7 @@ final class SyncRegistry
         'app_notifications' => ['kind' => self::SERVER, 'since' => '2026-09-18', 'filter' => 'staff_owned', 'branch' => 'via:user_id'],
         'activity_feed' => ['kind' => self::LOCAL, 'reason' => 'Canlı akış her düğümde servislerce yeniden üretilir.'],
         'import_jobs' => ['kind' => self::LOCAL, 'reason' => 'Excel içe aktarma dosyası düğüme özel.'],
+        'terminal_raw_packets' => ['kind' => self::LOCAL, 'reason' => 'Yoklama terminalinin push dinleyicisine gönderdiği ham baytlar: yalnız dinleyen Mac\'te anlamlı teşhis verisi; yoklama sunucuya attendance_events ile gider.'],
         'backup_runs' => ['kind' => self::LOCAL, 'reason' => 'Yedek yalnız sunucuda.'],
         'login_events' => ['kind' => self::LOCAL, 'reason' => 'Giriş kayıtları düğüme özel (KVKK: IP).'],
         'sequences' => ['kind' => self::LOCAL, 'reason' => 'Numara sayaçları: yerelde cihaz önekli / blok (SyncNumbers).'],

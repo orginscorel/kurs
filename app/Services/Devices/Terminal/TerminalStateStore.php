@@ -65,6 +65,47 @@ class TerminalStateStore
         return null;
     }
 
+    /**
+     * Push dinleyicisi ayarı (düğüme özel): açık mı, hangi port, isteğe bağlı aktarma (şeffaf köprü) hedefi.
+     *
+     * @return array{acik:bool, port:int, aktar_ip:?string, aktar_port:?int}
+     */
+    public function pushSettings(): array
+    {
+        $p = $this->read()['push_ayar'] ?? [];
+
+        return [
+            'acik' => (bool) ($p['acik'] ?? false),
+            'port' => (int) ($p['port'] ?? PushListener::DEFAULT_PORT),
+            'aktar_ip' => ($p['aktar_ip'] ?? null) ?: null,
+            'aktar_port' => isset($p['aktar_port']) && $p['aktar_port'] ? (int) $p['aktar_port'] : null,
+        ];
+    }
+
+    public function putPushSettings(bool $enabled, int $port, ?string $relayIp = null, ?int $relayPort = null): void
+    {
+        $this->mutate(function (array $state) use ($enabled, $port, $relayIp, $relayPort) {
+            $state['push_ayar'] = ['acik' => $enabled, 'port' => $port, 'aktar_ip' => $relayIp ?: null, 'aktar_port' => $relayIp ? $relayPort : null];
+
+            return $state;
+        });
+    }
+
+    /** Dinleyici sürecinin kendi yazdığı canlı durum (kalp atışı, son bağlantı, hata). */
+    public function listenerState(): array
+    {
+        return $this->read()['push_durum'] ?? [];
+    }
+
+    public function putListenerState(array $values, bool $replace = false): void
+    {
+        $this->mutate(function (array $state) use ($values, $replace) {
+            $state['push_durum'] = $replace ? $values : array_merge($state['push_durum'] ?? [], $values);
+
+            return $state;
+        });
+    }
+
     /** Eşitleme ajanının web'e taşıyacağı salt okunur özet (sır içermez). */
     public function snapshot(int $deviceId): array
     {

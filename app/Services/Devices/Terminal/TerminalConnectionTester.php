@@ -56,7 +56,7 @@ class TerminalConnectionTester
                 DriverStatus::ProtocolNotImplemented => TestStage::notVerified('Protokol el sıkışması', $protocol->message, $protocol->hint),
                 DriverStatus::Unsupported => TestStage::notVerified('Protokol el sıkışması', $protocol->message, $protocol->hint),
                 DriverStatus::AuthError => TestStage::fail('Protokol el sıkışması', $protocol->message, $protocol->hint),
-                default => TestStage::fail('Protokol el sıkışması', 'TCP bağlandı fakat cihaz protokolü yanıt vermedi.', trim($protocol->message.' '.$protocol->hint)),
+                default => TestStage::fail('Protokol el sıkışması', $protocol->message, $protocol->hint),
             };
 
             if ($protocol->isOk()) {
@@ -101,7 +101,8 @@ class TerminalConnectionTester
             ? 'Cihaz protokolü doğrulanamadı.'
             : 'Ağ bağlantısı başarılı fakat cihaz protokolü doğrulanamadı.';
 
-        return new TerminalTestReport('kismi', $code, $prefix.' '.$proto->detail, $proto->hint ?? '', $driver, $endpoint, $stages, $socket, $identity);
+        // Ayrıntı (sürücüye özgü neden) aşama tablosunda; özet tek cümle + seçili sürücü — metin iki kez yazılmaz.
+        return new TerminalTestReport('kismi', $code, $prefix.' Seçili sürücü: '.$driver->label().'.', $proto->hint ?? '', $driver, $endpoint, $stages, $socket, $identity);
     }
 
     private function remember(TerminalDriver $driver, TerminalEndpoint $endpoint, TerminalTestReport $report): void

@@ -12,6 +12,9 @@ use App\Services\Devices\Network\RawTcpDiagnostic;
 use App\Services\Devices\Network\SocketFailure;
 use App\Services\Devices\Network\TcpProbe;
 use App\Services\Devices\Terminal\DriverStatus;
+use App\Services\Devices\Terminal\PushListener;
+use App\Services\Devices\Terminal\PushListenerException;
+use App\Services\Devices\Terminal\TerminalStateStore;
 use App\Services\Devices\Terminal\TerminalConnectionTester;
 use App\Services\Devices\Terminal\TerminalEndpoint;
 use App\Support\BranchContext;
@@ -146,6 +149,9 @@ class TerminalBridgeTest extends TestCase
         $this->assertStringNotContainsString('bağlanılamadı', $report['mesaj']);
         $this->assertStringNotContainsString('ulaşılamıyor', $report['mesaj']);
         $this->assertSame('127.0.0.1', $report['kopru_ip']);
+        // Tek özet cümle; ZK'ya özgü "biri parmak okutuyor" metni özetle birlikte tekrar edilmez, yanlış sürücü önerilir
+        $this->assertStringNotContainsString('parmak okutuyor', $report['mesaj'].$report['oneri']);
+        $this->assertStringContainsString('Perkotek YT33', $report['oneri']);
     }
 
     public function test_perkotek_driver_reports_protocol_not_verified_and_sends_no_bytes(): void
@@ -158,7 +164,8 @@ class TerminalBridgeTest extends TestCase
         $this->assertSame('protokol_dogrulanmadi', $report['kod']);
         $this->assertSame('basarili', $report['asamalar']['tcp']['durum']);
         $this->assertSame('dogrulanamadi', $report['asamalar']['protokol']['durum']);
-        $this->assertStringContainsString('henüz doğrulanmadı', $report['mesaj']);
+        $this->assertStringContainsString('henüz doğrulanmadı', $report['asamalar']['protokol']['ayrinti']);
+        $this->assertStringContainsString('Perkotek YT33', $report['mesaj']);
 
         // Sürücü cihaza TEK BAYT göndermemeli (ZK paketi ya da uydurma başlık yok)
         $conn = stream_socket_accept($server, 1);
@@ -319,5 +326,215 @@ class TerminalBridgeTest extends TestCase
 
         $this->get('/api/v1/attendance/terminal/ham-tani/'.$raw->json('id').'/indir')->assertOk()
             ->assertHeader('Content-Type', 'text/plain; charset=utf-8');
+    }
+
+    // ============================================================ PUSH dinleyicisi
+
+    private function listener(?string $upHost = null, ?int $upPort = null): PushListener
+    {
+        $this->artisan('migrate', ['--force' => true])->run();
+        $listener = app(PushListener::class);
+        $listener->open(0, '127.0.0.1');
+        $listener->setUpstream($upHost, $upPort);
+
+        return $listener;
+    }
+
+    /** $until true dönene dek dinleyiciyi çalıştırır (en çok ~3 sn). */
+    private function pump(PushListener $listener, callable $until, float $max = 3.0): void
+    {
+        $deadline = microtime(true) + $max;
+        while (microtime(true) < $deadline) {
+            $listener->tick(0.05);
+            if ($until()) {
+                return;
+            }
+        }
+    }
+
+    private function readAll($stream, PushListener $listener, float $max = 3.0): string
+    {
+        stream_set_blocking($stream, false);
+        $got = '';
+        $this->pump($listener, function () use ($stream, &$got) {
+            $chunk = (string) @fread($stream, 8192);
+            $got .= $chunk;
+
+            return feof($stream);
+        }, $max);
+
+        return $got;
+    }
+
+    private function packets(): array
+    {
+        return DB::table('terminal_raw_packets')->orderBy('id')->get()->all();
+    }
+
+    public function test_push_listener_stores_http_request_and_replies_empty_200(): void
+    {
+        $listener = $this->listener();
+        $client = stream_socket_client('tcp://127.0.0.1:'.$listener->port(), $e, $s, 2);
+        fwrite($client, "POST /iclock/cdata?SN=ABC HTTP/1.1\r\nHost: x\r\nContent-Length: 11\r\n\r\n1\t2026-09-19");
+
+        $response = $this->readAll($client, $listener);
+        $listener->close();
+
+        $this->assertSame("HTTP/1.1 200 OK\r\nContent-Length: 0\r\nConnection: close\r\n\r\n", $response);
+        $rows = $this->packets();
+        $this->assertCount(1, $rows);
+        $this->assertSame('http', $rows[0]->format);
+        $this->assertSame('POST', $rows[0]->http_method);
+        $this->assertSame('/iclock/cdata?SN=ABC', $rows[0]->http_path);
+        $this->assertSame("1\t2026-09-19", base64_decode($rows[0]->http_body_base64));
+        $this->assertSame('device_to_bridge', $rows[0]->direction);
+        $this->assertSame('127.0.0.1', $rows[0]->remote_ip);
+
+        $detail = app(\App\Services\Devices\Terminal\TerminalPacketStore::class)->detail((int) $rows[0]->id);
+        $this->assertStringContainsString('50 4f 53 54', $detail['hex']);
+        $this->assertStringStartsWith('POST /iclock', $detail['ascii']);
+    }
+
+    public function test_push_listener_keeps_raw_binary_without_replying_and_marks_duplicates(): void
+    {
+        $listener = $this->listener();
+
+        foreach ([1, 2] as $_) {
+            $client = stream_socket_client('tcp://127.0.0.1:'.$listener->port(), $e, $s, 2);
+            fwrite($client, "\xA5\x5A\x01\x00\xFF");
+            usleep(50000);
+            stream_socket_shutdown($client, STREAM_SHUT_WR);
+            $this->assertSame('', $this->readAll($client, $listener), 'Ham TCP\'ye hiçbir şey gönderilmez');
+            fclose($client);
+        }
+        $this->pump($listener, fn () => $listener->activeConnections() === 0);
+        $listener->close();
+
+        $rows = $this->packets();
+        $this->assertCount(2, $rows);
+        $this->assertSame('binary', $rows[0]->format);
+        $this->assertSame(hash('sha256', "\xA5\x5A\x01\x00\xFF"), $rows[0]->sha256);
+        $this->assertNull($rows[0]->duplicate_of);
+        $this->assertSame($rows[0]->id, $rows[1]->duplicate_of);
+        $this->assertSame('unparsed', $rows[1]->parse_status);
+    }
+
+    public function test_relay_mode_forwards_both_directions_and_records_each_separately(): void
+    {
+        [$upstream, $upPort] = $this->silentServer();
+        stream_set_blocking($upstream, false);
+        $listener = $this->listener('127.0.0.1', $upPort);
+
+        $client = stream_socket_client('tcp://127.0.0.1:'.$listener->port(), $e, $s, 2);
+        stream_set_blocking($client, false);
+        fwrite($client, 'PING-FROM-DEVICE');
+
+        $server = null;
+        $this->pump($listener, function () use ($upstream, &$server) {
+            $server ??= @stream_socket_accept($upstream, 0) ?: null;
+
+            return $server !== null;
+        });
+        $this->assertNotNull($server, 'Dinleyici yukarı akışa bağlanmalı');
+        stream_set_blocking($server, false);
+
+        $seen = '';
+        $this->pump($listener, function () use ($server, &$seen) {
+            $seen .= (string) fread($server, 1024);
+
+            return $seen === 'PING-FROM-DEVICE';
+        });
+        $this->assertSame('PING-FROM-DEVICE', $seen);
+
+        fwrite($server, 'PONG-FROM-PDKS');
+        $back = '';
+        $this->pump($listener, function () use ($client, &$back) {
+            $back .= (string) fread($client, 1024);
+
+            return $back === 'PONG-FROM-PDKS';
+        });
+        $this->assertSame('PONG-FROM-PDKS', $back, 'Cihaza yanıt yukarı akıştan gelir, kendi 200\'ümüz değil');
+
+        fclose($server);
+        fclose($client);
+        $this->pump($listener, fn () => $listener->activeConnections() === 0);
+        $listener->close();
+
+        $rows = collect($this->packets())->keyBy('direction');
+        $this->assertSame('PING-FROM-DEVICE', base64_decode($rows['device_to_upstream']->payload_base64));
+        $this->assertSame('PONG-FROM-PDKS', base64_decode($rows['upstream_to_device']->payload_base64));
+        $this->assertSame('127.0.0.1:'.$upPort, $rows['device_to_upstream']->upstream);
+        $this->assertSame('connected', $rows['upstream_to_device']->upstream_status);
+        $this->assertSame($rows['device_to_upstream']->connection_id, $rows['upstream_to_device']->connection_id);
+    }
+
+    public function test_relay_failure_falls_back_to_empty_200_and_reports_why(): void
+    {
+        $listener = $this->listener('127.0.0.1', $this->closedPort());
+        $client = stream_socket_client('tcp://127.0.0.1:'.$listener->port(), $e, $s, 2);
+        fwrite($client, "POST /push HTTP/1.1\r\nContent-Length: 0\r\n\r\n");
+
+        $response = $this->readAll($client, $listener);
+        $listener->close();
+
+        $this->assertStringStartsWith('HTTP/1.1 200 OK', $response);
+        $this->assertStringContainsString('Aktarılamadı: 127.0.0.1:', (string) $listener->lastRelayError);
+        $this->assertStringContainsString('reddedildi', (string) $listener->lastRelayError);
+        $row = $this->packets()[0];
+        $this->assertSame('refused', $row->upstream_status);
+        $this->assertSame('device_to_bridge', $row->direction);
+    }
+
+    public function test_port_in_use_gives_turkish_bind_error(): void
+    {
+        [, $port] = $this->silentServer();
+
+        try {
+            app(PushListener::class)->open($port, '127.0.0.1');
+            $this->fail('Kullanımdaki port açılmamalıydı.');
+        } catch (PushListenerException $e) {
+            $this->assertStringContainsString("{$port} portu başka bir program tarafından kullanılıyor", $e->getMessage());
+        }
+    }
+
+    public function test_listen_command_respects_settings_and_node(): void
+    {
+        $this->artisan('migrate', ['--force' => true])->run();
+
+        config(['kurs.node' => 'server']);
+        $this->artisan('kurs:terminal-dinle')->assertExitCode(1);
+
+        config(['kurs.node' => 'local']);
+        $this->artisan('kurs:terminal-dinle')->assertExitCode(0);
+        $this->assertSame('kapali', app(TerminalStateStore::class)->listenerState()['durum']);
+
+        app(TerminalStateStore::class)->putPushSettings(true, 7005);
+        $this->artisan('kurs:terminal-dinle', ['--port' => $this->closedPort(), '--sure' => 0.3])->assertExitCode(0);
+        $this->assertSame('kapali', app(TerminalStateStore::class)->listenerState()['durum']);
+        $this->assertNotNull(app(TerminalStateStore::class)->listenerState()['kapandi'] ?? null);
+    }
+
+    public function test_push_settings_api_shows_what_to_type_into_device_menu(): void
+    {
+        $device = $this->actingAdminOnLocalNode();
+        [, $port] = $this->silentServer();
+        $device->forceFill(['protocol' => 'perkotek_fk', 'zk_ip' => '127.0.0.1', 'zk_port' => $port])->save();
+        app(TerminalStateStore::class)->putDevice($device->id, ['kopru_ip' => '192.168.68.176', 'son_test' => now()->toIso8601String()]);
+
+        $this->postJson('/api/v1/attendance/terminal/push', ['acik' => true, 'port' => 80])->assertStatus(422);
+        $this->postJson('/api/v1/attendance/terminal/push', ['acik' => true, 'port' => 7005, 'aktar_ip' => '192.168.68.5'])->assertStatus(422);
+
+        $this->postJson('/api/v1/attendance/terminal/push', ['acik' => true, 'port' => 7005, 'aktar_ip' => '192.168.68.5', 'aktar_port' => 7005])->assertOk()
+            ->assertJsonPath('push.durum', 'baslatiliyor')
+            ->assertJsonPath('push.cihaz_menusu.server_ip', '192.168.68.176')
+            ->assertJsonPath('push.cihaz_menusu.port', 7005)
+            ->assertJsonPath('push.aktar_ip', '192.168.68.5');
+
+        app(TerminalStateStore::class)->putListenerState(['durum' => 'aktif', 'port' => 7005, 'kalp' => now()->toIso8601String(), 'son_ip' => '192.168.68.60'], true);
+        $this->getJson('/api/v1/attendance/terminal/teshis')->assertOk()
+            ->assertJsonPath('push_dinleyici.durum', 'aktif')->assertJsonPath('push_dinleyici.son_ip', '192.168.68.60');
+
+        config(['kurs.node' => 'server']);
+        $this->postJson('/api/v1/attendance/terminal/push', ['acik' => false, 'port' => 7005])->assertStatus(409);
     }
 }

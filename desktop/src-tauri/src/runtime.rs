@@ -32,6 +32,10 @@ const SYNC_TIMEOUT: Duration = Duration::from_secs(150);
 const WAKE_GAP_SECS: u64 = 120;
 /// Zamanlayıcının başlattığı ve hâlâ yaşayan süreç grubu bu yaştan büyükse asılı sayılır
 const STUCK_GROUP_AGE: Duration = Duration::from_secs(600);
+/// Push dinleyicisi kapalıyken (çıkış 0) ayarın yeniden denenme aralığı
+const LISTENER_IDLE_RECHECK: Duration = Duration::from_secs(20);
+/// Push dinleyicisi çöktüğünde/port açılamadığında en uzun bekleme
+const LISTENER_MAX_BACKOFF: Duration = Duration::from_secs(60);
 
 type Groups = Arc<std::sync::Mutex<VecDeque<(i32, Instant)>>>;
 
@@ -149,6 +153,8 @@ struct Handle {
     /// Zamanlayıcının başlattığı süreç grupları — kapanışta ve uyanmada sonlandırılır
     groups: Groups,
     sync: Arc<SyncCtl>,
+    /// `kurs:terminal-dinle` (push dinleyicisi) süreç grubu (0 = çalışmıyor)
+    listener_pgid: Arc<AtomicI32>,
 }
 
 #[derive(Default)]
@@ -270,6 +276,7 @@ impl LocalRuntime {
         let (shutdown_tx, shutdown_rx) = watch::channel(false);
         let groups: Groups = Arc::default();
         let sync = Arc::new(SyncCtl::default());
+        let listener_pgid = Arc::new(AtomicI32::new(0));
 
         // Sunucu (port çakışmasına karşı 3 deneme)
         let mut last_err = String::new();
@@ -303,10 +310,10 @@ impl LocalRuntime {
                 child,
                 shutdown_rx.clone(),
             )),
-            tauri::async_runtime::spawn(watchdog(paths.clone(), sec_clone(&sec), port, shutdown_rx, groups.clone(), sync.clone())),
+            tauri::async_runtime::spawn(watchdog(paths.clone(), sec_clone(&sec), port, shutdown_rx, groups.clone(), sync.clone(), listener_pgid.clone())),
         ];
 
-        *guard = Some(Handle { info: info.clone(), shutdown: shutdown_tx, tasks, groups, sync });
+        *guard = Some(Handle { info: info.clone(), shutdown: shutdown_tx, tasks, groups, sync, listener_pgid });
         emit_status(app, "ready", "Hazır");
         Ok(info)
     }
@@ -326,6 +333,10 @@ impl LocalRuntime {
             let sp = h.sync.running_pgid.load(Ordering::SeqCst);
             if sp > 0 {
                 groups.push(sp);
+            }
+            let lp = h.listener_pgid.swap(0, Ordering::SeqCst);
+            if lp > 0 {
+                groups.push(lp);
             }
             for pg in &groups {
                 signal_group(*pg, libc::SIGTERM);
@@ -353,6 +364,8 @@ impl LocalRuntime {
                 }
                 #[cfg(unix)]
                 signal_group(h.sync.running_pgid.load(Ordering::SeqCst), libc::SIGKILL);
+                #[cfg(unix)]
+                signal_group(h.listener_pgid.swap(0, Ordering::SeqCst), libc::SIGKILL);
             }
         }
     }
@@ -574,18 +587,20 @@ fn kill_groups(groups: &Groups, all: bool) -> usize {
 
 /// Bekçi: zamanlayıcıyı ve eşitleme görevini ayakta tutar. Biri paniklerse / biterse ya da eşitleme görevi
 /// 10 dakikadır canlılık damgası vermezse yeniden kurulur. Uyanma algılanınca temizlik + hemen tur.
-async fn watchdog(paths: Paths, sec: LocalSecrets, port: u16, mut shutdown: watch::Receiver<bool>, groups: Groups, sync: Arc<SyncCtl>) {
+async fn watchdog(paths: Paths, sec: LocalSecrets, port: u16, mut shutdown: watch::Receiver<bool>, groups: Groups, sync: Arc<SyncCtl>, listener_pgid: Arc<AtomicI32>) {
     let rx = shutdown.clone();
     let spawn_sched = || tauri::async_runtime::spawn(scheduler(paths.clone(), sec_clone(&sec), port, rx.clone(), groups.clone()));
     let spawn_sync = || tauri::async_runtime::spawn(sync_worker(paths.clone(), sec_clone(&sec), port, rx.clone(), groups.clone(), sync.clone()));
+    let spawn_listener = || tauri::async_runtime::spawn(terminal_listener(paths.clone(), sec_clone(&sec), port, rx.clone(), listener_pgid.clone()));
     let mut sched = spawn_sched();
     let mut worker = spawn_sync();
+    let mut listener = spawn_listener();
     let mut wall = unix_now();
     let mut mono = Instant::now();
     loop {
         tokio::select! {
             _ = shutdown.changed() => {
-                let _ = tokio::time::timeout(Duration::from_secs(6), async { let _ = (&mut sched).await; let _ = (&mut worker).await; }).await;
+                let _ = tokio::time::timeout(Duration::from_secs(8), async { let _ = (&mut sched).await; let _ = (&mut worker).await; let _ = (&mut listener).await; }).await;
                 return;
             }
             _ = tokio::time::sleep(Duration::from_secs(10)) => {}
@@ -620,6 +635,12 @@ async fn watchdog(paths: Paths, sec: LocalSecrets, port: u16, mut shutdown: watc
         if sched.inner().is_finished() {
             log::error!("Zamanlayıcı görevi durmuş; yeniden kuruluyor");
             sched = spawn_sched();
+        }
+        if listener.inner().is_finished() {
+            log::error!("Push dinleyicisi görevi durmuş; yeniden kuruluyor");
+            #[cfg(unix)]
+            signal_group(listener_pgid.swap(0, Ordering::SeqCst), libc::SIGKILL);
+            listener = spawn_listener();
         }
         let hb = sync.heartbeat.load(Ordering::SeqCst);
         let hung = hb > 0 && unix_now().saturating_sub(hb) > 600;
@@ -690,6 +711,84 @@ async fn run_sync_once(paths: &Paths, env: &[(String, String)], force: bool, ctl
             signal_group(pgid, libc::SIGKILL);
             log::warn!("kurs:sync {} sn'de bitmedi; süreç grubu sonlandırıldı", SYNC_TIMEOUT.as_secs());
             SyncOutcome::new("offline", "Sunucuya ulaşılamadı", "Sunucuya ulaşılamadı: bağlantı zaman aşımına uğradı. Değişiklikler bekletiliyor.", 0)
+        }
+    }
+}
+
+/// Push dinleyicisi (`kurs:terminal-dinle`): yoklama terminalinin kendisinin bağlanıp veri gönderdiği TCP sunucusu
+/// (varsayılan 0.0.0.0:7005). Denetlenen uzun ömürlü süreç: ayar kapalıysa komut 0 ile çıkar ve 20 sn sonra yeniden
+/// denenir; port değişince 3 ile çıkar ve hemen yeniden başlar; çökme/port açılamazsa artan bekleme (en çok 60 sn).
+/// Kapanışta SIGTERM (komut bağlantıları kaydedip düzgün kapanır) → 5 sn → SIGKILL.
+/// macOS: ilk dinlemede Uygulama Güvenlik Duvarı "gelen bağlantılara izin ver" diye sorabilir (Info.plist'teki Yerel Ağ
+/// izni bağlantı KURMAK içindir; gelen bağlantı için güvenlik duvarı ayrı sorar).
+async fn terminal_listener(paths: Paths, sec: LocalSecrets, port: u16, mut shutdown: watch::Receiver<bool>, pgid: Arc<AtomicI32>) {
+    let env = php::build_env(&paths, &sec, &[("APP_URL", format!("http://127.0.0.1:{port}"))]);
+    let mut backoff = Duration::from_secs(2);
+    // İlk tur: sunucu ve göçler hazır olduktan kısa süre sonra
+    let mut wait = Duration::from_secs(5);
+    loop {
+        tokio::select! {
+            _ = shutdown.changed() => return,
+            _ = tokio::time::sleep(wait) => {}
+        }
+        if *shutdown.borrow() {
+            return;
+        }
+        let mut cmd = php::base_command(&paths, &env);
+        cmd.arg(paths.artisan())
+            .args(["kurs:terminal-dinle", "--no-ansi", "--no-interaction"])
+            .stdin(Stdio::null())
+            .stdout(log_file(&paths.scheduler_log()))
+            .stderr(log_file(&paths.scheduler_log()))
+            .kill_on_drop(true);
+        let mut child = match cmd.spawn() {
+            Ok(c) => c,
+            Err(e) => {
+                log::error!("Push dinleyicisi başlatılamadı: {e}");
+                wait = backoff;
+                backoff = (backoff * 2).min(LISTENER_MAX_BACKOFF);
+                continue;
+            }
+        };
+        let group = child.id().map(|p| p as i32).unwrap_or(0);
+        pgid.store(group, Ordering::SeqCst);
+        let started = Instant::now();
+        let status = tokio::select! {
+            _ = shutdown.changed() => {
+                #[cfg(unix)]
+                signal_group(group, libc::SIGTERM);
+                if tokio::time::timeout(Duration::from_secs(5), child.wait()).await.is_err() {
+                    #[cfg(unix)]
+                    signal_group(group, libc::SIGKILL);
+                    let _ = child.kill().await;
+                }
+                pgid.store(0, Ordering::SeqCst);
+                return;
+            }
+            s = child.wait() => s,
+        };
+        pgid.store(0, Ordering::SeqCst);
+        #[cfg(unix)]
+        signal_group(group, libc::SIGKILL); // artakalan olursa
+        match status.ok().and_then(|s| s.code()) {
+            Some(0) => {
+                // push kapalı ya da düzgün durdu: ayar açılınca birkaç saniye içinde başlasın
+                wait = LISTENER_IDLE_RECHECK;
+                backoff = Duration::from_secs(2);
+            }
+            Some(3) => {
+                log::info!("Push dinleyicisi ayarı değişti; yeniden başlatılıyor");
+                wait = Duration::from_millis(500);
+                backoff = Duration::from_secs(2);
+            }
+            other => {
+                if started.elapsed() > Duration::from_secs(120) {
+                    backoff = Duration::from_secs(2);
+                }
+                log::warn!("Push dinleyicisi kapandı (çıkış {other:?}); {} sn sonra yeniden denenecek", backoff.as_secs());
+                wait = backoff;
+                backoff = (backoff * 2).min(LISTENER_MAX_BACKOFF);
+            }
         }
     }
 }

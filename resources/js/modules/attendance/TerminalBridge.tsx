@@ -12,7 +12,7 @@ import { Panel, DescriptionList } from '@/components/ui/layout'
 import { DataTable, type Column } from '@/components/ui/DataTable'
 import { Alert, Badge, EmptyState, Skeleton, type Tone } from '@/components/ui/feedback'
 import { Button } from '@/components/ui/Button'
-import { Field, Input, Select, Textarea } from '@/components/ui/form'
+import { Field, Input, Select, Switch, Textarea } from '@/components/ui/form'
 import { Modal } from '@/components/ui/overlay'
 import { StudentSearch, type StudentHit } from './LivePresence'
 import type { DeviceRow } from './types'
@@ -122,8 +122,66 @@ type Diagnostics = {
   son_yoklama: { zaman: string; cihaz_id: number; kullanici_no: string | null; yon: string; eslesti: boolean } | null
   bekleyen_eslesme: number
   bekleyen_esitleme: number | null
-  push_dinleyici: { durum: string; mesaj: string }
+  push_dinleyici: PushStatus
+  push_paketleri: PacketRow[]
   ham_tanilamalar: RawRun[]
+}
+
+type PushStatus = {
+  durum: 'aktif' | 'kapali' | 'hata' | 'baslatiliyor'
+  durum_metni: string
+  oneri: string | null
+  acik: boolean
+  port: number
+  aktar_ip: string | null
+  aktar_port: number | null
+  aktarma_hatasi: string | null
+  son_ip: string | null
+  son_zaman: string | null
+  baglanti_sayisi: number
+  paket_sayisi: number
+  kopru_ip: string | null
+  cihaz_menusu: { server_ip: string; push_address: string; port: number; push: string } | null
+}
+
+type PacketDirection = 'device_to_bridge' | 'device_to_upstream' | 'upstream_to_device'
+
+type PacketRow = {
+  id: number
+  direction: PacketDirection
+  connection_id: string
+  upstream: string | null
+  upstream_status: string | null
+  remote_ip: string
+  remote_port: number | null
+  received_at: string
+  byte_count: number
+  truncated: boolean | number
+  duplicate_of: number | null
+  format: string
+  http_method: string | null
+  http_path: string | null
+}
+
+type PacketDetail = {
+  id: number
+  yon: PacketDirection
+  yon_metni: string
+  aktarma: string | null
+  aktarma_durumu: string | null
+  kaynak_ip: string
+  kaynak_port: number | null
+  zaman: string
+  bayt: number
+  kesildi: boolean
+  sha256: string
+  tekrar_of: number | null
+  bicim: string
+  kapanis: string | null
+  not: string | null
+  http: { metot: string; yol: string; basliklar: string | null; govde_bayt: number; govde_ascii: string; govde_hex: string } | null
+  hex: string
+  ascii: string
 }
 
 type BridgeBlock = { via?: string | null; reported_at?: string | null; last_pull_at?: string | null; status?: string | null; error?: string | null; connected?: boolean | null }
@@ -406,7 +464,7 @@ function ConnectionPanel({ device, drivers }: { device: DeviceRow; drivers: Driv
             { label: 'Cihaz IP', value: info?.ip ? `${info.ip}:${info.port ?? ''}` : '—' },
             { label: `TCP ${info?.port ?? ''}`, value: <StageBadge status={s?.tcp} /> },
             { label: 'Protokol', value: <StageBadge status={s?.protokol} /> },
-            { label: 'Push dinleyicisi', value: <Badge tone="neutral">Bu sürümde yok</Badge> },
+            { label: 'Push dinleyicisi', value: <PushBadge /> },
             { label: 'Son test', value: s?.son_test ? relative(s.son_test) : 'Hiç' },
             { label: 'Son çekme', value: info?.son_cekme ? relative(info.son_cekme) : 'Hiç' },
           ]}
@@ -515,7 +573,19 @@ function DiagnosticsPanel({ device }: { device: DeviceRow }) {
             { label: 'TCP portu', value: current?.port ?? '—' },
             { label: 'TCP durumu', value: <StageBadge status={current?.durum.tcp} /> },
             { label: 'Protokol durumu', value: <StageBadge status={current?.durum.protokol} /> },
-            { label: 'Push dinleyicisi', value: <Badge tone="neutral">{data?.push_dinleyici.durum === 'kapali' ? 'Kapalı' : data?.push_dinleyici.durum}</Badge> },
+            {
+              label: 'Push dinleyicisi',
+              value: data ? (
+                <span className="flex flex-wrap items-center gap-1.5">
+                  <Badge tone={PUSH_TONE[data.push_dinleyici.durum]} dot>{data.push_dinleyici.durum_metni}</Badge>
+                  {data.push_dinleyici.durum === 'aktif' && (
+                    <span className="text-[12px] text-ink-3">
+                      {data.push_dinleyici.son_ip ? `son bağlantı ${data.push_dinleyici.son_ip}` : 'henüz bağlantı yok'} · {data.push_dinleyici.paket_sayisi} paket
+                    </span>
+                  )}
+                </span>
+              ) : '—',
+            },
             { label: 'Son paket', value: lastPacket ? `${relative(lastPacket.zaman)} · ${lastPacket.bayt} B` : '—' },
             { label: 'Son yoklama', value: lastAtt ? `${dateTime(lastAtt.zaman)} · ${lastAtt.kullanici_no ?? '?'}${lastAtt.eslesti ? '' : ' (eşleşmedi)'}` : '—' },
             { label: 'Eşitleme bekleyen', value: data?.bekleyen_esitleme ?? '—' },
@@ -528,8 +598,15 @@ function DiagnosticsPanel({ device }: { device: DeviceRow }) {
         {current?.durum.son_hata && (
           <Alert tone={current.durum.tcp === 'basarili' ? 'warning' : 'danger'} className="mt-3" title="Son hata">{current.durum.son_hata}</Alert>
         )}
-        {data?.push_dinleyici.mesaj && <p className="mt-2 text-[12px] text-ink-3">{data.push_dinleyici.mesaj}</p>}
+        {data?.push_dinleyici.aktarma_hatasi && (
+          <Alert tone="danger" className="mt-3" title="Aktarma">{data.push_dinleyici.aktarma_hatasi}</Alert>
+        )}
+        {data?.push_dinleyici.durum === 'hata' && (
+          <Alert tone="danger" className="mt-3" title={data.push_dinleyici.durum_metni}>{data.push_dinleyici.oneri}</Alert>
+        )}
       </Panel>
+
+      <PacketsPanel packets={data?.push_paketleri ?? []} />
 
       <Panel title="Ham TCP tanılaması" description="Geliştirici modu: soketi açar, isteğe bağlı HEX gönderir, gelen baytları kaydeder.">
         <div className="space-y-3">
@@ -563,6 +640,191 @@ function DiagnosticsPanel({ device }: { device: DeviceRow }) {
         )}
       </Panel>
     </div>
+  )
+}
+
+// ---------------------------------------------------------------- push dinleyicisi (yalnız masaüstü)
+
+const PUSH_TONE: Record<PushStatus['durum'], Tone> = { aktif: 'success', kapali: 'neutral', hata: 'danger', baslatiliyor: 'warning' }
+
+const DIRECTION_LABEL: Record<PacketDirection, string> = {
+  device_to_bridge: 'Cihaz → Köprü',
+  device_to_upstream: 'Cihaz → Köprü → Sunucu',
+  upstream_to_device: 'Sunucu → Köprü → Cihaz',
+}
+
+function usePushStatus() {
+  return useQuery({ queryKey: ['terminal', 'push'], queryFn: () => api.get<PushStatus>('/attendance/terminal/push'), refetchInterval: 10_000 })
+}
+
+function PushBadge() {
+  const { data } = usePushStatus()
+  if (!data) return <Badge tone="neutral">—</Badge>
+  return <Badge tone={PUSH_TONE[data.durum]} dot>{data.durum_metni}</Badge>
+}
+
+function PushPanel() {
+  const qc = useQueryClient()
+  const { data, isLoading } = usePushStatus()
+  const [form, setForm] = useState({ acik: false, port: '7005', aktar: false, aktar_ip: '', aktar_port: '7005' })
+
+  useEffect(() => {
+    if (!data) return
+    setForm({
+      acik: data.acik,
+      port: String(data.port),
+      aktar: !!data.aktar_ip,
+      aktar_ip: data.aktar_ip ?? '',
+      aktar_port: data.aktar_port ? String(data.aktar_port) : '7005',
+    })
+  }, [data?.acik, data?.port, data?.aktar_ip, data?.aktar_port])
+
+  const save = useMutation({
+    mutationFn: () => api.post('/attendance/terminal/push', {
+      acik: form.acik,
+      port: Number(form.port) || 7005,
+      aktar_ip: form.aktar && form.aktar_ip.trim() ? form.aktar_ip.trim() : null,
+      aktar_port: form.aktar && form.aktar_ip.trim() ? Number(form.aktar_port) || null : null,
+    }),
+    onSuccess: () => { toast.success(form.acik ? 'Kaydedildi. Dinleyici birkaç saniye içinde başlar.' : 'Push dinleyicisi kapatıldı.'); qc.invalidateQueries({ queryKey: ['terminal'] }) },
+    onError: (e) => toast.error(errorText(e, 'Kaydedilemedi.')),
+  })
+
+  if (isLoading || !data) return <Skeleton className="h-48 rounded-[var(--radius-lg)]" />
+
+  const menu = data.cihaz_menusu
+
+  return (
+    <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+      <Panel title="Push dinleyicisi" description="Cihazın kendisi bu Mac'e bağlanıp veri gönderir (PUSH kipi).">
+        <div className="space-y-3.5">
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge tone={PUSH_TONE[data.durum]} dot>{data.durum_metni}</Badge>
+            {data.durum === 'aktif' && (
+              <span className="text-[12.5px] text-ink-3">
+                {data.son_ip ? `son bağlantı ${data.son_ip}${data.son_zaman ? ` · ${relative(data.son_zaman)}` : ''}` : 'henüz bağlantı yok'} · {data.paket_sayisi} paket
+              </span>
+            )}
+          </div>
+          {data.durum === 'hata' && <Alert tone="danger" title={data.durum_metni}>{data.oneri}</Alert>}
+          {data.aktarma_hatasi && <Alert tone="danger" title="Aktarma">{data.aktarma_hatasi}</Alert>}
+
+          <Switch checked={form.acik} onChange={(v) => setForm({ ...form, acik: v })} label="Push verisini bu Mac'te dinle" />
+          <Field label="Dinleme portu" hint="Önerilen 7005. Cihaz menüsündeki push portuyla aynı olmalı.">
+            <Input value={form.port} onChange={(e) => setForm({ ...form, port: e.target.value })} inputMode="numeric" className="sm:max-w-[160px]" />
+          </Field>
+
+          <div className="rounded-[var(--radius-md)] ring-1 ring-line p-3 space-y-3">
+            <Switch checked={form.aktar} onChange={(v) => setForm({ ...form, aktar: v })} label="Gelen veriyi mevcut PDKS programına da aktar (şeffaf köprü)" />
+            <p className="text-[12.5px] text-ink-2">
+              Cihaz tek bir push adresi destekliyorsa ve veriyi şu an başka bir bilgisayardaki PDKS programı alıyorsa bu kipi açın:
+              <strong> mevcut PDKS programınız çalışmaya devam eder.</strong> Cihazdan gelen her bayt değiştirilmeden oraya iletilir,
+              programın yanıtı cihaza geri döner; iki yön de burada ayrı ayrı kaydedilir.
+            </p>
+            {form.aktar && (
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                <div className="sm:col-span-2">
+                  <Field label="Aktarılacak IP" required><Input value={form.aktar_ip} onChange={(e) => setForm({ ...form, aktar_ip: e.target.value })} placeholder="192.168.68.5" inputMode="decimal" /></Field>
+                </div>
+                <Field label="Port" required><Input value={form.aktar_port} onChange={(e) => setForm({ ...form, aktar_port: e.target.value })} inputMode="numeric" /></Field>
+              </div>
+            )}
+          </div>
+
+          <Button variant="primary" loading={save.isPending} disabled={form.aktar && !form.aktar_ip.trim()} onClick={() => save.mutate()}>Kaydet</Button>
+        </div>
+      </Panel>
+
+      <Panel title="Cihaz menüsünde yapılacaklar" description="Uygulama cihazın ayarını değiştirmez; bu değerleri cihazın web arayüzüne siz girersiniz.">
+        {menu ? (
+          <DescriptionList
+            columns={1}
+            items={[
+              { label: 'Server IP', value: <code className="text-[13px]">{menu.server_ip}</code> },
+              { label: 'Push address', value: <code className="text-[13px]">{menu.push_address}</code> },
+              { label: 'Server Port / Push Port', value: <code className="text-[13px]">{menu.port}</code> },
+              { label: 'Push', value: <code className="text-[13px]">{menu.push}</code> },
+            ]}
+          />
+        ) : (
+          <p className="text-[12.5px] text-ink-3">Köprü IP'si henüz bilinmiyor. Önce Bağlantı bölümünde "Bağlantıyı test et" düğmesine basın.</p>
+        )}
+        <ul className="mt-3 list-disc space-y-1.5 pl-5 text-[12.5px] text-ink-2">
+          <li>Köprü IP'si bu Mac'in yerel ağ adresidir (soket testindeki yerel kaynak IP). Mac'in IP'si değişirse cihazdaki adres de güncellenmeli; yönlendiricide bu Mac'e sabit IP verin.</li>
+          <li>Aktarma açıksa cihazdaki adres yine bu Mac olur; eski PDKS programı veriyi köprü üzerinden almaya devam eder.</li>
+          <li>macOS ilk dinlemede “Erbaa Kurs gelen ağ bağlantılarını kabul etsin mi?” diye sorabilir → <strong>İzin Ver</strong>. Sorulmadıysa: Sistem Ayarları › Ağ › Güvenlik Duvarı › Seçenekler'de Erbaa Kurs “Gelen bağlantılara izin ver” olmalı.</li>
+          <li>Cihaz bu Mac'e bağlandığında Teşhis bölümünde paketler görünür.</li>
+        </ul>
+      </Panel>
+    </div>
+  )
+}
+
+function PacketsPanel({ packets }: { packets: PacketRow[] }) {
+  const [openId, setOpenId] = useState<number | null>(null)
+  const { data: detail, isFetching } = useQuery({
+    queryKey: ['terminal', 'packet', openId],
+    queryFn: () => api.get<PacketDetail>(`/attendance/terminal/paketler/${openId}`),
+    enabled: openId !== null,
+  })
+
+  return (
+    <Panel title="Push paketleri (son 50)" description="Cihazın bu Mac'e gönderdiği ham veriler. Silinmez; sunucuya gönderilmez.">
+      {!packets.length ? (
+        <EmptyState icon={<Radio />} title="Henüz push paketi yok" description="Push dinleyicisi açık ve cihaz bu Mac'e yönlendirilmişse okutma yapınca burada görünür." />
+      ) : (
+        <ul className="divide-y divide-line">
+          {packets.map((p) => (
+            <li key={p.id}>
+              <button type="button" onClick={() => setOpenId(p.id)} className="flex w-full flex-wrap items-center gap-x-2 gap-y-1 py-2 text-left hover:bg-surface-2 rounded-[var(--radius-sm)] px-1.5">
+                <span className="tabular text-[12px] text-ink-3">#{p.id}</span>
+                <Badge tone={p.direction === 'upstream_to_device' ? 'info' : 'accent'}>{DIRECTION_LABEL[p.direction]}</Badge>
+                <span className="text-[12.5px]">{p.remote_ip}</span>
+                <span className="text-[12px] text-ink-3">{dateTime(p.received_at)} · {p.byte_count} B · {p.format}{p.http_method ? ` ${p.http_method} ${p.http_path ?? ''}` : ''}</span>
+                {p.duplicate_of && <Badge tone="neutral">tekrar</Badge>}
+                {p.upstream && p.upstream_status && p.upstream_status !== 'connected' && <Badge tone="danger">aktarılamadı</Badge>}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <Modal open={openId !== null} onClose={() => setOpenId(null)} size="xl" title={`Paket #${openId ?? ''}`} description={detail?.yon_metni}>
+        {!detail || isFetching ? (
+          <Skeleton className="h-40" />
+        ) : (
+          <div className="space-y-3">
+            <DescriptionList
+              columns={2}
+              items={[
+                { label: 'Kaynak', value: `${detail.kaynak_ip}:${detail.kaynak_port ?? ''}` },
+                { label: 'Zaman', value: dateTime(detail.zaman) },
+                { label: 'Bayt', value: `${detail.bayt}${detail.kesildi ? ' (1 MB sınırında kesildi)' : ''}` },
+                { label: 'Biçim', value: detail.bicim },
+                { label: 'Aktarma', value: detail.aktarma ? `${detail.aktarma} · ${detail.aktarma_durumu ?? '?'}` : 'Yok (yalnız dinleme)' },
+                { label: 'Tekrar', value: detail.tekrar_of ? `Evet — ilk kayıt #${detail.tekrar_of}` : 'Hayır' },
+              ]}
+            />
+            <p className="break-all text-[11.5px] text-ink-3">SHA-256: {detail.sha256}</p>
+            {detail.not && <p className="text-[12px] text-ink-3">{detail.not}</p>}
+            {detail.http && (
+              <div>
+                <p className="mb-1 text-[12.5px] font-medium">HTTP</p>
+                <pre className="max-h-48 overflow-auto rounded-[var(--radius-md)] bg-surface-2 p-2.5 text-[11.5px] scroll-thin whitespace-pre">{`${detail.http.metot} ${detail.http.yol}\n${detail.http.basliklar ?? ''}\n\n${detail.http.govde_ascii}`}</pre>
+              </div>
+            )}
+            <div>
+              <p className="mb-1 text-[12.5px] font-medium">HEX</p>
+              <pre className="max-h-64 overflow-auto rounded-[var(--radius-md)] bg-surface-2 p-2.5 text-[11.5px] scroll-thin whitespace-pre">{detail.hex || '(boş)'}</pre>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button size="sm" icon={<FileDown className="size-3.5" />} onClick={() => api.download(`/attendance/terminal/paketler/${detail.id}/indir`, undefined, `paket-${detail.id}.txt`)}>.txt indir</Button>
+              <Button size="sm" variant="ghost" icon={<FileDown className="size-3.5" />} onClick={() => api.download(`/attendance/terminal/paketler/${detail.id}/indir`, { bicim: 'hex' }, `paket-${detail.id}.hex`)}>.hex indir</Button>
+            </div>
+          </div>
+        )}
+      </Modal>
+    </Panel>
   )
 }
 
@@ -771,7 +1033,7 @@ function PendingPanel() {
 export default function TerminalBridge() {
   const local = isLocalNode()
   const [deviceId, setDeviceId] = useState<number | null>(null)
-  const [section, setSection] = useState<'baglanti' | 'teshis' | 'kullanicilar' | 'bekleyen'>('baglanti')
+  const [section, setSection] = useState<'baglanti' | 'push' | 'teshis' | 'kullanicilar' | 'bekleyen'>('baglanti')
 
   const { data, isLoading } = useQuery({ queryKey: ['attendance', 'devices'], queryFn: () => api.get<{ data: DeviceWithBridge[] }>('/attendance/devices') })
   const { data: driverData } = useQuery({
@@ -798,7 +1060,7 @@ export default function TerminalBridge() {
 
   if (!local) return <ReadOnlyView devices={devices} />
 
-  const sections = [['baglanti', 'Bağlantı'], ['teshis', 'Teşhis'], ['kullanicilar', 'Cihaz kullanıcıları'], ['bekleyen', 'Bekleyen eşleştirme']] as const
+  const sections = [['baglanti', 'Bağlantı'], ['push', 'Push'], ['teshis', 'Teşhis'], ['kullanicilar', 'Cihaz kullanıcıları'], ['bekleyen', 'Bekleyen eşleştirme']] as const
 
   return (
     <div className="space-y-3">
@@ -818,6 +1080,7 @@ export default function TerminalBridge() {
       </div>
 
       {selected && section === 'baglanti' && <ConnectionPanel key={selected.id} device={selected} drivers={driverData?.data ?? []} />}
+      {section === 'push' && <PushPanel />}
       {selected && section === 'teshis' && <DiagnosticsPanel key={selected.id} device={selected} />}
       {selected && section === 'kullanicilar' && <DeviceUsersPanel key={selected.id} device={selected} />}
       {section === 'bekleyen' && <PendingPanel />}

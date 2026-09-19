@@ -1,5 +1,24 @@
 [
   {
+    "version": "1.14.1",
+    "date": "2026-09-19",
+    "title": "Terminal push dinleyicisi",
+    "items": [
+      {
+        "type": "yeni",
+        "text": "Push dinleyicisi: yoklama terminalinin gönderdiği paketler bu Mac'te kaydediliyor (varsayılan port 7005)"
+      },
+      {
+        "type": "yeni",
+        "text": "Aktarma kipi: gelen veri mevcut PDKS programına da iletiliyor"
+      },
+      {
+        "type": "duzeltme",
+        "text": "Terminal testinde yanlış sürücüye ait uyarı metni çıkmıyor"
+      }
+    ]
+  },
+  {
     "version": "1.14.0",
     "date": "2026-09-19",
     "title": "3D derslik ve oturma düzeni",

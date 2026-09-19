@@ -12,6 +12,8 @@ use App\Services\Devices\Network\RawTcpDiagnostic;
 use App\Services\Devices\Network\TcpProbe;
 use App\Services\Devices\Terminal\TerminalConnectionTester;
 use App\Services\Devices\Terminal\TerminalEndpoint;
+use App\Services\Devices\Terminal\PushListener;
+use App\Services\Devices\Terminal\TerminalPacketStore;
 use App\Services\Devices\Terminal\TerminalStateStore;
 use App\Support\Audit;
 use App\Support\BranchContext;
@@ -33,6 +35,7 @@ class TerminalController extends ApiController
         private readonly DriverRegistry $drivers,
         private readonly TerminalConnectionTester $tester,
         private readonly TerminalStateStore $state,
+        private readonly TerminalPacketStore $packets,
     ) {}
 
     public function drivers(): JsonResponse
@@ -177,9 +180,128 @@ class TerminalController extends ApiController
             'son_yoklama' => $last ? ['zaman' => $last->occurred_at, 'cihaz_id' => $last->device_id, 'kullanici_no' => $last->raw_identifier, 'yon' => $last->event_type, 'eslesti' => (bool) $last->is_matched] : null,
             'bekleyen_eslesme' => $pendingMatch,
             'bekleyen_esitleme' => $this->pendingSync(),
-            'push_dinleyici' => ['durum' => 'kapali', 'mesaj' => 'Push dinleyicisi bu sürümde yok; cihazdan kayıt alma (push) sonraki sürümde gelecek.'],
+            'push_dinleyici' => $this->pushStatus($network),
+            'push_paketleri' => $this->packets->latest(50),
             'ham_tanilamalar' => $this->state->diagnostics(),
         ]);
+    }
+
+    // ------------------------------------------------------------------ push dinleyicisi
+
+    public function push(NetworkProbe $network): JsonResponse
+    {
+        return response()->json($this->pushStatus($network));
+    }
+
+    /** Push ayarı: aç/kapat, port, isteğe bağlı aktarma hedefi. Cihazın kendi ayarı OTOMATİK değiştirilmez. */
+    public function savePush(Request $request, NetworkProbe $network): JsonResponse
+    {
+        $data = $request->validate([
+            'acik' => ['required', 'boolean'],
+            'port' => ['required', 'integer', 'between:1024,65535'],
+            'aktar_ip' => ['nullable', 'ip'],
+            'aktar_port' => ['nullable', 'required_with:aktar_ip', 'integer', 'between:1,65535'],
+        ], [
+            'port.between' => 'Port 1024 ile 65535 arasında olmalıdır (önerilen 7005).',
+            'aktar_ip.ip' => 'Aktarma adresi geçerli bir IP olmalıdır (ör. 192.168.68.5).',
+            'aktar_port.required_with' => 'Aktarma için port da girilmelidir.',
+            'aktar_port.between' => 'Aktarma portu 1 ile 65535 arasında olmalıdır.',
+        ], ['acik' => 'Push dinleyicisi', 'port' => 'Port', 'aktar_ip' => 'Aktarma IP', 'aktar_port' => 'Aktarma portu']);
+
+        $this->state->putPushSettings((bool) $data['acik'], (int) $data['port'], $data['aktar_ip'] ?? null, isset($data['aktar_port']) ? (int) $data['aktar_port'] : null);
+
+        Audit::log('device.terminal_push_saved', 'Terminal push dinleyicisi ayarını güncelledi ('.($data['acik'] ? 'açık' : 'kapalı').', port '.$data['port'].(! empty($data['aktar_ip']) ? ', aktarma '.$data['aktar_ip'].':'.$data['aktar_port'] : '').').');
+
+        return $this->ok($data['acik'] ? 'Push dinleyicisi birkaç saniye içinde başlar.' : 'Push dinleyicisi kapatıldı.', ['push' => $this->pushStatus($network)]);
+    }
+
+    public function packets(): JsonResponse
+    {
+        return response()->json(['data' => $this->packets->latest(50), 'toplam' => $this->packets->count()]);
+    }
+
+    public function packet(int $id): JsonResponse
+    {
+        $detail = $this->packets->detail($id);
+        abort_if($detail === null, 404, 'Paket bulunamadı.');
+
+        return response()->json($detail + ['yon_metni' => TerminalPacketStore::directionLabel($detail['yon'], $detail['aktarma'])]);
+    }
+
+    public function downloadPacket(Request $request, int $id): Response
+    {
+        $detail = $this->packets->detail($id);
+        abort_if($detail === null, 404, 'Paket bulunamadı.');
+        $hex = $request->query('bicim') === 'hex';
+
+        return response($hex ? $detail['hex'] : $this->packets->text($detail), 200, [
+            'Content-Type' => 'text/plain; charset=utf-8',
+            'Content-Disposition' => 'attachment; filename="terminal-paket-'.$id.($hex ? '.hex' : '.txt').'"',
+        ]);
+    }
+
+    private function pushStatus(NetworkProbe $network): array
+    {
+        $settings = $this->state->pushSettings();
+        $live = $this->state->listenerState();
+        $beat = isset($live['kalp']) ? now()->diffInSeconds(\Carbon\Carbon::parse($live['kalp']), true) : null;
+
+        $status = match (true) {
+            ! $settings['acik'] => 'kapali',
+            ($live['durum'] ?? null) === 'hata' => 'hata',
+            ($live['durum'] ?? null) === 'aktif' && $beat !== null && $beat <= 20 && (int) ($live['port'] ?? 0) === $settings['port'] => 'aktif',
+            default => 'baslatiliyor',
+        };
+
+        $bridgeIp = $this->bridgeIp($network);
+
+        return [
+            'durum' => $status,
+            'durum_metni' => match ($status) {
+                'aktif' => 'Aktif · port '.$settings['port'],
+                'kapali' => 'Kapalı',
+                'hata' => (string) ($live['hata'] ?? 'Dinleyici açılamadı.'),
+                default => 'Başlatılıyor… (birkaç saniye sürer; başlamazsa uygulamayı yeniden açın)',
+            },
+            'oneri' => $status === 'hata' ? ($live['oneri'] ?? null) : null,
+            'acik' => $settings['acik'],
+            'port' => $settings['port'],
+            'aktar_ip' => $settings['aktar_ip'],
+            'aktar_port' => $settings['aktar_port'],
+            'aktarma_hatasi' => $status === 'aktif' ? ($live['aktarma_hatasi'] ?? null) : null,
+            'son_ip' => $live['son_ip'] ?? null,
+            'son_zaman' => $live['son_zaman'] ?? null,
+            'baglanti_sayisi' => (int) ($live['baglanti_sayisi'] ?? 0),
+            'paket_sayisi' => $this->packets->count(),
+            'kalp' => $live['kalp'] ?? null,
+            'kopru_ip' => $bridgeIp,
+            // Cihaz menüsüne kullanıcının ELLE yazacağı değerler (uygulama cihaz ayarını değiştirmez)
+            'cihaz_menusu' => $bridgeIp ? ['server_ip' => $bridgeIp, 'push_address' => $bridgeIp, 'port' => $settings['port'], 'push' => 'Open'] : null,
+        ];
+    }
+
+    /** Köprü IP'si: son soket testinin yerel kaynak IP'si; yoksa bu makinenin ilk özel ağ adresi. */
+    private function bridgeIp(NetworkProbe $network): ?string
+    {
+        $latest = null;
+        foreach (Device::query()->withoutGlobalScope('branch')->pluck('id') as $id) {
+            $d = $this->state->device((int) $id);
+            if (! empty($d['kopru_ip']) && ($latest === null || ($d['son_test'] ?? '') > ($latest['son_test'] ?? ''))) {
+                $latest = $d;
+            }
+        }
+
+        if ($latest && $latest['kopru_ip'] !== '127.0.0.1') {
+            return $latest['kopru_ip'];
+        }
+
+        foreach ($network->interfaces() as $iface) {
+            if ($iface['taranabilir']) {
+                return $iface['ip'];
+            }
+        }
+
+        return $latest['kopru_ip'] ?? null;
     }
 
     // ------------------------------------------------------------------ yardımcılar
