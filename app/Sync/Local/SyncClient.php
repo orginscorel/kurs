@@ -166,7 +166,15 @@ class SyncClient
             ->post('sync/files', ['disk' => $disk, 'path' => $path, 'sha256' => $sha256]), 'Dosya yükleme');
     }
 
-    /** Biyometrik terminallerin bu kurulumdaki son durumu (web ekranı "Son durum: … üzerinden"). */
+    /** Uzaktan tanı paketi: terminal teşhis verisini (sıkıştırılmış) sunucuya cihaz jetonuyla yükler. */
+    public function uploadDiag(string $fullPath, array $summary, string $label, string $version): array
+    {
+        return $this->call(fn (PendingRequest $h) => $h->timeout(120)
+            ->attach('blob', fopen($fullPath, 'r'), 'terminal-diag.tar.gz')
+            ->post('sync/terminal-diag', ['summary' => json_encode($summary, JSON_UNESCAPED_UNICODE), 'device_label' => $label, 'app_version' => $version]), 'Tanı paketi');
+    }
+
+        /** Biyometrik terminallerin bu kurulumdaki son durumu (web ekranı "Son durum: … üzerinden"). */
     public function terminalStatus(array $devices): array
     {
         return $this->call(fn (PendingRequest $h) => $h->timeout(15)->post('sync/terminal-status', ['devices' => $devices]), 'Terminal durumu');

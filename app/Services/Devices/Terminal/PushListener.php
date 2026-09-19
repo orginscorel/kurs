@@ -207,7 +207,7 @@ class PushListener
             'toUp' => '', 'toClient' => '',
             'buf' => ['d' => '', 'u' => ''], 'buf_at' => ['d' => 0.0, 'u' => 0.0], 'trunc' => ['d' => false, 'u' => false],
             'client_eof' => false, 'client_eof_write' => false, 'up_eof' => false, 'up_shut' => false, 'client_shut' => false,
-            'http_replied' => false, 'close_after_write' => false,
+            'http_replied' => false, 'close_after_write' => false, 'req' => '', 'req_done' => false,
             'started' => $now, 'last' => $now, 'relay' => $this->upstreamHost !== null,
         ];
 
@@ -247,6 +247,9 @@ class PushListener
                     $this->rxBytes += strlen($data);
                     $this->lastDataAt = now()->toIso8601String();
                     $this->append($c, 'd', $data, $now);
+                    if (! $c['req_done'] && strlen($c['req']) < self::MAX_CHUNK) {
+                        $c['req'] .= $data;   // tek HTTP isteği (cihaz bağlantı başına bir istek gönderir)
+                    }
                     if ($c['up_state'] === 'connecting' || $c['up_state'] === 'connected') {
                         $c['toUp'] .= $data;
                     }
@@ -325,6 +328,23 @@ class PushListener
             $this->relayFailed($c, 'timeout');
         }
 
+        $relaying = $c['up_state'] === 'connected' || $c['up_state'] === 'connecting';
+
+        // HTTP isteği tamamlandı: önce ham kayıt (gizlenmiş), sonra işleme; kendimiz yanıtlıyorsak onay/boş 200.
+        // Aktarmada yanıt yukarı akıştan gelir, biz yalnız kaydeder ve işleriz.
+        if (! $c['req_done'] && $c['req'] !== '' && self::httpComplete($c['req'])) {
+            $c['req_done'] = true;
+            $packetId = $this->flush($c, 'd', 'http_istek');
+            $reply = $this->onHttpRequest($c['req'], $c['ip'], $packetId);
+            $c['req'] = '';
+
+            if (! $relaying) {
+                $c['toClient'] .= $reply ?? self::EMPTY_200;
+                $c['http_replied'] = true;
+                $c['close_after_write'] = true;
+            }
+        }
+
         // Sessizleşen yönün parçasını kaydet
         foreach (['d', 'u'] as $dir) {
             if ($c['buf'][$dir] !== '' && $now - $c['buf_at'][$dir] >= self::FLUSH_IDLE) {
@@ -332,17 +352,7 @@ class PushListener
             }
         }
 
-        $relaying = $c['up_state'] === 'connected' || $c['up_state'] === 'connecting';
-
         if (! $relaying) {
-            // Yalnız-dinle (ya da aktarma başarısız): HTTP isteği tamamlanınca boş 200 dön
-            if (! $c['http_replied'] && $c['buf']['d'] !== '' && self::httpComplete($c['buf']['d'])) {
-                $this->flush($c, 'd', 'http_istek');
-                $c['toClient'] .= self::EMPTY_200;
-                $c['http_replied'] = true;
-                $c['close_after_write'] = true;
-            }
-
             if ($c['close_after_write'] && $c['toClient'] === '') {
                 $this->finish($id, 'http_200_gonderildi');
 
@@ -403,25 +413,49 @@ class PushListener
         $c['buf'][$dir] .= $data;
     }
 
-    private function flush(array &$c, string $dir, string $reason): void
+    /**
+     * Tamamlanmış HTTP isteği için sürücü kancası: işler ve cihaza gidecek yanıtı döner (null → boş 200).
+     * Aktarma kipinde de çağrılır; o zaman dönen yanıt kullanılmaz (yanıtı yukarı akış verir).
+     */
+    protected function onHttpRequest(string $request, string $remoteIp, ?int $packetId): ?string
+    {
+        return null;
+    }
+
+    /**
+     * Kayda yazılmadan önce baytlardan saklanmaması gerekeni siler (ör. biyometrik şablon).
+     *
+     * @return array{0:string, 1:?string} [baytlar, kayıt notu]
+     */
+    protected function redact(string $bytes): array
+    {
+        return [$bytes, null];
+    }
+
+    private function flush(array &$c, string $dir, string $reason): ?int
     {
         $bytes = $c['buf'][$dir];
 
         if ($bytes === '' && ! ($reason === 'baglanti_kaydi')) {
-            return;
+            return null;
         }
+
+        $truncated = $c['trunc'][$dir];
+        $c['buf'][$dir] = '';
+        $c['trunc'][$dir] = false;
+        [$bytes, $note] = $this->redact($bytes);
 
         $direction = $dir === 'u' ? 'upstream_to_device' : ($c['relay'] && $c['up_state'] !== 'failed' ? 'device_to_upstream' : 'device_to_bridge');
         $local = $this->port ?: null;
 
-        $this->store->store(
-            $bytes, $direction, $c['id'], $c['ip'], $c['port'], $local, $c['trunc'][$dir], self::parseHttp($bytes), $reason,
-            $c['relay'] ? $this->upstreamLabel() : null, $c['relay'] ? $c['up_status'] : null,
+        $id = $this->store->store(
+            $bytes, $direction, $c['id'], $c['ip'], $c['port'], $local, $truncated, self::parseHttp($bytes), $reason,
+            $c['relay'] ? $this->upstreamLabel() : null, $c['relay'] ? $c['up_status'] : null, $note,
         );
 
         $this->packets++;
-        $c['buf'][$dir] = '';
-        $c['trunc'][$dir] = false;
+
+        return $id;
     }
 
     private function relayFailed(array &$c, string $status): void
@@ -456,8 +490,9 @@ class PushListener
             $this->flush($c, $dir, $reason);
         }
 
-        // Hiç bayt gelmeden kapanan bağlantı da iz bırakır (cihaz bağlandı mı, aktarma başarılı mı?)
-        if ($c['started'] === $c['last']) {
+        // Hiç bayt gelmeden kapanan bağlantı da iz bırakır (cihaz bağlandı mı, aktarma başarılı mı?).
+        // İstisna: bu makinenin kendi "port dinleniyor mu?" yoklaması (127.0.0.1 / ::1) kayıt oluşturmaz.
+        if ($c['started'] === $c['last'] && ! in_array($c['ip'], ['127.0.0.1', '::1'], true)) {
             $this->flush($c, 'd', 'baglanti_kaydi');
         }
 

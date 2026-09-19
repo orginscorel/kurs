@@ -111,6 +111,8 @@ Route::prefix('attendance')->group(function () {
             Route::post('ornekler/karsilastir', [TerminalDevController::class, 'compare'])->middleware('terminal.desktop');
             Route::post('ornekler/har', [TerminalDevController::class, 'importHar'])->middleware(['terminal.desktop', 'throttle:writes']);
             Route::post('push', [TerminalController::class, 'savePush'])->middleware(['terminal.desktop', 'throttle:writes']);
+            Route::post('push/baslat', [TerminalController::class, 'startPush'])->middleware(['terminal.desktop', 'throttle:writes']);
+            Route::post('push/durdur', [TerminalController::class, 'stopPush'])->middleware(['terminal.desktop', 'throttle:writes']);
             Route::get('paketler', [TerminalController::class, 'packets'])->middleware('terminal.desktop');
             Route::get('paketler/{id}', [TerminalController::class, 'packet'])->middleware('terminal.desktop')->whereNumber('id');
             Route::get('paketler/{id}/indir', [TerminalController::class, 'downloadPacket'])->middleware('terminal.desktop')->whereNumber('id');

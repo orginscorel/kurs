@@ -22,6 +22,7 @@ class TerminalPacketStore
     public function store(
         string $payload, string $direction, string $connectionId, string $remoteIp, ?int $remotePort, ?int $localPort,
         bool $truncated, ?array $http, string $closeReason, ?string $upstream = null, ?string $upstreamStatus = null,
+        ?string $note = null,
     ): int {
         $sha = hash('sha256', $payload);
         $duplicateOf = DB::table(self::TABLE)->where('sha256', $sha)->whereNull('duplicate_of')->orderBy('id')->value('id');
@@ -51,7 +52,7 @@ class TerminalPacketStore
             'payload_base64' => base64_encode($payload),
             'close_reason' => $closeReason,
             'parse_status' => 'unparsed',
-            'note' => 'Unknown raw device event — bu cihaz için doğrulanmış ayrıştırıcı yok; ham paket saklandı.',
+            'note' => $note ?? 'Unknown raw device event — bu cihaz için doğrulanmış ayrıştırıcı yok; ham paket saklandı.',
             'created_at' => $now,
             'updated_at' => $now,
         ]);

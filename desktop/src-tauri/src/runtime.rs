@@ -745,6 +745,7 @@ async fn terminal_listener(paths: Paths, sec: LocalSecrets, port: u16, mut shutd
             Ok(c) => c,
             Err(e) => {
                 log::error!("Push dinleyicisi başlatılamadı: {e}");
+                write_listener_status(&paths, "baslatilamadi", 0, None, Some(format!("PHP başlatılamadı: {e}")), backoff.as_secs());
                 wait = backoff;
                 backoff = (backoff * 2).min(LISTENER_MAX_BACKOFF);
                 continue;
@@ -752,6 +753,7 @@ async fn terminal_listener(paths: Paths, sec: LocalSecrets, port: u16, mut shutd
         };
         let group = child.id().map(|p| p as i32).unwrap_or(0);
         pgid.store(group, Ordering::SeqCst);
+        write_listener_status(&paths, "calisiyor", group, None, None, 0);
         let started = Instant::now();
         let status = tokio::select! {
             _ = shutdown.changed() => {
@@ -763,6 +765,7 @@ async fn terminal_listener(paths: Paths, sec: LocalSecrets, port: u16, mut shutd
                     let _ = child.kill().await;
                 }
                 pgid.store(0, Ordering::SeqCst);
+                write_listener_status(&paths, "durduruldu", 0, None, None, 0);
                 return;
             }
             s = child.wait() => s,
@@ -770,26 +773,49 @@ async fn terminal_listener(paths: Paths, sec: LocalSecrets, port: u16, mut shutd
         pgid.store(0, Ordering::SeqCst);
         #[cfg(unix)]
         signal_group(group, libc::SIGKILL); // artakalan olursa
-        match status.ok().and_then(|s| s.code()) {
+        let code = status.as_ref().ok().and_then(|s| s.code());
+        match code {
             Some(0) => {
                 // push kapalı ya da düzgün durdu: ayar açılınca birkaç saniye içinde başlasın
                 wait = LISTENER_IDLE_RECHECK;
                 backoff = Duration::from_secs(2);
+                write_listener_status(&paths, "bekliyor", 0, code, None, wait.as_secs());
             }
             Some(3) => {
                 log::info!("Push dinleyicisi ayarı değişti; yeniden başlatılıyor");
                 wait = Duration::from_millis(500);
                 backoff = Duration::from_secs(2);
+                write_listener_status(&paths, "yeniden_baslatiliyor", 0, code, None, 0);
             }
             other => {
                 if started.elapsed() > Duration::from_secs(120) {
                     backoff = Duration::from_secs(2);
                 }
                 log::warn!("Push dinleyicisi kapandı (çıkış {other:?}); {} sn sonra yeniden denenecek", backoff.as_secs());
+                write_listener_status(&paths, "cikti", 0, other, Some(format!("Dinleyici süreci çıkış kodu {other:?} ile kapandı; ayrıntı scheduler.log / terminal log.")), backoff.as_secs());
                 wait = backoff;
                 backoff = (backoff * 2).min(LISTENER_MAX_BACKOFF);
             }
         }
+    }
+}
+
+/// Denetçi durumunu uygulamaya bildirir (storage/app/terminal/listener-supervisor.json → Terminal Teşhis ekranı).
+fn write_listener_status(paths: &Paths, state: &str, pid: i32, exit_code: Option<i32>, error: Option<String>, next_try_secs: u64) {
+    let dir = paths.storage().join("app/terminal");
+    let _ = std::fs::create_dir_all(&dir);
+    let body = serde_json::json!({
+        "durum": state,
+        "pid": if pid > 0 { Some(pid) } else { None },
+        "son_cikis_kodu": exit_code,
+        "son_hata": error,
+        "sonraki_deneme_sn": next_try_secs,
+        "zaman": unix_now(),
+        "surum": env!("CARGO_PKG_VERSION"),
+    });
+    let tmp = dir.join("listener-supervisor.json.tmp");
+    if std::fs::write(&tmp, body.to_string()).is_ok() {
+        let _ = std::fs::rename(&tmp, dir.join("listener-supervisor.json"));
     }
 }
 

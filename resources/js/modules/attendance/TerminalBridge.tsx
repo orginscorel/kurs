@@ -144,6 +144,8 @@ type PushStatus = {
   son_zaman: string | null
   baglanti_sayisi: number
   paket_sayisi: number
+  okutma_sayisi?: number
+  son_okutma?: string | null
   kopru_ip: string | null
   cihaz_menusu: { server_ip: string; push_address: string; port: number; push: string } | null
 }
@@ -733,6 +735,7 @@ function PushPanel() {
             {data.durum === 'aktif' && (
               <span className="text-[12.5px] text-ink-3">
                 {data.son_ip ? `son bağlantı ${data.son_ip}${data.son_zaman ? ` · ${relative(data.son_zaman)}` : ''}` : 'henüz bağlantı yok'} · {data.paket_sayisi} paket
+                {data.okutma_sayisi ? ` · ${data.okutma_sayisi} okutma işlendi${data.son_okutma ? ` (son ${relative(data.son_okutma)})` : ''}` : ''}
               </span>
             )}
           </div>

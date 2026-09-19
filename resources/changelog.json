@@ -1,5 +1,28 @@
 [
   {
+    "version": "1.15.2",
+    "date": "2026-09-19",
+    "title": "Terminal okutmaları otomatik işleniyor",
+    "items": [
+      {
+        "type": "yeni",
+        "text": "Parmak izi terminalindeki (YT33) okutmalar anında öğrenci yoklamasına ve personel PDKS'sine işleniyor"
+      },
+      {
+        "type": "yeni",
+        "text": "Terminale kaydedilen kişiler PDKS'ye adıyla geliyor; adı tek bir öğrenci ya da personelle birebir uyuşanlar kendiliğinden eşleniyor"
+      },
+      {
+        "type": "duzeltme",
+        "text": "Terminal, köprüden onay alamadığı için aynı okutmayı tekrar tekrar gönderiyordu"
+      },
+      {
+        "type": "iyilestirme",
+        "text": "Parmak izi şablonları hiçbir kayıtta saklanmıyor (KVKK); eski kayıtlardakiler de silindi"
+      }
+    ]
+  },
+  {
     "version": "1.15.1",
     "date": "2026-09-19",
     "title": "Terminal ekranı düzeltmesi",

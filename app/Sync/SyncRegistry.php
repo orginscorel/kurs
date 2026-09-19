@@ -224,6 +224,8 @@ final class SyncRegistry
         'terminal_tcp_log' => ['kind' => self::LOCAL, 'reason' => 'Terminal PULL oturumlarının ham TX/RX baytları (geliştirici teşhisi); yalnız cihazla aynı ağdaki Mac\'te anlamlı.'],
         'terminal_protocol_samples' => ['kind' => self::LOCAL, 'reason' => 'Protokol analizi örnekleri (ham paket/HAR, maskeli); geliştirici aracı, sunucuya gitmez.'],
         'terminal_raw_packets' => ['kind' => self::LOCAL, 'reason' => 'Yoklama terminalinin push dinleyicisine gönderdiği ham baytlar: yalnız dinleyen Mac\'te anlamlı teşhis verisi; yoklama sunucuya attendance_events ile gider.'],
+        'terminal_diag_bundles' => ['kind' => self::LOCAL, 'reason' => 'Mac\'lerin yüklediği terminal tanı paketleri (dosya yolu + özet); yalnız sunucuda tutulur, cihazlara inmez.'],
+        'terminal_device_users' => ['kind' => self::LOCAL, 'reason' => 'Terminaldeki kullanıcı listesi (ad, kart, şablon SAYISI) yalnız cihazı dinleyen Mac\'te; PDKS eşlemesi device_identities ile eşitlenir.'],
         'backup_runs' => ['kind' => self::LOCAL, 'reason' => 'Yedek yalnız sunucuda.'],
         'login_events' => ['kind' => self::LOCAL, 'reason' => 'Giriş kayıtları düğüme özel (KVKK: IP).'],
         'sequences' => ['kind' => self::LOCAL, 'reason' => 'Numara sayaçları: yerelde cihaz önekli / blok (SyncNumbers).'],

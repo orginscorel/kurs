@@ -75,6 +75,12 @@ class TerminalController extends ApiController
 
         $device->save();
 
+        // "Server / Push" seçildiyse dinleyici kendiliğinden açılır (kullanıcı ayrıca Push sekmesine gitmek zorunda değil).
+        if (($data['baglanti_tipi'] ?? null) === 'push' && ! $this->state->pushSettings()['acik']) {
+            $p = $this->state->pushSettings();
+            $this->state->putPushSettings(true, $p['port'], $p['aktar_ip'], $p['aktar_port']);
+        }
+
         Audit::log('device.terminal_settings_saved', "\"{$device->name}\" terminalinin bağlantı ayarını güncelledi ({$driver->label()}, #{$device->id}).", $device);
 
         return $this->ok('Terminal ayarı kaydedildi.', ['cihaz' => $this->describe($device->fresh())]);
@@ -224,6 +230,88 @@ class TerminalController extends ApiController
         return $this->ok($data['acik'] ? 'Push dinleyicisi birkaç saniye içinde başlar.' : 'Push dinleyicisi kapatıldı.', ['push' => $this->pushStatus($network)]);
     }
 
+    /**
+     * "Dinlemeyi başlat": ayarı açar, dinleyici çalışmıyorsa bu makinede hemen başlatır (masaüstü denetçisini
+     * beklemeden), ≤5 sn içinde 127.0.0.1:<port> iç bağlantısıyla GERÇEKTEN dinlendiğini doğrular.
+     */
+    public function startPush(NetworkProbe $network): JsonResponse
+    {
+        $p = $this->state->pushSettings();
+        $this->state->putPushSettings(true, $p['port'], $p['aktar_ip'], $p['aktar_port']);
+
+        $spawned = false;
+        if (! $this->portListening($p['port'])) {
+            $spawned = $this->spawnListener();
+        }
+
+        $deadline = microtime(true) + 5.0;
+        while (! ($ok = $this->portListening($p['port'])) && microtime(true) < $deadline) {
+            usleep(250000);
+            if (($this->state->listenerState()['durum'] ?? null) === 'hata') {
+                break;
+            }
+        }
+
+        Audit::log('device.terminal_push_started', "Push dinleyicisini başlattı (port {$p['port']}).");
+        $status = $this->pushStatus($network);
+
+        return response()->json([
+            'basarili' => $ok,
+            'message' => $ok ? "Dinleniyor: 0.0.0.0:{$p['port']} (iç bağlantı testi başarılı)." : ($status['durum'] === 'hata' ? $status['durum_metni'] : 'Dinleyici 5 sn içinde başlamadı.'.($spawned ? '' : ' Başlatma komutu çalıştırılamadı.')),
+            'push' => $status,
+        ], $ok ? 200 : 422);
+    }
+
+    public function stopPush(NetworkProbe $network): JsonResponse
+    {
+        $p = $this->state->pushSettings();
+        $this->state->putPushSettings(false, $p['port'], $p['aktar_ip'], $p['aktar_port']);
+
+        $pid = (int) ($this->state->listenerState()['pid'] ?? 0);
+        if ($pid > 0 && function_exists('posix_kill')) {
+            @posix_kill($pid, 15);
+        }
+
+        $deadline = microtime(true) + 5.0;
+        while ($this->portListening($p['port']) && microtime(true) < $deadline) {
+            usleep(250000);
+        }
+
+        Audit::log('device.terminal_push_stopped', 'Push dinleyicisini durdurdu.');
+
+        return $this->ok($this->portListening($p['port']) ? 'Durdurma istendi; birkaç saniye içinde kapanır.' : 'Push dinleyicisi durduruldu.', ['push' => $this->pushStatus($network)]);
+    }
+
+    /** Bu makinede port gerçekten dinleniyor mu? (127.0.0.1'e 0,3 sn'lik bağlantı; dinleyici bunu kaydetmez) */
+    private function portListening(int $port): bool
+    {
+        $s = @stream_socket_client("tcp://127.0.0.1:{$port}", $e, $m, 0.3);
+        if ($s === false) {
+            return false;
+        }
+        @fclose($s);
+
+        return true;
+    }
+
+    /**
+     * Dinleyiciyi arka planda başlatır (kabuk "&" ile ayrılır; istek beklemez). Süreç yerel sunucunun süreç grubunda
+     * kalır → uygulama kapanınca onunla kapanır. Kilit dosyası ikinci kopyayı engeller.
+     */
+    private function spawnListener(): bool
+    {
+        if (! function_exists('exec')) {
+            return false;
+        }
+
+        $log = storage_path('logs/terminal-dinleyici.log');
+        $cmd = sprintf('%s %s kurs:terminal-dinle --no-ansi --no-interaction >> %s 2>&1 < /dev/null &',
+            escapeshellarg(PHP_BINARY ?: 'php'), escapeshellarg(base_path('artisan')), escapeshellarg($log));
+        @exec($cmd, $out, $code);
+
+        return $code === 0;
+    }
+
     public function packets(): JsonResponse
     {
         return response()->json(['data' => $this->packets->latest(50), 'toplam' => $this->packets->count()]);
@@ -256,7 +344,7 @@ class TerminalController extends ApiController
         $beat = isset($live['kalp']) ? now()->diffInSeconds(\Carbon\Carbon::parse($live['kalp']), true) : null;
 
         $status = match (true) {
-            ! $settings['acik'] => 'kapali',
+            ! $this->state->pushWanted() => 'kapali',
             ($live['durum'] ?? null) === 'hata' => 'hata',
             ($live['durum'] ?? null) === 'aktif' && $beat !== null && $beat <= 20 && (int) ($live['port'] ?? 0) === $settings['port'] => 'aktif',
             default => 'baslatiliyor',
@@ -282,8 +370,13 @@ class TerminalController extends ApiController
             'son_zaman' => $live['son_zaman'] ?? null,
             'baglanti_sayisi' => (int) ($live['baglanti_sayisi'] ?? 0),
             'paket_sayisi' => $this->packets->count(),
+            'okutma_sayisi' => (int) ($live['okutma_sayisi'] ?? 0),   // bu oturumda işlenen okutma (yoklama/PDKS)
+            'son_okutma' => $live['son_okutma'] ?? null,
             'kalp' => $live['kalp'] ?? null,
             'calisiyor' => $status === 'aktif',
+            'port_dinleniyor' => $this->portListening($settings['port']),
+            'istenen' => $this->state->pushWanted(),
+            'denetci' => $this->state->supervisorState(),
             'dinleme_ip' => '0.0.0.0',
             'rx_bayt' => (int) ($live['rx_bayt'] ?? 0),
             'tx_bayt' => (int) ($live['tx_bayt'] ?? 0),

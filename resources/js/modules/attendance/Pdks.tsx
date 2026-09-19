@@ -32,8 +32,15 @@ type PersonRow = {
   aktif: boolean
   son_okutma: string | null
   eslesmeyen_okutma: number
+  cihazdaki_ad?: string | null
 }
-type PendingRow = { kullanici_no: string; son_okutma: string | null; eslesmeyen_okutma: number }
+type PendingRow = { kullanici_no: string; son_okutma: string | null; eslesmeyen_okutma: number; cihazdaki_ad?: string | null; oto_eslesme?: string | null }
+
+const AUTO_LINK_NOTE: Record<string, string> = {
+  ambiguous: 'Aynı adda birden çok kişi var',
+  no_match: 'Bu adla kişi bulunamadı',
+  no_name: 'Cihazda ad girilmemiş',
+}
 type Hit = { kisi_turu: PersonType; kisi_id: number; ad: string; no: string | null; etiket: string }
 type EventRow = {
   id: number
@@ -238,6 +245,7 @@ function PeopleTab({ local }: { local: boolean }) {
   const columns: Column<PersonRow>[] = [
     { key: 'no', header: 'Cihaz no', cell: (r) => <code className="text-[12.5px]">{r.kullanici_no}</code> },
     { key: 'kisi', header: 'Kişi', cell: (r) => <span><span className="font-medium">{r.kisi}</span>{r.kisi_no && <span className="text-[12px] text-ink-3 tabular"> · {r.kisi_no}</span>}</span> },
+    { key: 'cihaz_ad', header: 'Cihazdaki ad', mobileHidden: true, cell: (r) => (r.cihazdaki_ad ? r.cihazdaki_ad : <span className="text-ink-3">—</span>) },
     { key: 'tur', header: 'Tür', cell: (r) => <Badge tone={r.kisi_turu === 'student' ? 'info' : 'accent'}>{r.kisi_turu_etiketi}</Badge> },
     { key: 'kimlik', header: 'Kimlik', cell: (r) => (r.tur === 'card' ? 'Kart' : 'Parmak / yüz') },
     { key: 'son', header: 'Son okutma', cell: (r) => (r.son_okutma ? relative(r.son_okutma) : <span className="text-ink-3">—</span>) },
@@ -246,12 +254,14 @@ function PeopleTab({ local }: { local: boolean }) {
   return (
     <div className="space-y-3">
       {data && data.bekleyen.length > 0 && (
-        <Panel title="Bekleyen eşleştirme" description="Cihazdan okutma gelmiş ama hiçbir kişiye bağlı olmayan numaralar. Okutmalar kaybolmaz; eşleyince bağlanır.">
+        <Panel title="Bekleyen eşleştirme" description="Cihaza kayıtlı ya da okutma yapmış ama hiçbir kişiye bağlı olmayan numaralar. Cihazdaki ad tek bir kişiyle birebir uyuşursa eşleme kendiliğinden yapılır; diğerlerini buradan eşleyin. Okutmalar kaybolmaz; eşleyince bağlanır.">
           <ul className="divide-y divide-line">
             {data.bekleyen.map((p) => (
               <li key={p.kullanici_no} className="flex flex-wrap items-center gap-2 py-2">
                 <code className="text-[13px]">{p.kullanici_no}</code>
+                {p.cihazdaki_ad && <span className="font-medium">{p.cihazdaki_ad}</span>}
                 <span className="text-[12.5px] text-ink-3">{p.eslesmeyen_okutma} okutma · son {p.son_okutma ? relative(p.son_okutma) : '—'}</span>
+                {p.oto_eslesme && AUTO_LINK_NOTE[p.oto_eslesme] && <Badge tone="warning">{AUTO_LINK_NOTE[p.oto_eslesme]}</Badge>}
                 {local && <Button className="ml-auto" size="sm" variant="primary" icon={<Link2 className="size-3.5" />} onClick={() => setLinkNo(p.kullanici_no)}>Eşleştir</Button>}
               </li>
             ))}

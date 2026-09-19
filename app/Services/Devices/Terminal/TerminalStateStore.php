@@ -82,6 +82,38 @@ class TerminalStateStore
         ];
     }
 
+    /**
+     * Dinleyici çalışmalı mı? Push ayarı açıksa YA DA herhangi bir etkin terminalin bağlantı tipi "Server / Push" ise
+     * (bağlantı tipinden bağımsız: ayar açıksa her zaman dinlenir).
+     */
+    public function pushWanted(): bool
+    {
+        if ($this->pushSettings()['acik']) {
+            return true;
+        }
+
+        try {
+            return \App\Models\Device::query()->withoutGlobalScopes()->whereNull('deleted_at')->where('is_active', true)
+                ->where('terminal_connection', 'push')->exists();
+        } catch (\Throwable) {
+            return false;
+        }
+    }
+
+    /** Masaüstü (Rust) denetçisinin yazdığı süreç durumu: çalışıyor / bekliyor / başlatılamadı, son çıkış kodu. */
+    public function supervisorState(): array
+    {
+        $raw = @file_get_contents(dirname($this->path()).'/listener-supervisor.json');
+        $data = is_string($raw) ? json_decode($raw, true) : null;
+
+        return is_array($data) ? $data : [];
+    }
+
+    public function lockPath(): string
+    {
+        return dirname($this->path()).'/listener.lock';
+    }
+
     public function putPushSettings(bool $enabled, int $port, ?string $relayIp = null, ?int $relayPort = null): void
     {
         $this->mutate(function (array $state) use ($enabled, $port, $relayIp, $relayPort) {

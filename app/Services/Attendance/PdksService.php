@@ -11,6 +11,7 @@ use App\Support\Audit;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 /**
  * PDKS — kurumun KENDİ personel/öğrenci devam kontrol sistemi (Perkotek yazılımı gerekmez).
@@ -54,15 +55,33 @@ class PdksService
             ];
         })->values();
 
+        // Terminaldeki kullanıcı adları (YT33 push kaydı; yalnız cihazı dinleyen Mac'te dolu)
+        $deviceNames = Schema::hasTable('terminal_device_users')
+            ? DB::table('terminal_device_users')->where('branch_id', $branchId)->orderBy('updated_at')->get(['user_no', 'name', 'link_status'])->keyBy('user_no')
+            : collect();
+
         $mapped = $identities->pluck('identifier')->all();
         $pending = $lastSeen->filter(fn ($r, $id) => ! in_array((string) $id, $mapped, true) && (int) $r->eslesmeyen > 0)
             ->map(fn ($r, $id) => ['kullanici_no' => (string) $id, 'son_okutma' => $r->son, 'eslesmeyen_okutma' => (int) $r->eslesmeyen])
             ->values();
 
+        // Cihaza kaydedilmiş ama henüz okutma yapmamış (ve eşlenmemiş) kullanıcılar da bekleyendir
+        $seen = $pending->pluck('kullanici_no')->all();
+        foreach ($deviceNames as $no => $u) {
+            if (! in_array((string) $no, $mapped, true) && ! in_array((string) $no, $seen, true)) {
+                $pending->push(['kullanici_no' => (string) $no, 'son_okutma' => null, 'eslesmeyen_okutma' => 0]);
+            }
+        }
+        $pending = $pending->map(fn ($r) => $r + [
+            'cihazdaki_ad' => $deviceNames[$r['kullanici_no']]->name ?? null,
+            'oto_eslesme' => $deviceNames[$r['kullanici_no']]->link_status ?? null,
+        ])->values();
+        $rows = $rows->map(fn ($r) => $r + ['cihazdaki_ad' => $deviceNames[$r['kullanici_no']]->name ?? null])->values();
+
         if ($q = trim((string) $q)) {
             $needle = mb_strtolower($q);
-            $rows = $rows->filter(fn ($r) => str_contains(mb_strtolower($r['kisi'].' '.$r['kullanici_no'].' '.$r['kisi_no']), $needle))->values();
-            $pending = $pending->filter(fn ($r) => str_contains($r['kullanici_no'], $q))->values();
+            $rows = $rows->filter(fn ($r) => str_contains(mb_strtolower($r['kisi'].' '.$r['kullanici_no'].' '.$r['kisi_no'].' '.$r['cihazdaki_ad']), $needle))->values();
+            $pending = $pending->filter(fn ($r) => str_contains(mb_strtolower($r['kullanici_no'].' '.$r['cihazdaki_ad']), $needle))->values();
         }
 
         return ['kisiler' => $rows->all(), 'bekleyen' => $pending->all()];

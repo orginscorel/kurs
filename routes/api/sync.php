@@ -39,6 +39,7 @@ Route::prefix('sync')->group(function () {
             Route::post('user-sessions/revoke', [SyncSessionController::class, 'revoke'])->middleware('throttle:30,1');
             // Küçük durum raporları: terminal köprüsünün son durumu (web ekranında "… üzerinden") + masaüstünde okunan bildirimler
             Route::post('terminal-status', [SyncReportController::class, 'terminalStatus']);
+            Route::post('terminal-diag', [\App\Http\Controllers\Api\Sync\TerminalDiagController::class, 'upload']);
             Route::post('notification-reads', [SyncReportController::class, 'notificationReads']);
         });
 
@@ -52,6 +53,8 @@ Route::prefix('sync')->group(function () {
         Route::get('conflicts', [SyncAdminController::class, 'conflicts']);
         Route::get('conflicts/{conflict}', [SyncAdminController::class, 'conflict'])->whereNumber('conflict');
         Route::post('conflicts/{conflict}/resolve', [SyncAdminController::class, 'resolve'])->whereNumber('conflict');
+        Route::get('terminal-diag', [\App\Http\Controllers\Api\Sync\TerminalDiagController::class, 'index']);
+        Route::get('terminal-diag/{id}/indir', [\App\Http\Controllers\Api\Sync\TerminalDiagController::class, 'download'])->whereNumber('id');
     });
 
     // Yerel düğüm göstergesi (sunucuda yalnız {node: server} döner)

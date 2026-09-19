@@ -40,7 +40,7 @@ class TerminalListenCommand extends Command
 
         $settings = $state->pushSettings();
 
-        if (! $settings['acik'] && ! $this->option('zorla')) {
+        if (! $state->pushWanted() && ! $this->option('zorla')) {
             $state->putListenerState(['durum' => 'kapali', 'pid' => null, 'hata' => null, 'guncellendi' => now()->toIso8601String()]);
             $this->line('Push dinleyicisi kapalı (Terminal Köprüsü › Push ayarından açılır).');
 
@@ -48,6 +48,18 @@ class TerminalListenCommand extends Command
         }
 
         $port = (int) ($this->option('port') ?: $settings['port']);
+
+        // Tek dinleyici: masaüstü denetçisi ve "Dinlemeyi başlat" düğmesi aynı anda başlatırsa ikincisi sessizce çıkar.
+        $lockDir = dirname($state->lockPath());
+        if (! is_dir($lockDir)) {
+            @mkdir($lockDir, 0775, true);
+        }
+        $lock = @fopen($state->lockPath(), 'c');
+        if ($lock && ! flock($lock, LOCK_EX | LOCK_NB)) {
+            $this->line('Push dinleyicisi zaten çalışıyor.');
+
+            return self::SUCCESS;
+        }
 
         try {
             $listener->open($port);
@@ -61,6 +73,16 @@ class TerminalListenCommand extends Command
 
         $listener->setUpstream($settings['aktar_ip'], $settings['aktar_port']);
         $this->trapSignals();
+
+        // Önceki sürümün (ayrıştırıcısız) ya da cihaz tanımlanmadan önce sakladığı istekler
+        try {
+            $backlog = $listener->ingest()->reprocess();
+            if ($backlog['taranan'] > 0) {
+                Log::channel('terminal')->info('Bekleyen push paketleri işlendi', $backlog);
+            }
+        } catch (\Throwable $e) {
+            report($e);
+        }
 
         $started = now()->toIso8601String();
         $state->putListenerState([
@@ -88,13 +110,14 @@ class TerminalListenCommand extends Command
                         'aktarma_hatasi' => $listener->lastRelayError,
                         'rx_bayt' => $listener->rxBytes, 'tx_bayt' => $listener->txBytes, 'son_veri' => $listener->lastDataAt,
                         'dinleme_ip' => '0.0.0.0',
+                        'okutma_sayisi' => $listener->ingest()->events, 'son_okutma' => $listener->ingest()->lastEventAt,
                     ]);
                     $lastPackets = $listener->packets;
 
                     if ($now - $lastBeat >= 5.0) {
                         $lastBeat = $now;
                         $fresh = $state->pushSettings();
-                        if (! $fresh['acik'] && ! $this->option('zorla')) {
+                        if (! $state->pushWanted() && ! $this->option('zorla')) {
                             break;
                         }
                         if (! $this->option('port') && $fresh['port'] !== $listener->port()) {

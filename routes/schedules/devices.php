@@ -28,4 +28,19 @@ if (config('kurs.node') === 'local') {
         ->withoutOverlapping(10)
         ->runInBackground()
         ->onFailure(fn () => null);   // cihaz kapalıysa zamanlayıcı sessiz geçer
+
+    // Web panel (HTTP) sürücüsü — yalnız uçları DOĞRULANMIŞ cihazlar varsa çekim yapar; yoksa komut hemen çıkar.
+    Schedule::command('kurs:panel-cek')
+        ->everyMinute()
+        ->when(function (): bool {
+            try {
+                return \App\Models\Device::query()->withoutGlobalScopes()->where('is_active', true)
+                    ->where('protocol', 'webpanel')->whereNull('deleted_at')->exists();
+            } catch (\Throwable) {
+                return false;
+            }
+        })
+        ->withoutOverlapping(10)
+        ->runInBackground()
+        ->onFailure(fn () => null);
 }
