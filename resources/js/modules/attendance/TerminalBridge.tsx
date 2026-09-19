@@ -233,9 +233,16 @@ const STAGE_META: Record<StageStatus, { tone: Tone; label: string; icon: ReactNo
   denenmedi: { tone: 'neutral', label: 'Denenmedi', icon: <CircleDashed className="size-4 text-ink-3" /> },
 }
 
-function StageBadge({ status }: { status: StageStatus | null | undefined }) {
-  if (!status) return <Badge tone="neutral">Test edilmedi</Badge>
-  const m = STAGE_META[status]
+/** Eski sürümlerin kaydettiği durum adları (ör. 1.12.3'te 'dogrulanamadi') ve bilinmeyen değerler ekranı çökertmesin. */
+const STAGE_ALIAS: Record<string, StageStatus> = { dogrulanamadi: 'dogrulama_bekliyor' }
+export function stageMeta(status: string | null | undefined) {
+  if (!status) return null
+  return STAGE_META[(STAGE_ALIAS[status] ?? status) as StageStatus] ?? STAGE_META.bekliyor
+}
+
+function StageBadge({ status }: { status: StageStatus | string | null | undefined }) {
+  const m = stageMeta(status)
+  if (!m) return <Badge tone="neutral">Test edilmedi</Badge>
   return <Badge tone={m.tone} dot>{m.label}</Badge>
 }
 
@@ -265,7 +272,7 @@ function StageTable({ report }: { report: TestReport }) {
           const s = report.asamalar[key]
           return (
             <li key={key} className="flex items-start gap-2.5 px-3 py-2.5">
-              <span className="mt-0.5 shrink-0">{STAGE_META[s.durum].icon}</span>
+              <span className="mt-0.5 shrink-0">{stageMeta(s.durum)?.icon}</span>
               <span className="min-w-0 flex-1">
                 <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
                   <span className="text-[13px] font-medium">{title}</span>
@@ -601,7 +608,7 @@ function DiagnosticsPanel({ device }: { device: DeviceRow }) {
               label: 'Push dinleyicisi',
               value: data ? (
                 <span className="flex flex-wrap items-center gap-1.5">
-                  <Badge tone={PUSH_TONE[data.push_dinleyici.durum]} dot>{data.push_dinleyici.durum_metni}</Badge>
+                  <Badge tone={PUSH_TONE[data.push_dinleyici.durum] ?? "neutral"} dot>{data.push_dinleyici.durum_metni}</Badge>
                   {data.push_dinleyici.durum === 'aktif' && (
                     <span className="text-[12px] text-ink-3">
                       {data.push_dinleyici.son_ip ? `son bağlantı ${data.push_dinleyici.son_ip}` : 'henüz bağlantı yok'} · {data.push_dinleyici.paket_sayisi} paket
@@ -683,7 +690,7 @@ function usePushStatus() {
 function PushBadge() {
   const { data } = usePushStatus()
   if (!data) return <Badge tone="neutral">—</Badge>
-  return <Badge tone={PUSH_TONE[data.durum]} dot>{data.durum_metni}</Badge>
+  return <Badge tone={PUSH_TONE[data.durum] ?? "neutral"} dot>{data.durum_metni}</Badge>
 }
 
 function PushPanel() {
@@ -722,7 +729,7 @@ function PushPanel() {
       <Panel title="Push dinleyicisi" description="Cihazın kendisi bu Mac'e bağlanıp veri gönderir (PUSH kipi).">
         <div className="space-y-3.5">
           <div className="flex flex-wrap items-center gap-2">
-            <Badge tone={PUSH_TONE[data.durum]} dot>{data.durum_metni}</Badge>
+            <Badge tone={PUSH_TONE[data.durum] ?? "neutral"} dot>{data.durum_metni}</Badge>
             {data.durum === 'aktif' && (
               <span className="text-[12.5px] text-ink-3">
                 {data.son_ip ? `son bağlantı ${data.son_ip}${data.son_zaman ? ` · ${relative(data.son_zaman)}` : ''}` : 'henüz bağlantı yok'} · {data.paket_sayisi} paket

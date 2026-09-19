@@ -1,5 +1,16 @@
 [
   {
+    "version": "1.15.1",
+    "date": "2026-09-19",
+    "title": "Terminal ekranı düzeltmesi",
+    "items": [
+      {
+        "type": "duzeltme",
+        "text": "Yoklama terminalleri ekranı önceki sürümden kalan test sonucuyla açılırken \"Sayfa yüklenirken bir sorun oluştu\" hatası veriyordu"
+      }
+    ]
+  },
+  {
     "version": "1.15.0",
     "date": "2026-09-19",
     "title": "PDKS",
