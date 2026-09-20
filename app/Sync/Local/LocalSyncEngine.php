@@ -241,7 +241,10 @@ class LocalSyncEngine
             // Kurulmuş bir düğümde bu durum yalnız sunucu "yeniden anlık görüntü" dediğinde oluşur
             // (değişiklik günlüğü budandı ya da veriler sıfırlandı): kullanıcıdan kurulum istemeden
             // tam görüntüyü kendisi alır ve sunucuda artık olmayan satırları siler.
-            return $this->state->get('resnapshot_at') ? $this->resnapshot($force) : ['status' => 'needs_snapshot'];
+            // last_success_at: bu düğüm daha önce çalışmış demektir (işareti eski sürüm yazmamış olabilir).
+            $kurulmus = $this->state->get('resnapshot_at') || $this->state->get('last_success_at');
+
+            return $kurulmus ? $this->resnapshot($force) : ['status' => 'needs_snapshot'];
         }
 
         $lock = $this->acquireCycleLock($force);

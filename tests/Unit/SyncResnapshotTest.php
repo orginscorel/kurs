@@ -143,4 +143,26 @@ class SyncResnapshotTest extends TestCase
         $this->assertDatabaseHas('leads', ['uuid' => $bekleyen->uuid]);
         $this->assertGreaterThanOrEqual(1, $ikinci['snapshot']['silinen']);
     }
+
+    /** Eski sürüm "yeniden görüntü" işareti yazmadan kaldıysa: çalışmış bir düğüm kurulum ekranına düşmemeli. */
+    public function test_isaret_olmadan_da_calismis_dugum_kendiliginden_goruntu_alir(): void
+    {
+        app(LeadService::class)->create([
+            'first_name' => 'Eski', 'last_name' => 'Demo', 'phone' => '05321112233', 'source' => 'other',
+        ]);
+        DB::table('sync_changes')->update(['status' => 'pushed']);
+        app(LocalState::class)->put('pushed_up_to', (int) DB::table('sync_changes')->max('id'));
+
+        // Eski sürümün bıraktığı durum: görüntü yok, işaret yok, ama düğüm daha önce eşitlemiş
+        app(LocalState::class)->put('snapshot_done_at', null);
+        app(LocalState::class)->put('resnapshot_at', null);
+        app(LocalState::class)->put('last_success_at', now()->subHour()->toIso8601String());
+
+        $this->fakeBosSunucu();
+        $out = app(LocalSyncEngine::class)->cycle(true);
+
+        $this->assertSame('resnapshot', $out['status'], 'Kurulum ekranı değil, kendiliğinden tam görüntü beklenir.');
+        $this->assertNotNull(app(LocalState::class)->get('snapshot_done_at'));
+        $this->assertSame(0, DB::table('leads')->count(), 'Sunucu boş: yerel ön kayıtlar da silinmeli.');
+    }
 }

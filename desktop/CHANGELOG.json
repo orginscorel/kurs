@@ -1,5 +1,16 @@
 [
   {
+    "version": "1.15.5",
+    "date": "2026-09-20",
+    "title": "Yerel kopya toparlanması",
+    "items": [
+      {
+        "type": "duzeltme",
+        "text": "Sunucu veri sıfırlamasından sonra uygulama kurulum ekranına düşmeden kendini toparlıyor"
+      }
+    ]
+  },
+  {
     "version": "1.15.4",
     "date": "2026-09-20",
     "title": "Veri sıfırlama ve yerel kopya",

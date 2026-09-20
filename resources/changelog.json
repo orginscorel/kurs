@@ -1,5 +1,16 @@
 [
   {
+    "version": "1.15.5",
+    "date": "2026-09-20",
+    "title": "Yerel kopya toparlanması",
+    "items": [
+      {
+        "type": "duzeltme",
+        "text": "Eski sürümden gelen masaüstü kurulumu veri sıfırlamasından sonra kurulum ekranına düşmüyor, tam görüntüyü kendi başına alıyor"
+      }
+    ]
+  },
+  {
     "version": "1.15.4",
     "date": "2026-09-20",
     "title": "Veri sıfırlama ve yerel kopya",
