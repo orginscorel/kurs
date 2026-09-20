@@ -1,5 +1,20 @@
 [
   {
+    "version": "1.15.4",
+    "date": "2026-09-20",
+    "title": "Veri sıfırlama ve yerel kopya",
+    "items": [
+      {
+        "type": "duzeltme",
+        "text": "Sunucudaki veriler toplu temizlendiğinde masaüstü kurulumu artık eski kayıtları göstermiyor; tam görüntüyü kendiliğinden alıp sunucuda olmayan satırları siliyor"
+      },
+      {
+        "type": "duzeltme",
+        "text": "Yeniden görüntü gerektiğinde kurulum ekranı açılmıyor, eşitleme turu kendi başına toparlanıyor; gönderilmemiş yerel kayıtlar korunuyor"
+      }
+    ]
+  },
+  {
     "version": "1.15.3",
     "date": "2026-09-19",
     "title": "Terminale kayıt sihirbazı",

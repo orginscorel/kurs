@@ -1,5 +1,16 @@
 [
   {
+    "version": "1.15.4",
+    "date": "2026-09-20",
+    "title": "Veri sıfırlama ve yerel kopya",
+    "items": [
+      {
+        "type": "duzeltme",
+        "text": "Sunucuda veriler temizlendiğinde uygulamadaki yerel kopya da boşalıyor; henüz gönderilmemiş kayıtlar silinmiyor"
+      }
+    ]
+  },
+  {
     "version": "1.15.3",
     "date": "2026-09-19",
     "title": "Terminale kayıt sihirbazı",

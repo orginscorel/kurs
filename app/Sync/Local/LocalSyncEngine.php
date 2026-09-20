@@ -3,10 +3,13 @@
 namespace App\Sync\Local;
 
 use App\Support\Sensitive;
+use App\Sync\BranchResolver;
+use App\Sync\ChangeRecorder;
 use App\Sync\RecomputeService;
 use App\Sync\RowCodec;
 use App\Sync\Sweeper;
 use App\Sync\SyncContext;
+use App\Sync\SyncFilters;
 use App\Sync\SyncNumbers;
 use App\Sync\SyncRegistry;
 use App\Sync\SyncSchema;
@@ -80,7 +83,7 @@ class LocalSyncEngine
     /**
      * İlk kurulum anlık görüntüsü.
      *
-     * @return array{tables: int, rows: int, cursor: int, deferred: int, ms: int}
+     * @return array{tables: int, rows: int, cursor: int, deferred: int, silinen: int, ms: int}
      */
     public function snapshot(?callable $progress = null): array
     {
@@ -88,6 +91,7 @@ class LocalSyncEngine
         $manifest = $this->client->manifest();
         $rows = 0;
         $deferred = [];
+        $received = [];   // tablo => [uuid => true]; sunucunun gönderdiği satırlar
         $this->codec->forget();
         $this->applier->snapshotMode = true;
         $this->applier->selfRefs = [];
@@ -100,11 +104,13 @@ class LocalSyncEngine
                 }
                 $after = 0;
                 $count = 0;
+                $received[$table] = [];
                 do {
                     $page = $this->client->snapshotPage($table, $after, (int) config('sync.snapshot_limit', 1000));
-                    DB::transaction(function () use ($page, $table, &$deferred, &$count) {
+                    DB::transaction(function () use ($page, $table, &$deferred, &$count, &$received) {
                         $this->deferForeignKeys();
                         foreach ($page['rows'] as $r) {
+                            $received[$table][(string) $r['row']] = true;
                             $res = $this->applier->apply(['table' => $table, 'row' => $r['row'], 'op' => 'upsert', 'fields' => $r['fields']]);
                             if ($res === 'deferred') {
                                 $deferred[] = ['table' => $table, 'row' => $r['row'], 'op' => 'upsert', 'fields' => $r['fields']];
@@ -143,6 +149,8 @@ class LocalSyncEngine
                 'last_error' => 'bağlı kayıt yok', 'created_at' => now(), 'updated_at' => now()]);
         }
 
+        $purged = $this->purgeStale($manifest, $received);
+
         $this->sweeper->baseline(null, true);
         $this->recompute->run();
         $this->state->put('server_cursor', (int) $manifest['cursor']);
@@ -157,7 +165,59 @@ class LocalSyncEngine
         $this->refillBlocksSafely();
 
         return ['tables' => count($manifest['tables']), 'rows' => $rows, 'cursor' => (int) $manifest['cursor'],
-            'deferred' => count($deferred), 'ms' => (int) ((hrtime(true) - $t0) / 1e6)];
+            'deferred' => count($deferred), 'silinen' => $purged, 'ms' => (int) ((hrtime(true) - $t0) / 1e6)];
+    }
+
+    /**
+     * Anlık görüntüde GELMEYEN yerel satırları siler.
+     *
+     * Anlık görüntü yalnız ekler/günceller; sunucuda silinmiş (ya da toplu temizlenmiş) kayıtlar
+     * bu adım olmadan yerelde sonsuza dek kalır ve ilk düzenlemede sunucuya geri gönderilir.
+     * Dokunulmayanlar: yukarı yönlü/yerele ait tablolar ve henüz gönderilmemiş yerel değişikliği
+     * olan satırlar (çevrimdışı açılan kayıt anlık görüntüde yoktur, silinmemeli).
+     *
+     * @param  array{tables: list<array{table: string}>}  $manifest
+     * @param  array<string, array<string, true>>  $received
+     */
+    private function purgeStale(array $manifest, array $received): int
+    {
+        // "Sunucunun onayladığı" dışındaki HER yerel değişiklik satırı korunur: gönderilmemiş (status null),
+        // reddedilmiş ya da imlecin üstünde kalmış kayıt anlık görüntüde bulunmasa da silinmemeli.
+        $pushedUpTo = (int) ($this->state->get('pushed_up_to') ?? 0);
+        $pending = [];
+        $sorgu = DB::table('sync_changes')->where(fn ($q) => $q->whereNull('status')->orWhere('status', 'rejected')->orWhere('id', '>', $pushedUpTo));
+        foreach ($sorgu->get(['table_name', 'row_uuid']) as $c) {
+            $pending[$c->table_name][(string) $c->row_uuid] = true;
+        }
+
+        $purged = 0;
+        foreach (array_reverse($manifest['tables']) as $t) {   // bağımlı tablolar önce
+            $table = $t['table'];
+            $def = SyncRegistry::get($table);
+            if ($def === null || ! $def->isPullable() || ! $def->hasUuid() || ! $this->schema->tableExists($table)) {
+                continue;
+            }
+            $keep = ($received[$table] ?? []) + ($pending[$table] ?? []);
+            $ids = [];
+            DB::table($table)->select('id', 'uuid')->orderBy('id')->chunkById(500, function ($rows) use ($keep, &$ids) {
+                foreach ($rows as $r) {
+                    if ($r->uuid === null || ! isset($keep[(string) $r->uuid])) {
+                        $ids[] = $r->id;
+                    }
+                }
+            });
+            if ($ids === []) {
+                continue;
+            }
+            DB::transaction(function () use ($table, $ids, &$purged) {
+                $this->deferForeignKeys();
+                foreach (array_chunk($ids, 500) as $part) {
+                    $purged += DB::table($table)->whereIn('id', $part)->delete();
+                }
+            });
+        }
+
+        return $purged;
     }
 
     /**
@@ -178,7 +238,10 @@ class LocalSyncEngine
             return ['status' => 'backoff', 'next_attempt_at' => $file['next_attempt_at']];
         }
         if (! $this->state->get('snapshot_done_at')) {
-            return ['status' => 'needs_snapshot'];
+            // Kurulmuş bir düğümde bu durum yalnız sunucu "yeniden anlık görüntü" dediğinde oluşur
+            // (değişiklik günlüğü budandı ya da veriler sıfırlandı): kullanıcıdan kurulum istemeden
+            // tam görüntüyü kendisi alır ve sunucuda artık olmayan satırları siler.
+            return $this->state->get('resnapshot_at') ? $this->resnapshot($force) : ['status' => 'needs_snapshot'];
         }
 
         $lock = $this->acquireCycleLock($force);
@@ -246,6 +309,42 @@ class LocalSyncEngine
         }
 
         return $out;
+    }
+
+    /**
+     * Sunucunun istediği yeniden anlık görüntü (kurulum ekranı açılmadan, tur içinde).
+     *
+     * @return array<string, mixed>
+     */
+    private function resnapshot(bool $force): array
+    {
+        $lock = $this->acquireCycleLock($force);
+        if (! $lock) {
+            return ['status' => 'running'];
+        }
+        $this->state->writeFile(['phase' => 'syncing', 'last_attempt_at' => now()->toIso8601String()]);
+        try {
+            $res = $this->snapshot();
+            $this->state->put('resnapshot_at', null);
+            $this->state->put('last_success_at', now()->toIso8601String());
+            $this->state->put('failures', 0);
+            $this->state->writeFile(['phase' => 'idle', 'last_error' => null, 'last_error_detail' => null, 'next_attempt_at' => null]);
+
+            return ['status' => 'resnapshot', 'snapshot' => $res];
+        } catch (SyncHttpException $e) {
+            $kind = $e->isRevoked() ? 'revoked' : ($e->isOffline() ? 'offline' : 'error');
+            $this->fail($kind, $e->getMessage(), $e->detail);
+
+            return ['status' => $kind, 'message' => $e->getMessage()];
+        } catch (\Throwable $e) {
+            Log::error('Yeniden anlık görüntü hatası', ['e' => $e->getMessage(), 'at' => $e->getFile().':'.$e->getLine()]);
+            $this->fail('error', $e->getMessage());
+
+            return ['status' => 'error', 'message' => $e->getMessage()];
+        } finally {
+            $lock->release();
+            Cache::forget(self::LOCK_HOLDER);
+        }
     }
 
     /** sync_state: sonradan katılan tablolardan tam çekilmiş olanlar ("tablo@since" listesi) */
@@ -326,10 +425,10 @@ class LocalSyncEngine
                     $known[(string) $r['row']] = true;
                 }
             }
-            $recorder = app(\App\Sync\ChangeRecorder::class);
-            $branches = app(\App\Sync\BranchResolver::class);
+            $recorder = app(ChangeRecorder::class);
+            $branches = app(BranchResolver::class);
             foreach ($byUuid as $uuid => $row) {
-                if (isset($known[$uuid]) || \App\Sync\SyncFilters::allows($def, $row) === false) {
+                if (isset($known[$uuid]) || SyncFilters::allows($def, $row) === false) {
                     continue;
                 }
                 $pending = DB::table('sync_changes')->where('table_name', $def->table)->where('row_uuid', $uuid)
@@ -702,7 +801,8 @@ class LocalSyncEngine
             $res = $this->client->pull($cursor, (int) config('sync.pull_limit', 500));
             if (! empty($res['resnapshot'])) {
                 $this->state->put('snapshot_done_at', null);
-                throw new SyncHttpException('Sunucu değişiklik günlüğü budanmış; yeniden anlık görüntü gerekiyor (php artisan kurs:sync --snapshot).', 409, 'resnapshot');
+                $this->state->put('resnapshot_at', now()->toIso8601String());   // sonraki tur kendiliğinden tam görüntü alır
+                throw new SyncHttpException('Sunucu yeniden anlık görüntü istedi; tam görüntü bir sonraki turda alınacak.', 409, 'resnapshot');
             }
             DB::transaction(function () use ($res, &$out) {
                 $this->deferForeignKeys();
