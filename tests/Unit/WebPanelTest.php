@@ -247,6 +247,69 @@ class WebPanelTest extends TestCase
         $this->assertDatabaseMissing('terminal_device_users', ['device_id' => $device->id, 'user_no' => '9001']);
     }
 
+    public function test_probe_command_adds_verifies_and_cleans_up_test_user(): void
+    {
+        $device = $this->actingAdminOnLocalNode();
+        $device->panel_user = 'admin';
+        $device->panel_password = 'admin';
+        $device->panel_port = 80;
+        $device->save();
+
+        $seen = [];
+        $exists = false;
+        Http::fake(function (Request $request) use (&$seen, &$exists) {
+            if (! $request->hasHeader('Authorization')) {
+                return Http::response('401', 401, ['WWW-Authenticate' => 'Digest realm="Login", qop="auth", nonce="'.md5(uniqid('', true)).'", algorithm=MD5']);
+            }
+            $body = json_decode($request->body(), true) ?: [];
+            $seen[] = $body['cmd'];
+            $rd = [];
+            if ($body['cmd'] === 'GetDeviceInfo') {
+                $rd = ['name' => 'YT33', 'userCount' => 5];
+            } elseif ($body['cmd'] === 'SetUserInfo') {
+                $exists = true;
+            } elseif ($body['cmd'] === 'DeleteUserInfo') {
+                $exists = false;
+            } elseif ($body['cmd'] === 'GetUserInfo') {
+                $rd = ['users' => $exists ? [['userId' => '9001', 'name' => 'KURS TEST']] : []];
+            }
+
+            return Http::response(json_encode(['result_code' => 0, 'result_data' => $rd]), 200);
+        });
+
+        $this->artisan('kurs:cihaz-panel-dene', ['--device' => $device->id])->assertSuccessful();
+
+        // Sıra: künye → boş mu → ekle → doğrula → sil → temiz mi
+        $this->assertSame(['GetDeviceInfo', 'GetUserInfo', 'SetUserInfo', 'GetUserInfo', 'DeleteUserInfo', 'GetUserInfo'], $seen);
+    }
+
+    public function test_probe_command_aborts_when_number_already_used(): void
+    {
+        $device = $this->actingAdminOnLocalNode();
+        $device->panel_user = 'admin';
+        $device->panel_password = 'admin';
+        $device->panel_port = 80;
+        $device->save();
+
+        $seen = [];
+        Http::fake(function (Request $request) use (&$seen) {
+            if (! $request->hasHeader('Authorization')) {
+                return Http::response('401', 401, ['WWW-Authenticate' => 'Digest realm="Login", qop="auth", nonce="'.md5(uniqid('', true)).'", algorithm=MD5']);
+            }
+            $body = json_decode($request->body(), true) ?: [];
+            $seen[] = $body['cmd'];
+            $rd = $body['cmd'] === 'GetUserInfo' ? ['users' => [['userId' => '9001', 'name' => 'Gerçek Kişi']]] : ['name' => 'YT33'];
+
+            return Http::response(json_encode(['result_code' => 0, 'result_data' => $rd]), 200);
+        });
+
+        $this->artisan('kurs:cihaz-panel-dene', ['--device' => $device->id])->assertFailed();
+
+        // Dolu numarada ASLA SetUserInfo/DeleteUserInfo çağrılmamalı
+        $this->assertNotContains('SetUserInfo', $seen);
+        $this->assertNotContains('DeleteUserInfo', $seen);
+    }
+
     private function actingAdminOnLocalNode(): Device
     {
         $this->artisan('migrate', ['--force' => true])->run();
