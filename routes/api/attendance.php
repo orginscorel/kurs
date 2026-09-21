@@ -130,6 +130,7 @@ Route::prefix('attendance')->group(function () {
             Route::post('terminal-kayit', [PdksController::class, 'enrollStart'])->middleware(['terminal.desktop', 'throttle:writes']);
             Route::get('terminal-kayit/{session}', [PdksController::class, 'enrollStatus'])->whereNumber('session')->middleware('terminal.desktop');
             Route::post('terminal-kayit/{session}/uzat', [PdksController::class, 'enrollExtend'])->whereNumber('session')->middleware('terminal.desktop');
+            Route::post('terminal-kayit/{session}/cihazda-baslat', [PdksController::class, 'enrollDeviceStart'])->whereNumber('session')->middleware(['terminal.desktop', 'throttle:writes']);
             Route::delete('terminal-kayit/{session}', [PdksController::class, 'enrollCancel'])->whereNumber('session')->middleware('terminal.desktop');
             Route::post('csv/onizle', [PdksController::class, 'csvPreview'])->middleware('terminal.desktop');
             Route::post('csv/uygula', [PdksController::class, 'csvApply'])->middleware(['terminal.desktop', 'throttle:writes']);
@@ -137,6 +138,19 @@ Route::prefix('attendance')->group(function () {
             Route::get('kayitlar/excel', [PdksController::class, 'export']);
             Route::get('ozet', [PdksController::class, 'summary']);
             Route::get('saglik', [PdksController::class, 'health']);
+            Route::get('panel-durum', [PdksController::class, 'panel']);
+
+            /*
+             | Cihaz web paneli (Perkotek YT33 "Dynamic Face" HTTP /bin/cmd) — cihaza yazma kanalı.
+             | Ayar okuma web'de açık; cihaza dokunan uçlar yalnız yerel düğümde (terminal.desktop).
+             */
+            Route::prefix('panel')->group(function () {
+                Route::get('{device}', [\App\Http\Controllers\Api\Attendance\WebPanelController::class, 'show'])->whereNumber('device');
+                Route::post('{device}', [\App\Http\Controllers\Api\Attendance\WebPanelController::class, 'save'])->whereNumber('device')->middleware(['terminal.desktop', 'throttle:writes']);
+                Route::post('{device}/test', [\App\Http\Controllers\Api\Attendance\WebPanelController::class, 'test'])->whereNumber('device')->middleware(['terminal.desktop', 'throttle:writes']);
+                Route::get('{device}/kullanicilar', [\App\Http\Controllers\Api\Attendance\WebPanelController::class, 'users'])->whereNumber('device')->middleware('terminal.desktop');
+                Route::delete('{device}/kullanici/{no}', [\App\Http\Controllers\Api\Attendance\WebPanelController::class, 'deleteUser'])->whereNumber('device')->where('no', '[0-9]+')->middleware(['terminal.desktop', 'throttle:writes']);
+            });
         });
 
         // Cihaz web paneli tarayıcı kaydı (HAR) → geliştirici tanısı (parola/çerez silinerek saklanır)

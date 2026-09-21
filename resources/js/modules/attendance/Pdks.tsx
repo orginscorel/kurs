@@ -10,7 +10,7 @@ import { DataTable, type Column } from '@/components/ui/DataTable'
 import { Alert, Badge, EmptyState, Skeleton } from '@/components/ui/feedback'
 import { Button } from '@/components/ui/Button'
 import { Field, Input, Select, Textarea } from '@/components/ui/form'
-import { Modal } from '@/components/ui/overlay'
+import { Modal, ConfirmDialog } from '@/components/ui/overlay'
 
 /*
 | PDKS — kurumun KENDİ personel ve öğrenci devam kontrol sistemi (Perkotek yazılımına gerek yok).
@@ -39,6 +39,7 @@ type TerminalInfo = { ad?: string | null; parmak: number | null; yuz: number; ka
 type EnrollSession = {
   id: number
   durum: 'bekliyor' | 'kaydedildi' | 'suresi_doldu'
+  panel_var: boolean
   kisi: string
   kisi_no: string | null
   kisi_turu_etiketi: string
@@ -49,6 +50,7 @@ type EnrollSession = {
   terminal: TerminalInfo | null
   son_okutma: string | null
 }
+type DeviceStartResult = { baslatildi: boolean; ozellik?: 'fp' | 'face'; asama?: string; mesaj: string; oneri?: string; oturum: EnrollSession }
 type PendingRow = { kullanici_no: string; son_okutma: string | null; eslesmeyen_okutma: number; cihazdaki_ad?: string | null; oto_eslesme?: string | null }
 
 const AUTO_LINK_NOTE: Record<string, string> = {
@@ -185,6 +187,21 @@ function TerminalBadges({ t }: { t?: TerminalInfo | null }) {
   )
 }
 
+function ManualEnrollSteps({ s }: { s: EnrollSession }) {
+  return (
+    <ol className="list-decimal space-y-1.5 pl-5 text-[13.5px] text-ink-2">
+      {s.yeni_numara ? (
+        <li>Cihazda <strong>Menü › Kullanıcı Yönetimi › Yeni Kullanıcı</strong> açın, <strong>Kullanıcı No</strong> alanına <strong className="tabular">{s.cihaz_no}</strong> yazın (ad girmeniz gerekmez).</li>
+      ) : (
+        <li>Bu kişi cihazda zaten <strong className="tabular">{s.cihaz_no}</strong> numarasıyla tanımlı. Cihazda <strong>Menü › Kullanıcı Yönetimi</strong> içinden bu kullanıcıyı açın.</li>
+      )}
+      <li><strong>Parmak izi:</strong> aynı parmağı istendiği kadar (genelde 3 kez) okutun; yedek olarak ikinci bir parmak da kaydedin.</li>
+      <li><strong>Kart:</strong> kartı okuyucuya yaklaştırın. <strong>Yüz:</strong> kişi ekrana bakarak yüz kaydını tamamlasın.</li>
+      <li>Cihazda <strong>Kaydet</strong>'e basın. Bu pencere kaydı kendiliğinden görecek.</li>
+    </ol>
+  )
+}
+
 function EnrollModal({ person, onClose, onNext }: { person: Hit | null; onClose: () => void; onNext?: () => void }) {
   const qc = useQueryClient()
   const [picked, setPicked] = useState<Hit | null>(person)
@@ -230,6 +247,18 @@ function EnrollModal({ person, onClose, onNext }: { person: Hit | null; onClose:
     mutationFn: () => api.post<{ data: EnrollSession }>(`/attendance/pdks/terminal-kayit/${s!.id}/uzat`, {}),
     onSuccess: (r) => { setSession(r.data); poll.refetch() },
   })
+
+  const deviceStart = useMutation({
+    mutationFn: (ozellik: 'fp' | 'face') => api.post<{ data: DeviceStartResult }>(`/attendance/pdks/terminal-kayit/${s!.id}/cihazda-baslat`, { ozellik }),
+    onSuccess: (r) => {
+      setSession(r.data.oturum)
+      if (r.data.baslatildi) toast.success(r.data.mesaj)
+      else toast.error(r.data.mesaj)
+      poll.refetch()
+    },
+    onError: (e) => toast.error(err(e, 'Cihazda başlatılamadı.')),
+  })
+  const startResult = deviceStart.data?.data
 
   const close = async () => {
     if (s && s.durum !== 'kaydedildi') {
@@ -300,16 +329,26 @@ function EnrollModal({ person, onClose, onNext }: { person: Hit | null; onClose:
             </Alert>
           ) : (
             <>
-              <ol className="list-decimal space-y-1.5 pl-5 text-[13.5px] text-ink-2">
-                {s.yeni_numara ? (
-                  <li>Cihazda <strong>Menü › Kullanıcı Yönetimi › Yeni Kullanıcı</strong> açın, <strong>Kullanıcı No</strong> alanına <strong className="tabular">{s.cihaz_no}</strong> yazın (ad girmeniz gerekmez).</li>
-                ) : (
-                  <li>Bu kişi cihazda zaten <strong className="tabular">{s.cihaz_no}</strong> numarasıyla tanımlı. Cihazda <strong>Menü › Kullanıcı Yönetimi</strong> içinden bu kullanıcıyı açın.</li>
-                )}
-                <li><strong>Parmak izi:</strong> aynı parmağı istendiği kadar (genelde 3 kez) okutun; yedek olarak ikinci bir parmak da kaydedin.</li>
-                <li><strong>Kart:</strong> kartı okuyucuya yaklaştırın. <strong>Yüz:</strong> kişi ekrana bakarak yüz kaydını tamamlasın.</li>
-                <li>Cihazda <strong>Kaydet</strong>'e basın. Bu pencere kaydı kendiliğinden görecek.</li>
-              </ol>
+              {s.panel_var ? (
+                <div className="space-y-2 rounded-[var(--radius-md)] bg-primary-soft/60 p-3 ring-1 ring-primary/20">
+                  <p className="text-[13px] font-semibold text-ink">Cihazda otomatik başlat</p>
+                  <p className="text-[12.5px] text-ink-2">Kişiyi cihazda <strong className="tabular">{s.cihaz_no}</strong> numarasıyla açar ve cihazı kayıt ekranına geçirir. Kişi cihazın başındayken seçin:</p>
+                  <div className="flex flex-wrap gap-2">
+                    <Button size="sm" variant="primary" icon={<Fingerprint className="size-3.5" />} loading={deviceStart.isPending && deviceStart.variables === 'fp'} disabled={deviceStart.isPending} onClick={() => deviceStart.mutate('fp')}>Parmak izi kaydını başlat</Button>
+                    <Button size="sm" variant="primary" icon={<ScanFace className="size-3.5" />} loading={deviceStart.isPending && deviceStart.variables === 'face'} disabled={deviceStart.isPending} onClick={() => deviceStart.mutate('face')}>Yüz kaydını başlat</Button>
+                  </div>
+                  {startResult && (startResult.baslatildi
+                    ? <p className="text-[12.5px] text-success">✓ {startResult.mesaj}</p>
+                    : <p className="text-[12.5px] text-danger">{startResult.mesaj}{startResult.oneri ? ` — ${startResult.oneri}` : ''}</p>
+                  )}
+                  <details className="text-[12.5px] text-ink-3">
+                    <summary className="cursor-pointer select-none">Cihaza ulaşılamıyorsa elle yapın</summary>
+                    <div className="mt-2"><ManualEnrollSteps s={s} /></div>
+                  </details>
+                </div>
+              ) : (
+                <ManualEnrollSteps s={s} />
+              )}
               {s.durum === 'bekliyor' ? (
                 <div className="flex items-center gap-2 rounded-[var(--radius-md)] px-3 py-2.5 ring-1 ring-line text-[13px] text-ink-2">
                   <Loader2 className="size-4 animate-spin text-info" /> Cihazdan kayıt bekleniyor…
@@ -664,29 +703,106 @@ function HealthTab() {
   )
 }
 
-const DEVICE_OPS: { label: string; how: string }[] = [
-  { label: 'Cihaza kullanıcı ekle', how: '"Terminale kaydet" sekmesinden kişiyi seçin: sistem numara verir, cihazda o numarayla Yeni Kullanıcı açıp okutun; kayıt kendiliğinden bağlanır.' },
-  { label: 'Parmak izi / kart / yüz kaydı', how: '"Terminale kaydet" sekmesinden kişiyi seçin ve cihazda okutun. Biyometrik veri cihazda kalır; bu sisteme yalnız kaç parmak kaydedildiği gelir.' },
-  { label: 'Cihazdan kullanıcı sil', how: 'Cihaz menüsü › Kullanıcı Yönetimi › kullanıcıyı seçin › Sil. Buradaki eşleşmeyi de "Kişiler" listesinden kaldırın.' },
-  { label: 'Cihazdan kullanıcı / kayıt indir', how: 'Okutmalar push (Terminal Köprüsü › Push) ya da doğrulanmış protokolle otomatik gelir. Şimdilik cihaz web panelinden (Dynamic Face) dışa aktarabilirsiniz.' },
-  { label: 'Cihaz saatini eşitle', how: 'Cihaz menüsü ya da web paneli › Sistem › Tarih/Saat. Saat yanlışsa giriş-çıkış saatleri de yanlış kaydedilir.' },
-]
+type PanelCandidate = { id: number; ad: string; ip: string | null; kullanici: string | null; port: number; hazir: boolean }
+type PanelState = { cihaz: { id: number; hazir: boolean } | null; adaylar: PanelCandidate[] }
+type PanelUser = { kullanici_no: string; ad: string; kart: string | null; parmak_sayisi: number | null; yuz_sayisi: number | null; sifre_var: boolean }
 
-function DeviceOpsTab() {
+function DeviceOpsTab({ local }: { local: boolean }) {
+  const qc = useQueryClient()
+  const { data, isLoading } = useQuery({ queryKey: ['pdks', 'panel'], queryFn: () => api.get<{ data: PanelState }>('/attendance/pdks/panel-durum') })
+  const st = data?.data
+  const [devId, setDevId] = useState<number | ''>('')
+  const [form, setForm] = useState({ ip: '', port: '80', kullanici: '', sifre: '' })
+  const [testMsg, setTestMsg] = useState<{ ok: boolean; text: string } | null>(null)
+  const [delNo, setDelNo] = useState<string | null>(null)
+  const selected = st?.adaylar.find((d) => d.id === devId) ?? null
+
+  useEffect(() => {
+    if (devId === '' && st && st.adaylar.length) setDevId(st.cihaz?.id ?? st.adaylar[0].id)
+  }, [st, devId])
+  useEffect(() => {
+    const d = st?.adaylar.find((x) => x.id === devId)
+    if (d) { setForm({ ip: d.ip ?? '', port: String(d.port || 80), kullanici: d.kullanici ?? '', sifre: '' }); setTestMsg(null) }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [devId])
+
+  const save = useMutation({
+    mutationFn: () => api.post(`/attendance/pdks/panel/${devId}`, { ip: form.ip || undefined, port: Number(form.port) || 80, kullanici: form.kullanici, ...(form.sifre ? { sifre: form.sifre } : {}) }),
+    onSuccess: () => { toast.success('Web paneli ayarı kaydedildi.'); setForm((f) => ({ ...f, sifre: '' })); qc.invalidateQueries({ queryKey: ['pdks', 'panel'] }) },
+    onError: (e) => toast.error(err(e, 'Kaydedilemedi.')),
+  })
+  const test = useMutation({
+    mutationFn: () => api.post<{ mesaj: string; cihaz: { ad: string | null; kullanici_sayisi: number | null; firmware: string | null } }>(`/attendance/pdks/panel/${devId}/test`, {}),
+    onSuccess: (r) => setTestMsg({ ok: true, text: `${r.mesaj} ${r.cihaz?.ad ?? ''} · ${r.cihaz?.kullanici_sayisi ?? '?'} kullanıcı${r.cihaz?.firmware ? ` · ${r.cihaz.firmware}` : ''}` }),
+    onError: (e) => setTestMsg({ ok: false, text: err(e, 'Cihaza bağlanılamadı.') }),
+  })
+  const users = useQuery({ queryKey: ['pdks', 'panel', 'users', devId], queryFn: () => api.get<{ data: PanelUser[] }>(`/attendance/pdks/panel/${devId}/kullanicilar`), enabled: false })
+  const del = useMutation({
+    mutationFn: (no: string) => api.delete(`/attendance/pdks/panel/${devId}/kullanici/${no}`),
+    onSuccess: () => { toast.success('Kullanıcı cihazdan silindi.'); setDelNo(null); users.refetch(); qc.invalidateQueries({ queryKey: ['pdks', 'people'] }) },
+    onError: (e) => toast.error(err(e, 'Silinemedi.')),
+  })
+
+  if (isLoading) return <Skeleton className="h-48" />
+  if (!st || st.adaylar.length === 0) {
+    return <EmptyState icon={<Lock />} title="Önce cihaz ekleyin" description="Web paneline bağlanmak için önce Yoklama › Cihazlar'da bir cihaz tanımlayın (IP dahil)." />
+  }
+
   return (
     <div className="space-y-3">
-      <Alert tone="info" title="Protokol verisi bekleniyor" icon={<Lock className="size-4" />}>
-        Bu işlemler cihaza komut gönderir. YT33 protokolü gerçek trafik kaydıyla doğrulanana kadar uygulama cihaza tahmini komut göndermez;
-        işlemi cihazın kendi menüsünden ya da web panelinden yapın. Kişi eşleştirme, giriş-çıkış kayıtları ve raporlar bugün tam çalışır.
+      <Alert tone="info" title="Cihaz web paneli (Dynamic Face)" icon={<Fingerprint className="size-4" />}>
+        Cihazın kendi web paneli üzerinden kullanıcı ekleme/okuma/silme ve parmak-yüz kaydı başlatma buradan yapılır.
+        İşlemler yalnız cihazın bulunduğu yerel ağdaki Mac uygulamasından çalışır.
       </Alert>
-      <ul className="divide-y divide-line rounded-[var(--radius-md)] ring-1 ring-line">
-        {DEVICE_OPS.map((op) => (
-          <li key={op.label} className="flex flex-col gap-2 p-3 sm:flex-row sm:items-start">
-            <Button size="sm" disabled className="shrink-0">{op.label}</Button>
-            <p className="text-[12.5px] text-ink-2"><span className="font-medium">Nasıl yapılır: </span>{op.how}</p>
-          </li>
-        ))}
-      </ul>
+      {!local && <Alert tone="warning" title="Yalnız Mac uygulamasında">Panel ayarı web'den görülebilir ama cihaza bağlanma (kaydet/test/sil) kurumdaki Mac uygulamasından yapılır.</Alert>}
+
+      <Panel title="Panel bağlantısı" description="Cihaz IP'si, panel kullanıcı adı ve şifresi. Şifre HTTP Digest ile gönderilir ve şifreli saklanır.">
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+          <Field label="Cihaz">
+            <Select value={devId === '' ? '' : String(devId)} onChange={(e) => setDevId(Number(e.target.value))}
+              options={st.adaylar.map((d) => ({ value: String(d.id), label: `${d.ad}${d.hazir ? ' ✓' : ''}` }))} />
+          </Field>
+          <Field label="Cihaz IP"><Input value={form.ip} onChange={(e) => setForm((f) => ({ ...f, ip: e.target.value }))} placeholder="192.168.68.60" /></Field>
+          <Field label="Panel kullanıcı adı"><Input value={form.kullanici} onChange={(e) => setForm((f) => ({ ...f, kullanici: e.target.value }))} placeholder="admin" /></Field>
+          <Field label="Panel portu"><Input value={form.port} onChange={(e) => setForm((f) => ({ ...f, port: e.target.value }))} placeholder="80" inputMode="numeric" /></Field>
+          <Field label="Panel şifresi" hint={selected?.hazir ? 'Kayıtlı — değiştirmemek için boş bırakın' : 'Cihaz panel şifresi'}>
+            <Input type="password" value={form.sifre} onChange={(e) => setForm((f) => ({ ...f, sifre: e.target.value }))} placeholder={selected?.hazir ? '••••••••' : ''} autoComplete="new-password" />
+          </Field>
+        </div>
+        {testMsg && <p className={`mt-2 text-[12.5px] ${testMsg.ok ? 'text-success' : 'text-danger'}`}>{testMsg.text}</p>}
+        <div className="mt-3 flex flex-wrap gap-2">
+          <Button variant="primary" loading={save.isPending} disabled={!local || !form.kullanici} onClick={() => save.mutate()}>Kaydet</Button>
+          <Button variant="secondary" loading={test.isPending} disabled={!local} onClick={() => test.mutate()}>Bağlantıyı test et</Button>
+        </div>
+      </Panel>
+
+      <Panel title="Cihazdaki kullanıcılar" description="Cihaz belleğindeki kullanıcılar. Biyometrik veri gelmez; yalnız kaç parmak/yüz kayıtlı olduğu görünür."
+        actions={<Button size="sm" loading={users.isFetching} disabled={!local || !selected?.hazir} onClick={() => users.refetch()} icon={<Download className="size-3.5" />}>Cihazdan oku</Button>}>
+        {!selected?.hazir ? (
+          <EmptyState icon={<Lock />} title="Panel ayarı eksik" description="Önce bu cihaz için panel kullanıcı adı ve şifresini kaydedin." />
+        ) : users.isError ? (
+          <Alert tone="danger" title="Okunamadı">{err(users.error, 'Cihazdan kullanıcı listesi alınamadı.')}</Alert>
+        ) : !users.data ? (
+          <p className="text-[12.5px] text-ink-3">Listeyi getirmek için "Cihazdan oku"ya basın.</p>
+        ) : users.data.data.length === 0 ? (
+          <EmptyState icon={<Fingerprint />} title="Cihazda kullanıcı yok" />
+        ) : (
+          <ul className="divide-y divide-line">
+            {users.data.data.map((u) => (
+              <li key={u.kullanici_no} className="flex flex-wrap items-center gap-2 py-2">
+                <code className="text-[13px]">{u.kullanici_no}</code>
+                <span className="font-medium">{u.ad || <span className="text-ink-3">(ad yok)</span>}</span>
+                <span className="text-[12px] text-ink-3">{u.parmak_sayisi ? `${u.parmak_sayisi} parmak` : ''}{u.yuz_sayisi ? ' · yüz' : ''}{u.kart ? ' · kart' : ''}</span>
+                {local && <Button className="ml-auto" size="sm" variant="danger" icon={<X className="size-3.5" />} onClick={() => setDelNo(u.kullanici_no)}>Cihazdan sil</Button>}
+              </li>
+            ))}
+          </ul>
+        )}
+      </Panel>
+
+      <ConfirmDialog open={delNo !== null} onClose={() => setDelNo(null)} danger confirmLabel="Cihazdan sil" loading={del.isPending}
+        onConfirm={() => delNo && del.mutate(delNo)} title={`${delNo} numaralı kullanıcıyı sil?`}
+        description="Bu kullanıcı cihaz belleğinden (parmak/yüz kayıtlarıyla) silinir. İşlem geri alınamaz; yalnız bu numara silinir." />
     </div>
   )
 }
@@ -723,7 +839,7 @@ export default function Pdks() {
       {tab === 'kayitlar' && <EventsTab />}
       {tab === 'ozet' && <SummaryTab />}
       {tab === 'saglik' && <HealthTab />}
-      {tab === 'cihaz' && <DeviceOpsTab />}
+      {tab === 'cihaz' && <DeviceOpsTab local={local} />}
     </div>
   )
 }

@@ -62,6 +62,36 @@ class PdksController extends ApiController
         return response()->json(['data' => $enroll->status($this->branch(), $session)]);
     }
 
+    /** Bu şubenin web paneli cihazını + yapılandırılabilir aday cihazları döner (ayar ekranı + silme düğmesi için). */
+    public function panel(TerminalEnrollmentService $enroll): JsonResponse
+    {
+        $device = $enroll->panelDevice($this->branch());
+        $candidates = Device::query()->where('is_active', true)->whereNull('deleted_at')->orderBy('name')
+            ->get(['id', 'name', 'zk_ip', 'panel_user', 'panel_port', 'panel_password_encrypted'])
+            ->map(fn (Device $d) => [
+                'id' => $d->id, 'ad' => $d->name, 'ip' => $d->zk_ip,
+                'kullanici' => $d->panel_user, 'port' => (int) ($d->panel_port ?: 80), 'hazir' => $d->supportsWebPanel(),
+            ])->values();
+
+        return response()->json(['data' => [
+            'cihaz' => $device ? [
+                'id' => $device->id, 'ad' => $device->name, 'ip' => $device->zk_ip, 'port' => (int) ($device->panel_port ?: 80),
+                'kullanici' => $device->panel_user, 'sifre_var' => ! empty($device->panel_password_encrypted), 'hazir' => true,
+            ] : null,
+            'adaylar' => $candidates,
+        ]]);
+    }
+
+    /** "Cihazda kaydı başlat": kişiyi cihazda aç (SetUserInfo) ve kayıt ekranına geçir (EnterEnroll). */
+    public function enrollDeviceStart(Request $request, int $session, TerminalEnrollmentService $enroll): JsonResponse
+    {
+        $data = $request->validate([
+            'ozellik' => ['required', Rule::in(['fp', 'face'])],
+        ], [], ['ozellik' => 'Kayıt türü']);
+
+        return response()->json(['data' => $enroll->deviceStart($this->branch(), $session, $data['ozellik'])]);
+    }
+
     public function enrollExtend(int $session, TerminalEnrollmentService $enroll): JsonResponse
     {
         return response()->json(['data' => $enroll->extend($this->branch(), $session)]);

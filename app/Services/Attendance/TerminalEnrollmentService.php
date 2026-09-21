@@ -8,6 +8,7 @@ use App\Models\DeviceIdentity;
 use App\Models\Employee;
 use App\Models\Student;
 use App\Models\Teacher;
+use App\Services\Devices\WebPanel\WebPanelDriver;
 use App\Support\Audit;
 use Illuminate\Support\Facades\DB;
 
@@ -31,7 +32,66 @@ class TerminalEnrollmentService
 
     private const MINUTES = 15;
 
-    public function __construct(private readonly PdksService $pdks) {}
+    public function __construct(
+        private readonly PdksService $pdks,
+        private readonly WebPanelDriver $panel,
+    ) {}
+
+    /** Bu şubede web paneli (IP + panel kullanıcı/şifre) tanımlı, cihaza yazılabilir ilk etkin cihaz. */
+    public function panelDevice(int $branchId): ?Device
+    {
+        return Device::query()->withoutGlobalScope('branch')->where('branch_id', $branchId)
+            ->where('is_active', true)->whereNull('deleted_at')
+            ->whereNotNull('zk_ip')->whereNotNull('panel_user')->whereNotNull('panel_password_encrypted')
+            ->orderBy('id')->get()->first(fn (Device $d) => $d->supportsWebPanel());
+    }
+
+    /**
+     * Kişiyi cihazda AÇ (SetUserInfo, no + ad) ve cihazı kayıt ekranına GEÇİR (EnterEnroll fp/face).
+     * Fiziksel okutma bitince cihaz enroll push'u gönderir → RealtimeIngest → onEnroll oturumu tamamlar.
+     * Cihaza ulaşılamazsa/başarısızsa oturum açık kalır; kullanıcı elle talimatı görür.
+     *
+     * @return array{baslatildi:bool, ozellik?:string, asama?:string, mesaj:string, oneri?:string, oturum:array}
+     */
+    public function deviceStart(int $branchId, int $sessionId, string $feature): array
+    {
+        $session = $this->find($branchId, $sessionId);
+        $person = $this->pdks->findPerson($branchId, $session->person_type, (int) $session->person_id);
+
+        if ($session->completed_at) {
+            return ['baslatildi' => true, 'mesaj' => 'Bu kişi zaten cihaza kaydedilmiş.', 'oturum' => $this->present($session, $person)];
+        }
+
+        $device = $this->panelDevice($branchId);
+        if (! $device) {
+            throw new BusinessRuleException(
+                'Bu şubede web paneli tanımlı bir cihaz yok. Cihaza otomatik yazmak için Yoklama › Cihazlar › Web paneli ayarından IP, panel kullanıcı adı ve şifresini girin.',
+                'panel_device_yok', [], 422,
+            );
+        }
+
+        $no = (string) $session->reserved_no;
+
+        $set = $this->panel->upsertUser($device, $no, (string) $person['ad']);
+        if (! $set->isOk()) {
+            return ['baslatildi' => false, 'asama' => 'kullanici', 'mesaj' => $set->message, 'oneri' => $set->hint, 'oturum' => $this->present($session, $person)];
+        }
+
+        $enroll = $this->panel->enterEnroll($device, $no, $feature);
+        if (! $enroll->isOk()) {
+            return ['baslatildi' => false, 'asama' => 'kayit', 'mesaj' => $enroll->message, 'oneri' => $enroll->hint, 'oturum' => $this->present($session, $person)];
+        }
+
+        DB::table(self::TABLE)->where('id', $session->id)->update(['device_id' => $device->id, 'updated_at' => now()]);
+        Audit::log('terminal_enrollment.device_started', "{$person['ad']} için cihazda {$feature} kaydı başlatıldı (no {$no}, cihaz #{$device->id}).");
+
+        return [
+            'baslatildi' => true,
+            'ozellik' => $feature,
+            'mesaj' => 'Cihaz kayıt ekranına geçti. Kişi şimdi '.($feature === 'face' ? 'yüzünü okutsun' : 'parmağını okutsun').'; kayıt bitince bu pencere kendiliğinden görecek.',
+            'oturum' => $this->present($this->find($branchId, $sessionId), $person),
+        ];
+    }
 
     /** Kişi için kayıt oturumu açar (varsa mevcut numarasını kullanır — ek parmak / kart / yüz kaydı). */
     public function start(int $branchId, string $type, int $personId): array
@@ -239,6 +299,7 @@ class TerminalEnrollmentService
         return [
             'id' => $session->id,
             'durum' => $state,
+            'panel_var' => $this->panelDevice((int) $session->branch_id) !== null,
             'kisi' => $person['ad'],
             'kisi_no' => $person['no'],
             'kisi_turu' => $session->person_type,

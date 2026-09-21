@@ -1,5 +1,20 @@
 [
   {
+    "version": "1.16.0",
+    "date": "2026-09-21",
+    "title": "Terminale otomatik kayıt (cihaza yazma)",
+    "items": [
+      {
+        "type": "yeni",
+        "text": "Yoklama › Terminale kaydet: kişiyi seçip \"Cihazda kaydı başlat\" ile Perkotek YT33 (Dynamic Face) cihazı otomatik açılır ve parmak izi ya da yüz kayıt ekranına geçer; kişi okutunca kayıt kendiliğinden bağlanır. Cihaza ulaşılamazsa eski elle talimat görünür"
+      },
+      {
+        "type": "yeni",
+        "text": "Yoklama › Cihaz işlemleri › Web paneli: cihaz IP, panel kullanıcı adı ve şifresi (şifreli saklanır), bağlantı testi, cihazdaki kullanıcıları okuma ve tek kullanıcıyı onaylı silme"
+      }
+    ]
+  },
+  {
     "version": "1.15.7",
     "date": "2026-09-21",
     "title": "Cihaz web paneli kaydı",
