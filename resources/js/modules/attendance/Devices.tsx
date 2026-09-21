@@ -257,8 +257,47 @@ function IdentitiesTab() {
   )
 }
 
+/** Cihaz web paneli tarayıcı kaydını (HAR) geliştiriciye gönderme — panelin kullanıcı ekle/düzenle isteklerini görmek için. */
+function PanelKaydiTab() {
+  const [dosya, setDosya] = useState<File | null>(null)
+  const [not, setNot] = useState('')
+  const [sonuc, setSonuc] = useState<string | null>(null)
+  const gonder = useMutation({
+    mutationFn: () => { const fd = new FormData(); fd.append('dosya', dosya!); if (not.trim()) fd.append('not', not.trim()); return api.post<{ message: string }>('/attendance/cihaz-panel-kaydi', fd) },
+    onSuccess: (r) => { setSonuc(r.message); setDosya(null); setNot(''); toast.success(r.message) },
+    onError: (e) => toast.error(e instanceof ApiError ? e.firstError() : 'Gönderilemedi.'),
+  })
+
+  return (
+    <div className="grid gap-4 lg:grid-cols-[1fr_360px]">
+      <Panel title="Cihaz web paneli kaydını gönder" description="Terminale kişi eklemeyi panelden otomatik yapabilmemiz için cihazın web panelinin arka planda hangi istekleri gönderdiğini görmemiz gerekiyor.">
+        <ol className="list-decimal space-y-2 pl-5 text-[13.5px] text-ink-2">
+          <li>Kurumdaki bilgisayarda <b>Chrome</b> ile cihazın web paneline girin (ör. <code>http://192.168.68.60</code>) ve oturum açın.</li>
+          <li>Klavyeden <b>F12</b>'ye basın (Mac: <b>⌥ ⌘ I</b>), açılan bölmede <b>Network / Ağ</b> sekmesine geçin. <b>Preserve log / Günlüğü koru</b> kutusunu işaretleyin.</li>
+          <li>Sayfayı bir kez yenileyin (<b>F5</b>), sonra panelde gezinin: kullanıcı listesini açın, <b>bir kullanıcıyı düzenleyip kaydedin</b> (adında küçük bir değişiklik yeterli), cihaz ayarları ve kayıtlar sayfalarını da açın.</li>
+          <li>Ağ sekmesindeki listede sağ tıklayın › <b>Save all as HAR with content / Tümünü içerikle HAR olarak kaydet</b>.</li>
+          <li>Kaydedilen <code>.har</code> dosyasını yandan gönderin.</li>
+        </ol>
+        <p className="mt-3 text-[12.5px] text-ink-3">Dosyadaki çerezler, oturum bilgileri ve parola alanları sunucuya yazılmadan silinir. Dosya yalnız yöneticilerin erişebildiği özel alanda saklanır; cihaza hiçbir komut gönderilmez.</p>
+      </Panel>
+      <Panel title="Dosya">
+        <div className="space-y-3">
+          <Field label="HAR dosyası" required>
+            <input type="file" accept=".har,application/json" onChange={(e) => { setDosya(e.target.files?.[0] ?? null); setSonuc(null) }} className="block w-full text-[13px]" />
+          </Field>
+          <Field label="Not (isteğe bağlı)">
+            <Input value={not} onChange={(e) => setNot(e.target.value)} placeholder="ör. Ali'nin adını düzenleyip kaydettim" />
+          </Field>
+          <Button variant="primary" icon={<Upload className="size-4" />} disabled={!dosya} loading={gonder.isPending} onClick={() => gonder.mutate()} className="w-full">Gönder</Button>
+          {sonuc && <p className="text-[12.5px] text-success">{sonuc}</p>}
+        </div>
+      </Panel>
+    </div>
+  )
+}
+
 export default function Devices() {
-  const [tab, setTab] = useState<'devices' | 'identities' | 'bridge'>('devices')
+  const [tab, setTab] = useState<'devices' | 'identities' | 'bridge' | 'panel'>('devices')
 
   return (
     <div className="animate-fade-in">
@@ -271,9 +310,10 @@ export default function Devices() {
           { value: 'devices', label: 'Cihazlar' },
           { value: 'identities', label: 'Kimlik Eşlemeleri' },
           { value: 'bridge', label: 'Terminal Köprüsü' },
+          { value: 'panel', label: 'Web paneli kaydı' },
         ]}
       />
-      {tab === 'devices' ? <DevicesTab /> : tab === 'identities' ? <IdentitiesTab /> : <TerminalBridge />}
+      {tab === 'devices' ? <DevicesTab /> : tab === 'identities' ? <IdentitiesTab /> : tab === 'panel' ? <PanelKaydiTab /> : <TerminalBridge />}
     </div>
   )
 }

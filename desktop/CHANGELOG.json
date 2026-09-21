@@ -1,5 +1,16 @@
 [
   {
+    "version": "1.15.7",
+    "date": "2026-09-21",
+    "title": "Cihaz web paneli kaydı",
+    "items": [
+      {
+        "type": "yeni",
+        "text": "Yoklama terminalleri › Web paneli kaydı: cihaz web panelinin tarayıcı kaydını geliştiriciye gönderme (parola ve oturum bilgileri silinir)"
+      }
+    ]
+  },
+  {
     "version": "1.15.6",
     "date": "2026-09-21",
     "title": "Vazgeç ve kapat düğmeleri",

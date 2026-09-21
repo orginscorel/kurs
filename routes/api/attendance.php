@@ -139,6 +139,10 @@ Route::prefix('attendance')->group(function () {
             Route::get('saglik', [PdksController::class, 'health']);
         });
 
+        // Cihaz web paneli tarayıcı kaydı (HAR) → geliştirici tanısı (parola/çerez silinerek saklanır)
+        Route::post('cihaz-panel-kaydi', [\App\Http\Controllers\Api\Sync\TerminalDiagController::class, 'uploadHar'])
+            ->middleware(['permission:devices.manage', 'throttle:10,1']);
+
         Route::get('identities', [DeviceIdentityController::class, 'index']);
         Route::post('identities', [DeviceIdentityController::class, 'store'])->middleware(['terminal.desktop:identity', 'throttle:writes']);
         Route::delete('identities/{identity}', [DeviceIdentityController::class, 'destroy'])->middleware(['terminal.desktop:identity', 'throttle:writes']);

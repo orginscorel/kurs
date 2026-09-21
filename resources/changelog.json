@@ -1,5 +1,16 @@
 [
   {
+    "version": "1.15.7",
+    "date": "2026-09-21",
+    "title": "Cihaz web paneli kaydı",
+    "items": [
+      {
+        "type": "yeni",
+        "text": "Yoklama terminalleri › Web paneli kaydı: cihazın web panelinin tarayıcı kaydını (HAR) geliştiriciye gönderme; terminale kişi eklemeyi otomatikleştirmenin ilk adımı. Parola ve oturum bilgileri gönderilmeden silinir"
+      }
+    ]
+  },
+  {
     "version": "1.15.6",
     "date": "2026-09-21",
     "title": "Vazgeç ve kapat düğmeleri",

@@ -3,6 +3,9 @@
 namespace App\Http\Controllers\Api\Sync;
 
 use App\Http\Controllers\Api\ApiController;
+use App\Services\Devices\Analysis\HarSanitizer;
+use App\Support\BranchContext;
+use App\Sync\Local\SyncClient;
 use App\Sync\Models\SyncDevice;
 use App\Support\Audit;
 use Illuminate\Http\JsonResponse;
@@ -59,6 +62,47 @@ class TerminalDiagController extends ApiController
     }
 
     /** Web yöneticisi: liste (devices.manage). */
+    /**
+     * CİHAZ WEB PANELİ KAYDI (HAR) — yönetici tarayıcıdan gönderir (2026-09-21). Perkotek panelinin cihaza
+     * gönderdiği istekleri ve JS dosyalarını geliştiriciye ulaştırır (cihaz yerel ağda, sunucudan erişilemez).
+     * Çerez / oturum başlıkları ve parola alanları KAYDA YAZILMADAN silinir (HarSanitizer). Masaüstünden
+     * (yerel düğüm) gönderilirse eşitleme bağlantısıyla sunucuya iletilir.
+     */
+    public function uploadHar(Request $request, HarSanitizer $temizleyici): JsonResponse
+    {
+        $request->validate([
+            'dosya' => ['required', 'file', 'max:61440'],   // ≤60 MB ham HAR
+            'not' => ['nullable', 'string', 'max:500'],
+        ], ['dosya.required' => 'HAR dosyası seçin.', 'dosya.max' => 'Dosya en çok 60 MB olabilir.']);
+
+        $t = $temizleyici->temizle((string) file_get_contents($request->file('dosya')->getRealPath()));
+        $ozet = ['tur' => 'har', 'istek' => $t['istek'], 'hostlar' => $t['hostlar'], 'not' => $request->input('not'),
+            'gonderen' => $request->user()?->name, 'dosya_adi' => $request->file('dosya')->getClientOriginalName()];
+        $gz = gzencode($t['json'], 6);
+
+        if (config('kurs.node') === 'local') {
+            $gecici = tempnam(sys_get_temp_dir(), 'har');
+            file_put_contents($gecici, $gz);
+            try {
+                app(SyncClient::class)->uploadDiag($gecici, $ozet, 'Web paneli kaydı', (string) config('kurs.version', ''));
+            } finally {
+                @unlink($gecici);
+            }
+        } else {
+            $path = 'terminal-diag/'.(app(BranchContext::class)->id() ?? 0).'/'.now()->format('Ymd-His').'-'.bin2hex(random_bytes(4)).'.har.gz';
+            Storage::disk('local')->put('private/'.$path, $gz);
+            DB::table('terminal_diag_bundles')->insert([
+                'branch_id' => app(BranchContext::class)->id(), 'sync_device_id' => null, 'device_label' => 'Web paneli kaydı',
+                'app_version' => null, 'summary' => json_encode($ozet, JSON_UNESCAPED_UNICODE), 'blob_path' => $path,
+                'blob_size' => strlen($gz), 'created_at' => now(),
+            ]);
+        }
+
+        Audit::log('terminal.panel_har_gonderildi', 'Cihaz web paneli kaydı gönderdi ('.$t['istek'].' istek).');
+
+        return response()->json(['message' => 'Kayıt gönderildi ('.$t['istek'].' istek). Parola ve oturum bilgileri silindi.', 'istek' => $t['istek'], 'hostlar' => $t['hostlar']]);
+    }
+
     public function index(Request $request): JsonResponse
     {
         $rows = DB::table('terminal_diag_bundles')->orderByDesc('id')->limit(100)
