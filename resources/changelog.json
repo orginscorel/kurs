@@ -1,5 +1,20 @@
 [
   {
+    "version": "1.15.6",
+    "date": "2026-09-21",
+    "title": "Vazgeç ve kapat düğmeleri",
+    "items": [
+      {
+        "type": "duzeltme",
+        "text": "Yeni öğrenci ve öğrenci düzenleme penceresi Vazgeç, X ve Esc ile kapanmıyordu; pencere açıkken tarayıcı da gereksiz yere yoruluyordu"
+      },
+      {
+        "type": "duzeltme",
+        "text": "Pencere açıkken öğrenci listesi isteğine pencere bilgisi (yeni=1) süzgeç olarak gidiyordu"
+      }
+    ]
+  },
+  {
     "version": "1.15.5",
     "date": "2026-09-20",
     "title": "Yerel kopya toparlanması",

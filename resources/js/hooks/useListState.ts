@@ -5,13 +5,17 @@ import { useSearchParams } from 'react-router-dom'
  * Liste ekranı durumu URL'de tutulur (arama, filtre, sayfa, sıralama):
  * bağlantı paylaşılabilir, geri tuşu filtreyi korur.
  */
+/** Pencere / sekme gibi yalnız ARAYÜZ durumu taşıyan adres parametreleri: liste süzgeci değildir, API'ye gitmez.
+ *  (Eskiden "Yeni öğrenci" penceresi açılınca `yeni=1` liste isteğine süzgeç olarak ekleniyordu.) */
+const ARAYUZ_PARAMLARI = new Set(['yeni', 'ice-aktar', 'sekme', 'detay', 'tab', 'aktarim', 'kip', 'gorunum', 'adim'])
+
 export function useListState(defaults: { sort?: string; per_page?: number; filters?: Record<string, string> } = {}) {
   const [params, setParams] = useSearchParams()
 
   const state = useMemo(() => {
     const filters: Record<string, string> = { ...(defaults.filters ?? {}) }
     params.forEach((v, k) => {
-      if (!['q', 'page', 'sort', 'per_page'].includes(k)) filters[k] = v
+      if (!['q', 'page', 'sort', 'per_page'].includes(k) && !ARAYUZ_PARAMLARI.has(k)) filters[k] = v
     })
     return {
       q: params.get('q') ?? '',

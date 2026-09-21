@@ -66,6 +66,7 @@ export function StudentFormDrawer({ open, onClose, onSaved, options, student }: 
   const [withEnrollment, setWithEnrollment] = useState(false)
   const [enrollment, setEnrollment] = useState<Record<string, any>>({})
   const [errors, setErrors] = useState<Record<string, string[]>>({})
+  const canEnroll = can('enrollments.create')
 
   useEffect(() => {
     if (!open) return
@@ -90,9 +91,11 @@ export function StudentFormDrawer({ open, onClose, onSaved, options, student }: 
       const nextMonth = new Date()
       nextMonth.setMonth(nextMonth.getMonth() + 1, 15)
       setEnrollment({ academic_term_id: term?.id ?? '', enrolled_on: todayISO(), installment_count: 8, down_payment: 0, discount_amount: 0, scholarship_amount: 0, first_due_date: nextMonth.toISOString().slice(0, 10) })
-      setWithEnrollment(can('enrollments.create'))
+      setWithEnrollment(canEnroll)
     }
-  }, [open, student, options, can])
+    // Yalnız pencere açılınca / öğrenci değişince form kurulur. `can` fonksiyonu bağımlılık OLMAMALI:
+    // kimliği değişirse efekt her çizimde formu sıfırlayıp sonsuz döngü kuruyordu (Vazgeç/X çalışmıyordu).
+  }, [open, student, options, canEnroll])
 
   const set = (key: string, value: unknown) => setForm((f) => ({ ...f, [key]: value }))
   const setE = (key: string, value: unknown) => setEnrollment((f) => ({ ...f, [key]: value }))

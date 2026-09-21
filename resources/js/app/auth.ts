@@ -1,3 +1,4 @@
+import { useCallback } from 'react'
 import { create } from 'zustand'
 import { api } from '@/lib/api'
 
@@ -68,9 +69,16 @@ export const useAuth = create<AuthState>((set) => ({
 export function useCan() {
   const perms = useAuth((s) => s.permissionSet)
   const isSuper = useAuth((s) => s.me?.is_super_admin ?? false)
-  return (permission: string | string[] | undefined) => {
-    if (!permission) return true
-    if (isSuper) return true
-    return Array.isArray(permission) ? permission.some((p) => perms.has(p)) : perms.has(permission)
-  }
+  /* KARARLI KİMLİK ŞART (2026-09-21): eskiden her çizimde yeni fonksiyon dönüyordu. `can`'i efekt bağımlılığına
+     koyan bileşenler (Yeni öğrenci formu, rehberlik görüşmeleri) sonsuz döngüye giriyordu: efekt → setState →
+     çizim → yeni `can` → efekt… İşlemci %99, ve React Router'ın "kapat" geçişi hiç sıraya giremediği için
+     pencere Vazgeç/X ile KAPANMIYORDU. Yetkiler değişmedikçe aynı fonksiyon döner. */
+  return useCallback(
+    (permission: string | string[] | undefined) => {
+      if (!permission) return true
+      if (isSuper) return true
+      return Array.isArray(permission) ? permission.some((p) => perms.has(p)) : perms.has(permission)
+    },
+    [perms, isSuper],
+  )
 }
