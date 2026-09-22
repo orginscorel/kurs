@@ -154,6 +154,11 @@ final class SyncRegistry
         'student_notes' => ['kind' => self::REFERENCE, 'branch' => 'via:student_id'],
         'student_observations' => ['kind' => self::REFERENCE],
         'student_risk_scores' => ['kind' => self::DERIVED, 'reason' => 'kurs:compute-risk her düğümde yeniden hesaplar.'],
+        // Koçluk (akademik koçluk) — iki yönlü, alan bazında son yazan kazanır
+        'coaching_assignments' => ['kind' => self::REFERENCE, 'permission' => 'coaching.view'],
+        'coaching_sessions' => ['kind' => self::REFERENCE, 'permission' => 'coaching.view'],
+        'coaching_plans' => ['kind' => self::REFERENCE, 'permission' => 'coaching.view', 'key' => ['student_id', 'week_start']],
+        'coaching_plan_items' => ['kind' => self::REFERENCE, 'branch' => 'via:coaching_plan_id', 'permission' => 'coaching.view'],
         'contact_requests' => ['kind' => self::REFERENCE],
         'discipline_behaviors' => ['kind' => self::REFERENCE],
         'discipline_sanction_types' => ['kind' => self::REFERENCE],

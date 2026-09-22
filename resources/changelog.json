@@ -1,5 +1,24 @@
 [
   {
+    "version": "1.18.0",
+    "date": "2026-09-22",
+    "title": "Koçluk modülü + finans menüsü sadeleşti",
+    "items": [
+      {
+        "type": "yeni",
+        "text": "Koçluk sistemi — kendi \"Koçluk\" menüsü: koç atama, koçluk görüşmeleri (odak/motivasyon, aksiyon notları), haftalık çalışma planları (ders/hedef/işaretleme) ve koç panosu"
+      },
+      {
+        "type": "iyilestirme",
+        "text": "Finans menüsü sadeleştirildi — 16 ayrı girdi yerine 3 üst başlık (Özet · Kayıt ve sözleşmeler · Muhasebe ve raporlar); grup içi geçiş sekme şeridiyle, hiçbir işlev kaldırılmadı"
+      },
+      {
+        "type": "iyilestirme",
+        "text": "Rehberlik görüşmesi kaydına \"Görüşen (rehber öğretmen)\" seçimi eklendi — görüşmeyi yapan hoca atanabiliyor"
+      }
+    ]
+  },
+  {
     "version": "1.17.1",
     "date": "2026-09-22",
     "title": "Sözleşme PDF'i resmî biçim",

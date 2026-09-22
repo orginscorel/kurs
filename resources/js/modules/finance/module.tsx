@@ -1,11 +1,13 @@
 import {
-  AlarmClock, BookOpen, BookText, FileSignature, CircleDollarSign, FilePlus2, FileSpreadsheet, FileText, HandCoins, Landmark, LayoutGrid, Lock, Package, PhoneCall,
+  AlarmClock, BookText, FileSignature, CircleDollarSign, FilePlus2, FileSpreadsheet, FileText, HandCoins, Landmark, LayoutGrid, Lock, Package, PhoneCall,
   ReceiptText, Scale, Settings2, TrendingDown, Undo2, UserPlus, Users, Wallet,
 } from 'lucide-react'
+import type { ReactNode } from 'react'
 import { Navigate, useLocation } from 'react-router-dom'
 import { lazyPage } from '@/app/lazy'
 import { page } from '@/app/page'
 import type { ModuleDef } from '@/app/modules'
+import { FinanceNav } from './FinanceNav'
 
 const FinanceHome = lazyPage(() => import('./FinanceHome'))
 const CollectPage = lazyPage(() => import('./CollectPage'))
@@ -38,55 +40,61 @@ function GuardianCollectRedirect() {
 }
 
 /**
+ * Bölüm sekmeleri (FinanceNav) üstte, sayfa içeriği altta. Sayfanın kendi başlığı ve
+ * `?sekme=` iç sekmeleri korunur; şerit yalnız aynı gruptaki sayfalar arası geçiş içindir.
+ * FinanceNav Suspense DIŞINDA kalır ki sayfa tembel yüklenirken bile görünür.
+ */
+const section = (node: ReactNode) => (
+  <>
+    <FinanceNav />
+    {page(node)}
+  </>
+)
+
+/**
  * Finans modülü. Rotalar /finans altında; tahsilat ekranı öğrenci profilinden
  * /finans/tahsilat?ogrenci=ID (isteğe bağlı &taksit=1,2) ile açılır.
  * Veli toplu tahsilat aynı sayfanın ikinci sekmesidir: /finans/tahsilat?kip=veli
+ *
+ * Kenar menüsü 3 üst girdiye indirildi (Finans / Kayıt ve sözleşmeler / Muhasebe ve raporlar);
+ * gruptaki diğer sayfalara FinanceNav sekme şeridinden ulaşılır. Tüm rotalar ve komut paleti
+ * girdileri olduğu gibi korunur (derin bağlantılar kırılmaz).
  */
 export default {
   id: 'finance',
   routes: [
-    { path: 'finans', element: page(<FinanceHome />) },
-    { path: 'finans/tahsilat', element: page(<CollectPage />) },
-    { path: 'finans/tahsilatlar', element: page(<PaymentList />) },
-    { path: 'finans/alacaklar', element: page(<Receivables />) },
-    { path: 'finans/kayitlar', element: page(<EnrollmentList />) },
+    { path: 'finans', element: section(<FinanceHome />) },
+    { path: 'finans/tahsilat', element: section(<CollectPage />) },
+    { path: 'finans/tahsilatlar', element: section(<PaymentList />) },
+    { path: 'finans/alacaklar', element: section(<Receivables />) },
+    { path: 'finans/kayitlar', element: section(<EnrollmentList />) },
     { path: 'finans/kayitlar/yeni', element: page(<EnrollmentCreate />) },
     { path: 'finans/kayitlar/:id', element: page(<EnrollmentDetail />) },
-    { path: 'finans/gelir-gider', element: page(<Entries />) },
-    { path: 'finans/hesaplar', element: page(<Accounts />) },
+    { path: 'finans/gelir-gider', element: section(<Entries />) },
+    { path: 'finans/hesaplar', element: section(<Accounts />) },
     { path: 'finans/hesaplar/:id', element: page(<AccountLedger />) },
-    { path: 'finans/raporlar', element: page(<Reports />) },
-    { path: 'finans/paketler', element: page(<Packages />) },
-    { path: 'finans/envanter', element: page(<Inventory />) },
+    { path: 'finans/raporlar', element: section(<Reports />) },
+    { path: 'finans/paketler', element: section(<Packages />) },
+    { path: 'finans/envanter', element: section(<Inventory />) },
     { path: 'finans/tahsilat/veli', element: <GuardianCollectRedirect /> },
-    { path: 'finans/faturalar', element: page(<Invoices />) },
+    { path: 'finans/faturalar', element: section(<Invoices />) },
     { path: 'finans/faturalar/yeni', element: page(<InvoiceEditor />) },
     { path: 'finans/faturalar/:id', element: page(<InvoiceEditor />) },
-    { path: 'finans/iadeler', element: page(<Refunds />) },
-    { path: 'finans/takip', element: page(<Collections />) },
-    { path: 'finans/mutabakat', element: page(<Reconciliation />) },
-    { path: 'finans/muhasebe', element: page(<Accounting />) },
+    { path: 'finans/iadeler', element: section(<Refunds />) },
+    { path: 'finans/takip', element: section(<Collections />) },
+    { path: 'finans/mutabakat', element: section(<Reconciliation />) },
+    { path: 'finans/muhasebe', element: section(<Accounting />) },
     { path: 'finans/ayarlar', element: page(<FinanceSettings />) },
-    { path: 'finans/senetler', element: page(<PromissoryNotes />) },
+    { path: 'finans/senetler', element: section(<PromissoryNotes />) },
   ],
+  // Finans kenar menüsü yalnız 3 üst girdi; grup içi geçiş FinanceNav sekme şeridiyle. Rotalar/komutlar korunur.
+  // Paketler ve Ayarlar navigation.ts'deki MOVE_TO ile "Ayarlar" bölümünde gösterilir (Finans grubunu şişirmez).
   nav: [
-    { section: 'finance', label: 'Finans Merkezi', to: '/finans', icon: LayoutGrid, permission: 'finance.view', end: true, order: 1 },
-    { section: 'finance', label: 'Tahsilat Al', to: '/finans/tahsilat', icon: HandCoins, permission: 'payments.create', order: 2 },
-    { section: 'finance', label: 'Tahsilatlar', to: '/finans/tahsilatlar', icon: ReceiptText, permission: 'finance.view', order: 3 },
-    { section: 'finance', label: 'Taksit ve Alacaklar', to: '/finans/alacaklar', icon: AlarmClock, permission: 'finance.view', order: 4 },
-    { section: 'finance', label: 'Faturalar', to: '/finans/faturalar', icon: FileText, permission: 'finance.view', order: 4.5 },
-    { section: 'finance', label: 'Senetler', to: '/finans/senetler', icon: FileSignature, permission: ['installments.manage', 'enrollments.create', 'finance.invoice'], order: 5.5 },
-    { section: 'finance', label: 'Kayıt ve Planlar', to: '/finans/kayitlar', icon: Scale, permission: 'finance.view', order: 5 },
-    { section: 'finance', label: 'Gelir ve Gider', to: '/finans/gelir-gider', icon: TrendingDown, permission: 'finance.view', order: 6 },
-    { section: 'finance', label: 'Kasa ve Banka', to: '/finans/hesaplar', icon: Landmark, permission: 'finance.view', order: 7 },
-    { section: 'finance', label: 'Muhasebe', to: '/finans/muhasebe', icon: BookText, permission: 'finance.accounting', order: 7.5 },
-    { section: 'finance', label: 'Finans Raporları', to: '/finans/raporlar', icon: FileSpreadsheet, permission: 'reports.finance', order: 8 },
-    { section: 'finance', label: 'İadeler', to: '/finans/iadeler', icon: Undo2, permission: 'finance.view', order: 21 },
-    { section: 'finance', label: 'Gecikme takibi', to: '/finans/takip', icon: PhoneCall, permission: 'finance.view', order: 22 },
-    { section: 'finance', label: 'Mutabakat', to: '/finans/mutabakat', icon: Scale, permission: 'finance.view', order: 23 },
-    { section: 'finance', label: 'Finans ve fatura', to: '/finans/ayarlar', icon: Settings2, permission: ['settings.manage', 'finance.accounting'], order: 30 },
+    { section: 'finance', label: 'Finans', to: '/finans', icon: LayoutGrid, permission: 'finance.view', end: true, order: 1 },
+    { section: 'finance', label: 'Kayıt ve sözleşmeler', to: '/finans/kayitlar', icon: FileSignature, permission: 'finance.view', order: 2 },
+    { section: 'finance', label: 'Muhasebe ve raporlar', to: '/finans/gelir-gider', icon: BookText, permission: 'finance.view', order: 3 },
     { section: 'finance', label: 'Eğitim Paketleri', to: '/finans/paketler', icon: Package, permission: 'finance.view', order: 9 },
-    { section: 'finance', label: 'Kitap ve Materyal', to: '/finans/envanter', icon: BookOpen, permission: ['finance.view', 'inventory.manage'], order: 10 },
+    { section: 'finance', label: 'Finans ve fatura', to: '/finans/ayarlar', icon: Settings2, permission: ['settings.manage', 'finance.accounting'], order: 30 },
   ],
   commands: [
     { id: 'finance-collect', label: 'Tahsilat Yap', to: '/finans/tahsilat', icon: HandCoins, permission: 'payments.create', hint: 'Finans', keywords: ['tahsilat', 'ödeme al', 'makbuz', 'para'] },

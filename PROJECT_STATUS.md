@@ -41,7 +41,7 @@
 `storage/app/private/demo-users.txt`. İlk yönetici parolası: `/root/.config/bogahost/kurs-admin.txt`.
 
 ## Yayın
-`VITE_MODULES=core,students,academic,attendance,exams,crm,guidance,finance,placement,communication,integrations,staff,settings,portal,calendar,reports,teacher-portal node scripts/gen-modules.mjs && npx tsc --noEmit -p . && npx vite build` — listede olmayan modül derlemeye girmez.
+`VITE_MODULES=core,students,academic,attendance,exams,crm,guidance,coaching,finance,placement,communication,integrations,staff,settings,portal,calendar,reports,teacher-portal node scripts/gen-modules.mjs && npx tsc --noEmit -p . && npx vite build` — listede olmayan modül derlemeye girmez.
 
 ## Öğrenci portalı (2026-09-16)
 - Hesap: `students.user_id` → `users` (user_type=student, rol `ogrenci`). Kullanıcı adı = öğrenci no. `StudentService::create`

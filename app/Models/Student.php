@@ -65,6 +65,22 @@ class Student extends Model
         return $this->belongsTo(Teacher::class, 'guidance_teacher_id');
     }
 
+    /** Aktif akademik koç ataması (Koçluk modülü). */
+    public function activeCoachingAssignment(): HasOne
+    {
+        return $this->hasOne(CoachingAssignment::class)->where('is_active', true)->latestOfMany();
+    }
+
+    public function coachingSessions(): HasMany
+    {
+        return $this->hasMany(CoachingSession::class);
+    }
+
+    public function coachingPlans(): HasMany
+    {
+        return $this->hasMany(CoachingPlan::class);
+    }
+
     public function classGroups(): BelongsToMany
     {
         return $this->belongsToMany(ClassGroup::class)->withPivot(['id', 'joined_on', 'left_on'])->withTimestamps();

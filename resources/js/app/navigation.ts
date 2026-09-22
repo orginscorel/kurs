@@ -1,6 +1,6 @@
 import type { LucideIcon } from 'lucide-react'
 import {
-  BarChart3, CalendarDays, Gavel, ClipboardCheck, Compass, GraduationCap, LayoutDashboard, MessageCircle, Settings, UserPlus, Users, Wallet,
+  BarChart3, CalendarDays, Gavel, ClipboardCheck, Compass, GraduationCap, LayoutDashboard, MessageCircle, Settings, Target, UserPlus, Users, Wallet,
 } from 'lucide-react'
 import { modules, type ModuleNavItem, type SectionKey } from '@/app/modules'
 
@@ -28,6 +28,7 @@ const GROUPS: { key: SectionKey; label: string; icon: LucideIcon }[] = [
   { key: 'academic', label: 'Akademik', icon: CalendarDays },
   { key: 'exams', label: 'Sınavlar', icon: GraduationCap },
   { key: 'guidance', label: 'Rehberlik', icon: Compass },
+  { key: 'coaching', label: 'Koçluk', icon: Target },
   { key: 'discipline', label: 'Disiplin', icon: Gavel },
   { key: 'finance', label: 'Finans', icon: Wallet },
   { key: 'communication', label: 'İletişim', icon: MessageCircle },
@@ -91,8 +92,8 @@ const SHORT_LABEL: Record<string, string> = {
   '/finans': 'Özet',
   '/finans/tahsilat': 'Tahsilat al',
   '/finans/alacaklar': 'Taksit ve alacaklar',
-  '/finans/kayitlar': 'Kayıt ve ödeme planları',
-  '/finans/gelir-gider': 'Gelir ve gider',
+  '/finans/kayitlar': 'Kayıt ve sözleşmeler',
+  '/finans/gelir-gider': 'Muhasebe ve raporlar',
   '/finans/hesaplar': 'Kasa ve banka',
   '/finans/envanter': 'Kitap ve materyal',
   '/finans/raporlar': 'Finans raporları',

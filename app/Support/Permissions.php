@@ -83,6 +83,10 @@ final class Permissions
                 'guidance.private' => 'Gizli rehberlik notlarını görme',
                 'risk.view' => 'Riskli öğrenci ekranı',
             ]],
+            'coaching' => ['label' => 'Koçluk', 'items' => [
+                'coaching.view' => 'Koçluk panosu, atamalar, görüşme ve planları görme',
+                'coaching.manage' => 'Koç atama, koçluk görüşmesi ve haftalık plan yönetimi',
+            ]],
             'discipline' => ['label' => 'Disiplin', 'items' => [
                 'discipline.view' => 'Disiplin kayıtlarını görme',
                 'discipline.create' => 'Olay kaydetme, savunma isteme/kaydetme',
@@ -159,7 +163,7 @@ final class Permissions
                 'students.create', 'students.update', 'students.export', 'students.bulk', 'students.credentials', 'students.impersonate', 'guardians.manage', 'guardians.credentials', 'guardians.impersonate', 'documents.view', 'documents.manage',
                 'teachers.manage', 'teachers.credentials', 'teachers.impersonate', 'employees.view', 'crm.view', 'crm.manage', 'enrollments.create', 'academic.manage', 'classroom_layouts.manage', 'schedule.manage',
                 'study.manage', 'homework.manage', 'exams.manage', 'exams.import', 'exams.publish', 'attendance.take', 'attendance.override',
-                'guidance.view', 'risk.view', 'finance.view', 'messages.view', 'messages.send', 'announcements.manage', 'reports.view',
+                'guidance.view', 'risk.view', 'coaching.view', 'coaching.manage', 'finance.view', 'messages.view', 'messages.send', 'announcements.manage', 'reports.view',
                 'messages.campaign', 'messages.campaign_send', 'messages.consents',
                 'reports.export', 'imports.manage',
                 'payments.create', 'reports.finance',
@@ -175,12 +179,14 @@ final class Permissions
                 'sync.use',
             ]],
             'rehber' => ['label' => 'Rehber Öğretmen', 'permissions' => array_merge($viewAll, [
-                'guidance.view', 'guidance.manage', 'guidance.private', 'risk.view', 'discipline.view', 'discipline.create', 'study.manage', 'messages.view', 'messages.send',
+                'guidance.view', 'guidance.manage', 'guidance.private', 'risk.view', 'coaching.view', 'coaching.manage', 'discipline.view', 'discipline.create', 'study.manage', 'messages.view', 'messages.send',
                 'reports.view', 'documents.view',
                 'teacher_portal.access', 'teacher_portal.attendance', 'teacher_portal.homework', 'teacher_portal.observations',
             ])],
             // Yalnız öğretmen portalı: yönetim ekranı yok ('staff' ara katmanı kapalı), veri kendi sınıf/öğrencileriyle sınırlı.
             // Yönetim ekranı da gereken öğretmene ek rol (ör. rehber, mudur) verilir.
+            // Yalnız portal (yönetim ekranı yok). Koçluk yönetim ekranıdır ('staff' ara katmanı) → koç olan öğretmene
+            // ayrı yönetim rolü (rehber/mudur ya da özel rol) verilir; o rollerde coaching yetkisi zaten vardır.
             'ogretmen' => ['label' => 'Öğretmen', 'permissions' => [
                 'teacher_portal.access', 'teacher_portal.attendance', 'teacher_portal.homework', 'teacher_portal.observations',
             ]],
@@ -188,6 +194,7 @@ final class Permissions
                 'dashboard.view', 'search.global', 'students.view', 'students.create', 'students.update', 'students.credentials',
                 'students.impersonate', 'guardians.view', 'guardians.manage', 'guardians.credentials', 'guardians.impersonate', 'documents.view', 'documents.manage', 'crm.view', 'crm.manage', 'enrollments.create',
                 'discipline.view', 'academic.view', 'finance.view', 'messages.view', 'messages.send', 'reports.view', 'reports.export',
+                'coaching.view',
                 'messages.campaign', 'messages.consents', // toplu gönderim taslağı hazırlar; onay/gönderim müdür/yöneticide
             ]],
             'sistem' => ['label' => 'Teknik Yönetici', 'permissions' => [

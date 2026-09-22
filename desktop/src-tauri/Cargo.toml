@@ -1,6 +1,6 @@
 [package]
 name = "erbaa-kurs"
-version = "1.17.1"
+version = "1.18.0"
 description = "Erbaa Bilgi Eğitim masaüstü uygulaması"
 authors = ["Erbaa Bilgi Eğitim"]
 edition = "2021"

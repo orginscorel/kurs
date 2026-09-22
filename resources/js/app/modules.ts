@@ -10,7 +10,7 @@ import type { RouteObject } from 'react-router-dom'
  */
 
 export type SectionKey =
-  | 'main' | 'people' | 'crm' | 'academic' | 'exams' | 'attendance' | 'guidance' | 'discipline'
+  | 'main' | 'people' | 'crm' | 'academic' | 'exams' | 'attendance' | 'guidance' | 'coaching' | 'discipline'
   | 'finance' | 'communication' | 'reports' | 'settings' | 'portal'
 
 export const SECTIONS: Record<SectionKey, { label?: string; order: number }> = {
@@ -22,6 +22,7 @@ export const SECTIONS: Record<SectionKey, { label?: string; order: number }> = {
   exams: { label: 'Sınav Merkezi', order: 40 },
   attendance: { label: 'Yoklama', order: 50 },
   guidance: { label: 'Rehberlik', order: 60 },
+  coaching: { label: 'Koçluk', order: 62 },
   discipline: { label: 'Disiplin', order: 65 },
   finance: { label: 'Finans', order: 70 },
   communication: { label: 'İletişim', order: 80 },

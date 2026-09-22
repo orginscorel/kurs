@@ -92,12 +92,12 @@ export function MeetingFormDrawer({ open, onClose, onSaved, meetingId, studentId
     if (editing && detail.data) {
       const d = detail.data
       setForm({
-        student_id: d.student?.id, met_at: toLocalInput(d.met_at), kind: d.kind, summary: d.summary ?? '', goal: d.goal ?? '',
+        student_id: d.student?.id, counselor_id: d.counselor?.id ?? '', met_at: toLocalInput(d.met_at), kind: d.kind, summary: d.summary ?? '', goal: d.goal ?? '',
         motivation: d.motivation ?? '', study_discipline: d.study_discipline ?? '', visibility: d.visibility ?? 'staff', visible_to_student: !!d.visible_to_student,
         next_meeting_on: d.next_meeting_on?.slice(0, 10) ?? '', private_note: d.private_note ?? '',
       })
     } else if (!editing) {
-      setForm({ student_id: studentId ?? '', met_at: toLocalInput(new Date().toISOString()), kind: 'individual', visibility: 'staff', visible_to_student: false, summary: '', next_meeting_on: '' })
+      setForm({ student_id: studentId ?? '', counselor_id: '', met_at: toLocalInput(new Date().toISOString()), kind: 'individual', visibility: 'staff', visible_to_student: false, summary: '', next_meeting_on: '' })
       setPickedStudentLabel(studentName ?? '')
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -148,6 +148,10 @@ export function MeetingFormDrawer({ open, onClose, onSaved, meetingId, studentId
             <Select value={form.kind ?? ''} onChange={(e) => set('kind', e.target.value)} placeholder="Tür seçin" options={Object.entries(options?.kinds ?? {}).map(([value, label]) => ({ value, label }))} />
           </Field>
         </div>
+        <Field label="Görüşen (rehber öğretmen)" optional hint="Boş bırakılırsa görüşmeyi kaydeden kişi atanır" error={err('counselor_id')}>
+          <Select value={form.counselor_id ?? ''} onChange={(e) => set('counselor_id', e.target.value)} placeholder="Görüşmeyi yapan öğretmen / rehber"
+            options={(options?.counselors ?? []).map((c) => ({ value: c.id, label: c.name }))} />
+        </Field>
         <Field label="Görüşme özeti" required error={err('summary')}><Textarea rows={4} value={form.summary ?? ''} onChange={(e) => set('summary', e.target.value)} placeholder="Konuşulanlar, gözlemler ve öneriler" /></Field>
         <Field label="Belirlenen hedef" optional error={err('goal')}><Input value={form.goal ?? ''} onChange={(e) => set('goal', e.target.value)} placeholder="Örn. Günlük 100 soru" /></Field>
 
