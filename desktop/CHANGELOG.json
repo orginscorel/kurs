@@ -1,5 +1,16 @@
 [
   {
+    "version": "1.18.1",
+    "date": "2026-09-22",
+    "title": "Koçluk menüsü Akademik altına",
+    "items": [
+      {
+        "type": "iyilestirme",
+        "text": "Koçluk menüsü kenar çubuğunda Akademik'in altına alındı"
+      }
+    ]
+  },
+  {
     "version": "1.18.0",
     "date": "2026-09-22",
     "title": "Koçluk modülü + finans menüsü sadeleşti",
