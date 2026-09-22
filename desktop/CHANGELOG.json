@@ -1,5 +1,24 @@
 [
   {
+    "version": "1.19.2",
+    "date": "2026-09-22",
+    "title": "Portal talep önizleme + koçluk yönetici görünümü",
+    "items": [
+      {
+        "type": "duzeltme",
+        "text": "Portal Paketlerim önizlemede talep düğmeleri görünür; koçluk paketleri görüntülenebilir"
+      },
+      {
+        "type": "iyilestirme",
+        "text": "Koçluk Koç Panom yönetici tüm koçları görür/süzer"
+      },
+      {
+        "type": "iyilestirme",
+        "text": "Öğretmenler tablosu sadeleştirildi"
+      }
+    ]
+  },
+  {
     "version": "1.19.1",
     "date": "2026-09-22",
     "title": "Koçluk menüsü Günlük altında",

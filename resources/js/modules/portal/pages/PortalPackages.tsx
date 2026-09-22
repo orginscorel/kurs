@@ -37,13 +37,13 @@ const enrollTone: Record<string, 'success' | 'neutral'> = { active: 'success' }
 
 export default function PortalPackages() {
   const v = useVoice()
-  const imp = useAuth((s) => s.me?.impersonation)
   const { data, isLoading } = usePortal<Data>('packages', '/portal/packages')
   const [compose, setCompose] = useState<'package' | 'coaching' | null>(null)
 
   if (isLoading || !data) return <div className="flex flex-col gap-4"><Skeleton className="h-24" /><Skeleton className="h-48" /></div>
 
-  const canRequest = data.requests_enabled && !imp
+  // Önizlemede (yönetici "öğrenci olarak giriş") düğmeler görünür ki paketler/koçluk görülebilsin; gönderim RequestForm'da engellenir.
+  const canRequest = data.requests_enabled
   const c = data.coaching
 
   return (
@@ -171,6 +171,7 @@ export default function PortalPackages() {
 
 function RequestForm({ data, initialKind, onClose }: { data: Data; initialKind: 'package' | 'coaching'; onClose: () => void }) {
   const qc = useQueryClient()
+  const imp = useAuth((s) => s.me?.impersonation)
   const extra = usePortalQuery()
   const coachingAllowed = data.coaching_addon_available
   const packagesAllowed = data.available_packages.length > 0
@@ -215,9 +216,10 @@ function RequestForm({ data, initialKind, onClose }: { data: Data; initialKind: 
     <Drawer open onClose={onClose} title="Paket / koçluk talebi" description="Talebiniz kuruma iletilir; onaylanınca sizinle iletişime geçilir. Portaldan ödeme alınmaz."
       footer={<>
         <Button variant="ghost" onClick={onClose}>Vazgeç</Button>
-        <Button variant="primary" type="submit" form="pkg-req-form" loading={send.isPending} disabled={kind === 'package' && !packageId}>Talep oluştur</Button>
+        <Button variant="primary" type="submit" form="pkg-req-form" loading={send.isPending} disabled={(kind === 'package' && !packageId) || !!imp}>Talep oluştur</Button>
       </>}>
       <form id="pkg-req-form" onSubmit={submit} className="flex flex-col gap-3.5">
+        {imp && <Alert tone="info">Önizleme modundasınız. Talep yalnız gerçek öğrenci/veli girişinde gönderilebilir; buradan paketleri ve koçluk seçeneğini görüntüleyebilirsiniz.</Alert>}
         {kindOptions.length > 1 && (
           <Field label="Talep türü" required>
             <Segmented value={kind} onChange={(k) => setKind(k as 'package' | 'coaching')} options={kindOptions} />

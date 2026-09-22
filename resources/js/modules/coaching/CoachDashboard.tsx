@@ -27,7 +27,7 @@ export default function CoachDashboard() {
     <div className="animate-fade-in">
       <PageHeader title="Koç Panom" description="Öğrencilerim, yaklaşan görüşmeler ve bu haftanın planları"
         actions={isManager && (
-          <Select value={coachId} onChange={(e) => setCoachId(e.target.value)} placeholder="Kendi öğrencilerim" aria-label="Koç seçin"
+          <Select value={coachId} onChange={(e) => setCoachId(e.target.value)} placeholder={can('coaching.manage') ? 'Tüm koçlar' : 'Kendi öğrencilerim'} aria-label="Koç seçin"
             options={(options.data?.coaches ?? []).map((c) => ({ value: c.id, label: c.name }))} className="w-[220px]" />
         )}
       />

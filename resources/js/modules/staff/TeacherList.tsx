@@ -70,7 +70,7 @@ export default function TeacherList() {
           </div>
         ),
       },
-      { key: 'employment', priority: 4, header: 'Çalışma türü', hideable: true, cell: (t) => <span className="text-ink-2 whitespace-nowrap">{t.employment_type_label}</span> },
+      { key: 'employment', priority: 4, header: 'Çalışma türü', hideable: true, defaultHidden: true, cell: (t) => <span className="text-ink-2 whitespace-nowrap">{t.employment_type_label}</span> },
       {
         key: 'classes', priority: 3,
         header: 'Girdiği sınıf',
@@ -101,7 +101,7 @@ export default function TeacherList() {
       { key: 'phone', priority: 2, header: 'Cep telefonu', hideable: true, cell: (t) => <PhoneText value={t.phone} whatsapp /> },
       { key: 'email', header: 'E-posta', hideable: true, defaultHidden: true, cell: (t) => <MailText value={t.email} /> },
       { key: 'hired', header: 'İşe başlama', sortKey: 'hired_on', hideable: true, defaultHidden: true, cell: (t) => <span className="text-ink-2 tabular whitespace-nowrap">{t.hired_on ? date(t.hired_on) : '—'}</span> },
-      { key: 'user', priority: 4, header: 'Portal hesabı', hideable: true, cell: (t) => <Badge tone={t.has_user ? 'success' : 'neutral'}>{t.has_user ? 'Var' : 'Yok'}</Badge> },
+      { key: 'user', priority: 4, header: 'Portal hesabı', hideable: true, defaultHidden: true, cell: (t) => <Badge tone={t.has_user ? 'success' : 'neutral'}>{t.has_user ? 'Var' : 'Yok'}</Badge> },
       { key: 'status', priority: 2, header: 'Durum', cell: (t) => <Badge tone={t.is_active ? 'success' : 'neutral'} dot>{t.is_active ? 'Aktif' : 'Pasif'}</Badge> },
     ],
     [],

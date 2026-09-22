@@ -1,5 +1,24 @@
 [
   {
+    "version": "1.19.2",
+    "date": "2026-09-22",
+    "title": "Portal talep önizleme + koçluk yönetici görünümü",
+    "items": [
+      {
+        "type": "duzeltme",
+        "text": "Portal Paketlerim'de yönetici önizlemesinde (öğrenci olarak giriş) paket ve koçluk talep düğmeleri artık görünür; koçluk paketleri görüntülenebilir (talep yalnız gerçek öğrenci/veli girişinde gönderilir)"
+      },
+      {
+        "type": "iyilestirme",
+        "text": "Koçluk Koç Panom — yönetici/rehber tüm koçların öğrencilerini görür ve koç seçerek süzebilir"
+      },
+      {
+        "type": "iyilestirme",
+        "text": "Öğretmenler tablosu sadeleştirildi (daha az varsayılan sütun; gerekli sütunlar aç/kapa ile)"
+      }
+    ]
+  },
+  {
     "version": "1.19.1",
     "date": "2026-09-22",
     "title": "Koçluk menüsü Günlük altında",

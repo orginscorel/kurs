@@ -16,13 +16,15 @@ class CoachingDashboardController extends ApiController
 {
     public function index(Request $request): JsonResponse
     {
-        // Varsayılan olarak giriş yapan kişi; müdür/rehber başka koçu seçebilir.
-        $coachId = $request->integer('coach_id') ?: (int) $request->user()->id;
+        // Yönetici/rehber (coaching.manage) varsayılan olarak TÜM koçları görür ve coach_id ile süzebilir;
+        // yalnız koç olan kullanıcı kendi öğrencilerini görür.
+        $isManager = $request->user()->can('coaching.manage');
+        $coachId = $request->integer('coach_id') ?: ($isManager ? null : (int) $request->user()->id);
         $today = CarbonImmutable::today();
         $weekStart = $today->startOfWeek()->toDateString();
 
         $assignments = CoachingAssignment::query()
-            ->where('coach_id', $coachId)->where('is_active', true)
+            ->when($coachId, fn ($q) => $q->where('coach_id', $coachId))->where('is_active', true)
             ->with('student:id,full_name,student_no,school_grade,field')
             ->get()
             ->filter(fn (CoachingAssignment $a) => $a->student !== null);
