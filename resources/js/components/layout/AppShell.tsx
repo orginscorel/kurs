@@ -5,7 +5,7 @@ import { Bell, ChevronDown, ChevronsLeft, ChevronsRight, KeyRound, LogOut, Menu 
 import { cn } from '@/lib/cn'
 import { apply as applyTheme, readMode, resolve as resolveTheme, saveMode, watchSystem, type ThemeMode } from '@/lib/theme'
 import { useAuth, useCan } from '@/app/auth'
-import { activeGroupFor, navigation, type NavGroup, type NavItem } from '@/app/navigation'
+import { activeGroupFor, navigation, SETTINGS_LANDING, type NavGroup, type NavItem } from '@/app/navigation'
 import { BrandMark } from '@/app/AuthGate'
 import { Avatar, Kbd } from '@/components/ui/feedback'
 import { Menu, Tooltip } from '@/components/ui/overlay'
@@ -133,9 +133,12 @@ export function AppShell({ children }: { children: ReactNode }) {
 /** Ayarlar: geniş ekranda başlıklara ayrılmış sol alt menü; dar ekranda tek seçim kutusu (yatay kaydırma yok) */
 function SettingsLayout({ group, activeTo, children }: { group: NavGroup; activeTo: string; children: ReactNode }) {
   const navigate = useNavigate()
+  // Genel bakış (hub) kategorilerin dışında, en üstte sabit bir bağlantı olarak durur.
+  const overview = group.items.find((i) => i.to === SETTINGS_LANDING)
   const categories = useMemo(() => {
     const map = new Map<string, NavItem[]>()
     for (const item of group.items) {
+      if (item.to === SETTINGS_LANDING) continue
       const key = item.category ?? 'Diğer'
       map.set(key, [...(map.get(key) ?? []), item])
     }
@@ -154,6 +157,7 @@ function SettingsLayout({ group, activeTo, children }: { group: NavGroup; active
             onChange={(e) => navigate(e.target.value)}
             className="h-11 w-full rounded-[var(--radius-sm)] border border-line bg-surface px-3 text-[14px] text-ink"
           >
+            {overview && <option value={overview.to}>{overview.label}</option>}
             {categories.map(([category, items]) => (
               <optgroup key={category} label={category}>
                 {items.map((item) => (
@@ -165,6 +169,17 @@ function SettingsLayout({ group, activeTo, children }: { group: NavGroup; active
         </label>
         <nav aria-label="Ayarlar" className="hidden lg:block">
           <div className="flex min-w-0 flex-col gap-5">
+            {overview && (
+              <Link
+                to={overview.to}
+                className={cn(
+                  'inline-flex h-8 items-center rounded-[var(--radius-sm)] px-2.5 text-[13px] transition-colors',
+                  overview.to === activeTo ? 'bg-surface-3 font-medium text-ink' : 'text-ink-2 hover:bg-surface-2 hover:text-ink',
+                )}
+              >
+                {overview.label}
+              </Link>
+            )}
             {categories.map(([category, items]) => (
               <div key={category} className="flex flex-col gap-0.5">
                 <p className="px-2.5 pb-1 text-[11px] font-medium uppercase tracking-[0.06em] text-ink-3">{category}</p>

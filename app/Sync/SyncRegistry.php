@@ -160,6 +160,8 @@ final class SyncRegistry
         'coaching_plans' => ['kind' => self::REFERENCE, 'permission' => 'coaching.view', 'key' => ['student_id', 'week_start']],
         'coaching_plan_items' => ['kind' => self::REFERENCE, 'branch' => 'via:coaching_plan_id', 'permission' => 'coaching.view'],
         'contact_requests' => ['kind' => self::REFERENCE],
+        // Portal paket/koçluk talepleri: iki yönlü, alan bazında son yazan kazanır (yönetici kararı sunucuda)
+        'package_requests' => ['kind' => self::REFERENCE, 'since' => '2026-09-22'],
         'discipline_behaviors' => ['kind' => self::REFERENCE],
         'discipline_sanction_types' => ['kind' => self::REFERENCE],
         'discipline_incidents' => ['kind' => self::REFERENCE, 'permission' => 'discipline.view'],

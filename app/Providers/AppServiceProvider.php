@@ -107,6 +107,7 @@ class AppServiceProvider extends ServiceProvider
             'student_note' => \App\Models\StudentNote::class,
             'student_observation' => \App\Models\StudentObservation::class,
             'contact_request' => \App\Models\ContactRequest::class,
+            'package_request' => \App\Models\PackageRequest::class,
             'discipline_incident' => \App\Models\DisciplineIncident::class,
             'discipline_incident_student' => \App\Models\DisciplineIncidentStudent::class,
             'discipline_sanction' => \App\Models\DisciplineSanction::class,

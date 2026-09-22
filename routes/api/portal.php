@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\Portal\PortalController;
 use App\Http\Controllers\Api\Portal\PortalExtrasController as X;
+use App\Http\Controllers\Api\Portal\PortalPackagesController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -21,6 +22,7 @@ Route::middleware('portal.student')->prefix('portal')->group(function () {
     Route::get('finance', [PortalController::class, 'finance']);
     Route::get('finance/overdue-alert', [\App\Http\Controllers\Api\Portal\PortalFinanceController::class, 'overdueAlert']);
     Route::get('finance/statement.pdf', [\App\Http\Controllers\Api\Portal\PortalFinanceController::class, 'statementPdf'])->middleware('throttle:20,1');
+    Route::get('packages', [PortalPackagesController::class, 'index']);
     Route::get('guidance', [PortalController::class, 'guidance']);
     Route::get('announcements', [PortalController::class, 'announcements']);
     Route::get('profile', [PortalController::class, 'profile']);
@@ -40,5 +42,7 @@ Route::middleware('portal.student')->prefix('portal')->group(function () {
         Route::post('announcements/{announcement}/read', [X::class, 'announcementRead'])->whereNumber('announcement');
         // Veli → öğretmen mesaj/görüşme talebi (yalnız kayda düşer, mesaj gönderilmez)
         Route::post('requests', [X::class, 'requestStore'])->middleware('throttle:10,1');
+        // Paket / koçluk talebi (öğrenci + veli; online ödeme yok, yalnız kayda düşer)
+        Route::post('packages/requests', [PortalPackagesController::class, 'store'])->middleware('throttle:10,1');
     });
 });

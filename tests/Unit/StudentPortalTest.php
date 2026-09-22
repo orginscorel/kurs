@@ -69,13 +69,15 @@ class StudentPortalTest extends TestCase
         $portal = array_filter($this->apiRoutes(), fn (RoutingRoute $r) => str_starts_with($r->uri(), 'api/v1/portal'));
         $this->assertNotEmpty($portal);
 
-        // Yazma uçları yalnız bunlar: ödev teslimi/görüldü/dosya silme (öğrenci), duyuru okundu, veli talebi
+        // Yazma uçları yalnız bunlar: ödev teslimi/görüldü/dosya silme (öğrenci), duyuru okundu, veli talebi,
+        // paket/koçluk talebi (öğrenci + veli)
         $writes = [
             'POST api/v1/portal/homework/{submission}/submit',
             'POST api/v1/portal/homework/{submission}/seen',
             'DELETE api/v1/portal/homework/{submission}/files/{document}',
             'POST api/v1/portal/announcements/{announcement}/read',
             'POST api/v1/portal/requests',
+            'POST api/v1/portal/packages/requests',
         ];
         $seenWrites = [];
 

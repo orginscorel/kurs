@@ -131,10 +131,19 @@ export const SETTINGS_CATEGORIES: { label: string; paths: string[] }[] = [
   { label: 'Eğitim', paths: ['/akademik', '/finans/paketler'] },
   { label: 'Finans', paths: ['/finans/ayarlar'] },
   { label: 'İletişim', paths: ['/ayarlar/mesaj-kanallari', '/iletisim/sablonlar', '/iletisim/otomasyonlar', '/ayarlar/entegrasyonlar', '/ayarlar/webhooklar'] },
-  { label: 'Sistem', paths: ['/yoklama/cihazlar', '/ayarlar/bagli-cihazlar', '/ayarlar/esitleme-cakismalari', '/ayarlar/denetim-kayitlari', '/ayarlar/sistem-sagligi'] },
+  { label: 'Sistem', paths: ['/yoklama/cihazlar', '/ayarlar/bagli-cihazlar', '/ayarlar/esitleme-cakismalari', '/uygulamalar', '/ayarlar/denetim-kayitlari', '/ayarlar/sistem-sagligi'] },
 ]
 
-const settingsOrder = SETTINGS_CATEGORIES.flatMap((c) => c.paths.map((p) => ({ path: p, category: c.label })))
+/**
+ * Ayarlar öğe sırası. `/ayarlar` (genel bakış / hub) her zaman en başta gelir; böylece kenar çubuğunun
+ * altındaki "Ayarlar" bağlantısı hub'a gider. Hub ve sol alt menü bu sırayı ve kategorileri paylaşır.
+ * `SETTINGS_LANDING` = hub'un adresi (hub kartlarında ve sol menüde kendini listelememek için ayrılır).
+ */
+export const SETTINGS_LANDING = '/ayarlar'
+const settingsOrder: { path: string; category?: string }[] = [
+  { path: SETTINGS_LANDING, category: undefined },
+  ...SETTINGS_CATEGORIES.flatMap((c) => c.paths.map((p) => ({ path: p, category: c.label }))),
+]
 const settingsRank = (to: string) => {
   const i = settingsOrder.findIndex((s) => s.path === to)
   return i === -1 ? 999 : i

@@ -1,7 +1,7 @@
 import { useEffect, useMemo } from 'react'
 import { Outlet, useNavigate } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { BookOpenCheck, CalendarDays, ClipboardCheck, Compass, GraduationCap, Home, Megaphone, MessageSquareHeart, ShieldCheck, TrendingUp, UserRound, Users, UsersRound, Wallet } from 'lucide-react'
+import { BookOpenCheck, CalendarDays, ClipboardCheck, Compass, GraduationCap, Home, Megaphone, MessageSquareHeart, Package, ShieldCheck, TrendingUp, UserRound, Users, UsersRound, Wallet } from 'lucide-react'
 import { api, ApiError } from '@/lib/api'
 import { useAuth } from '@/app/auth'
 import { EmptyState, Skeleton } from '@/components/ui/feedback'
@@ -42,6 +42,7 @@ function buildGroups(unread: number): PortalNavGroup[] {
     {
       label: 'Hesap',
       items: [
+        { to: '/portal/paketlerim', label: 'Paketlerim', icon: Package },
         { to: '/portal/odemeler', label: 'Ödemeler', icon: Wallet },
         { to: '/portal/profil', label: 'Profilim', icon: UserRound },
       ],

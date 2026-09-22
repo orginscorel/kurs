@@ -1,5 +1,5 @@
 import {
-  AlarmClock, BookText, FileSignature, CircleDollarSign, FilePlus2, FileSpreadsheet, FileText, HandCoins, Landmark, LayoutGrid, Lock, Package, PhoneCall,
+  AlarmClock, BookText, FileSignature, CircleDollarSign, FilePlus2, FileSpreadsheet, FileText, HandCoins, Inbox, Landmark, LayoutGrid, Lock, Package, PhoneCall,
   ReceiptText, Scale, Settings2, TrendingDown, Undo2, UserPlus, Users, Wallet,
 } from 'lucide-react'
 import type { ReactNode } from 'react'
@@ -21,6 +21,7 @@ const Accounts = lazyPage(() => import('./Accounts'))
 const AccountLedger = lazyPage(() => import('./AccountLedger'))
 const Reports = lazyPage(() => import('./Reports'))
 const Packages = lazyPage(() => import('./Packages'))
+const PackageRequests = lazyPage(() => import('./PackageRequests'))
 const Inventory = lazyPage(() => import('./Inventory'))
 const Invoices = lazyPage(() => import('./Invoices'))
 const InvoiceEditor = lazyPage(() => import('./InvoiceEditor'))
@@ -75,6 +76,7 @@ export default {
     { path: 'finans/hesaplar/:id', element: page(<AccountLedger />) },
     { path: 'finans/raporlar', element: section(<Reports />) },
     { path: 'finans/paketler', element: section(<Packages />) },
+    { path: 'finans/paket-talepleri', element: section(<PackageRequests />) },
     { path: 'finans/envanter', element: section(<Inventory />) },
     { path: 'finans/tahsilat/veli', element: <GuardianCollectRedirect /> },
     { path: 'finans/faturalar', element: section(<Invoices />) },
@@ -104,6 +106,7 @@ export default {
     { id: 'finance-overdue', label: 'Gecikmiş ödemeler', to: '/finans/alacaklar?status=overdue', icon: AlarmClock, permission: 'finance.view', hint: 'Finans', keywords: ['gecikmiş', 'geciken', 'borç', 'vadesi geçmiş'] },
     { id: 'finance-payments', label: 'Tahsilat listesi', to: '/finans/tahsilatlar', icon: ReceiptText, permission: 'finance.view', hint: 'Finans', keywords: ['makbuz', 'tahsilatlar'] },
     { id: 'finance-enroll', label: 'Yeni dönem kaydı', to: '/finans/kayitlar/yeni', icon: UserPlus, permission: 'enrollments.create', hint: 'Finans', keywords: ['kayıt', 'sözleşme', 'ödeme planı'] },
+    { id: 'finance-package-requests', label: 'Paket talepleri', to: '/finans/paket-talepleri', icon: Inbox, permission: 'package_requests.manage', hint: 'Finans', keywords: ['paket talebi', 'koçluk talebi', 'portal talep', 'paket ekle'] },
     { id: 'finance-dayend', label: 'Gün sonu kasa özeti', to: '/finans/hesaplar?sekme=gun-sonu', icon: Landmark, permission: 'finance.view', hint: 'Finans', keywords: ['gün sonu', 'kasa', 'banka'] },
     { id: 'finance-invoice-new', label: 'Fatura kes', to: '/finans/faturalar/yeni', icon: FilePlus2, permission: 'finance.invoice', hint: 'Finans', keywords: ['fatura', 'e-arşiv', 'e-fatura', 'kdv'] },
     { id: 'finance-unbilled', label: 'Faturalanmamış tahsilatlar', to: '/finans/faturalar?sekme=faturalanmamis', icon: FileText, permission: 'finance.view', hint: 'Finans', keywords: ['fatura', 'toplu fatura', 'taslak'] },

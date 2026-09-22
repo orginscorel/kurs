@@ -1,5 +1,20 @@
 [
   {
+    "version": "1.19.0",
+    "date": "2026-09-22",
+    "title": "Portal Paketlerim + Ayarlar merkezi",
+    "items": [
+      {
+        "type": "yeni",
+        "text": "Öğrenci/veli portalında \"Paketlerim\" — alınan paket, içeriği ve koçluk durumu; paket/koçluk ekleme talebi (yönetici onaylar)"
+      },
+      {
+        "type": "iyilestirme",
+        "text": "Ayarlar için kategorili ana sayfa + \"Tüm ayarlar\" menüsü"
+      }
+    ]
+  },
+  {
     "version": "1.18.1",
     "date": "2026-09-22",
     "title": "Koçluk menüsü Akademik altına",

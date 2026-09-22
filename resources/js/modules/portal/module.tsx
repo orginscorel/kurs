@@ -18,6 +18,7 @@ const Progress = lazyPage(() => import('./pages/PortalProgress'))
 const Feedback = lazyPage(() => import('./pages/PortalFeedback'))
 const Teachers = lazyPage(() => import('./pages/PortalTeachers'))
 const Finance = lazyPage(() => import('./pages/PortalFinance'))
+const Packages = lazyPage(() => import('./pages/PortalPackages'))
 const Guidance = lazyPage(() => import('./pages/PortalGuidance'))
 const Announcements = lazyPage(() => import('./pages/PortalAnnouncements'))
 const Profile = lazyPage(() => import('./pages/PortalProfile'))
@@ -39,6 +40,7 @@ export default {
         { path: 'gelisim', element: page(<Progress />) },
         { path: 'geri-bildirim', element: page(<Feedback />) },
         { path: 'ogretmenler', element: page(<Teachers />) },
+        { path: 'paketlerim', element: page(<Packages />) },
         { path: 'odemeler', element: page(<Finance />) },
         { path: 'rehberlik', element: page(<Guidance />) },
         { path: 'disiplin', element: page(<Discipline />) },

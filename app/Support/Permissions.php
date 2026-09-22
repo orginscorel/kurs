@@ -100,6 +100,7 @@ final class Permissions
                 'payments.create' => 'Tahsilat alma',
                 'payments.void' => 'Tahsilat iptali',
                 'installments.manage' => 'Ödeme planı/taksit düzenleme',
+                'package_requests.manage' => 'Portaldan gelen paket/koçluk taleplerini görme ve karara bağlama',
                 'expenses.manage' => 'Gelir/gider kaydetme',
                 'accounts.manage' => 'Kasa/banka yönetimi ve transfer',
                 'inventory.manage' => 'Kitap/materyal stoğu',

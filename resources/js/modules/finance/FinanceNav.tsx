@@ -32,6 +32,7 @@ const GROUPS: { key: string; tabs: Tab[] }[] = [
       { to: '/finans/faturalar', label: 'Faturalar', permission: 'finance.view' },
       { to: '/finans/senetler', label: 'Senetler', permission: ['installments.manage', 'enrollments.create', 'finance.invoice'] },
       { to: '/finans/paketler', label: 'Eğitim paketleri', permission: 'finance.view' },
+      { to: '/finans/paket-talepleri', label: 'Paket talepleri', permission: 'package_requests.manage' },
     ],
   },
   {
