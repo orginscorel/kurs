@@ -307,7 +307,7 @@ function Sidebar({
   }
 
   const SECTIONS: { label: string; keys: string[] }[] = [
-    { label: 'Günlük', keys: ['main', 'crm', 'people', 'attendance', 'academic', 'exams', 'guidance', 'discipline'] },
+    { label: 'Günlük', keys: ['main', 'crm', 'people', 'attendance', 'academic', 'coaching', 'exams', 'guidance', 'discipline'] },
     { label: 'Yönetim', keys: ['finance', 'communication', 'reports'] },
   ]
   const sectioned = SECTIONS.map((s) => ({ ...s, groups: workGroups.filter((g) => s.keys.includes(g.key)) }))

@@ -1,5 +1,16 @@
 [
   {
+    "version": "1.19.1",
+    "date": "2026-09-22",
+    "title": "Koçluk menüsü Günlük altında",
+    "items": [
+      {
+        "type": "duzeltme",
+        "text": "Koçluk menüsü kenar çubuğunda \"Yönetim\" altında en altta görünüyordu; artık \"Günlük\" başlığında Akademik'in yanında"
+      }
+    ]
+  },
+  {
     "version": "1.19.0",
     "date": "2026-09-22",
     "title": "Portal Paketlerim + Ayarlar merkezi",

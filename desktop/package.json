@@ -1,7 +1,7 @@
 {
   "name": "erbaa-kurs-desktop",
   "private": true,
-  "version": "1.19.0",
+  "version": "1.19.1",
   "type": "module",
   "description": "Erbaa Bilgi Eğitim masaüstü uygulaması (Tauri 2) — kurulum ön yüzü ve paketleme betikleri",
   "scripts": {

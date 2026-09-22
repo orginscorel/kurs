@@ -1,5 +1,16 @@
 [
   {
+    "version": "1.19.1",
+    "date": "2026-09-22",
+    "title": "Koçluk menüsü Günlük altında",
+    "items": [
+      {
+        "type": "duzeltme",
+        "text": "Koçluk menüsü Günlük başlığında Akademik yanına alındı"
+      }
+    ]
+  },
+  {
     "version": "1.19.0",
     "date": "2026-09-22",
     "title": "Portal Paketlerim + Ayarlar merkezi",
