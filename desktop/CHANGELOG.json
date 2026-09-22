@@ -1,5 +1,16 @@
 [
   {
+    "version": "1.16.2",
+    "date": "2026-09-22",
+    "title": "Ön kayıt hızlı ekleme düzeltmesi",
+    "items": [
+      {
+        "type": "duzeltme",
+        "text": "Ön kayıt (aday) eklerken \"Nereden duydu\" boş bırakılınca ya da yalnız veli telefonu girilince kayıt eklenmiyor / boş dönüyordu; artık isim ve bir telefon yeterli, çevrimdışı dahil sorunsuz eklenir"
+      }
+    ]
+  },
+  {
     "version": "1.16.1",
     "date": "2026-09-22",
     "title": "Web paneli hata mesajları",

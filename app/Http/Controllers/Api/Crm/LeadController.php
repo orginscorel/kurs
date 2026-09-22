@@ -368,7 +368,8 @@ class LeadController extends ApiController
             'school_name' => ['nullable', 'string', 'max:160'],
             'school_grade' => ['nullable', 'string', 'max:20'],
             'interested_program_id' => ['nullable', 'integer', Rule::exists('programs', 'id')],
-            'source' => ['required', Rule::in(array_keys(Lead::SOURCES))],
+            // Hızlı (özellikle çevrimdışı) ekleme kolay olsun: "Nereden duydu" opsiyonel; boşsa 'other' sayılır.
+            'source' => ['nullable', Rule::in(array_keys(Lead::SOURCES))],
             'source_detail' => ['nullable', 'string', 'max:160'],
             'offered_price' => ['nullable', 'numeric', 'min:0'],
             'owner_id' => ['nullable', 'integer', Rule::exists('users', 'id')],

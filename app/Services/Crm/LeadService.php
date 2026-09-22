@@ -29,6 +29,12 @@ class LeadService
         return DB::transaction(function () use ($data) {
             $lead = new Lead();
             $lead->fill(array_intersect_key($data, array_flip(self::FIELDS)));
+            // Offline/hızlı ekleme güvencesi: NOT NULL kolonlar boş bırakılınca çökmesin
+            // (yalnız veli telefonu verildiyse phone gelmez → '' olur; source her zaman bir değer taşır).
+            $lead->phone ??= '';
+            if (empty($lead->source)) {
+                $lead->source = 'other';
+            }
             $lead->stage = 'new';
             $lead->stage_position = (int) Lead::query()->where('stage', 'new')->max('stage_position') + 1;
             $lead->save();
@@ -47,6 +53,7 @@ class LeadService
     {
         return DB::transaction(function () use ($lead, $data) {
             $lead->fill(array_intersect_key($data, array_flip(self::FIELDS)));
+            $lead->phone ??= '';
             $lead->save();
             Audit::log('lead.updated', "{$lead->full_name} aday bilgilerini güncelledi.", $lead);
 
