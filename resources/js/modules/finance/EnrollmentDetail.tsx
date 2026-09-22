@@ -1,9 +1,9 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import {
-  AlertTriangle, CalendarPlus, Combine, Download, FileCheck2, FilePen, FileText, HandCoins, History, Lock, Pencil, Percent, Plus, Printer, RefreshCw, Scissors, Trash2, Undo2,
+  AlertTriangle, CalendarPlus, Combine, Download, FileCheck2, FilePen, FileText, HandCoins, History, Lock, Pencil, Percent, Plus, Printer, RefreshCw, RotateCcw, Save, Scissors, Trash2, Undo2,
 } from 'lucide-react'
 import { api, ApiError } from '@/lib/api'
 import { date, dateTime, money } from '@/lib/format'
@@ -13,7 +13,7 @@ import { DescriptionList, PageHeader, Panel } from '@/components/ui/layout'
 import { Alert, Badge, EmptyState, Skeleton } from '@/components/ui/feedback'
 import { Button, ButtonLink } from '@/components/ui/Button'
 import { Checkbox, Field, Input, Select, Textarea } from '@/components/ui/form'
-import { Modal } from '@/components/ui/overlay'
+import { Drawer, Modal } from '@/components/ui/overlay'
 import { PersonText } from '@/components/ui/contact'
 import { MetricRow, MoneyInput } from './components'
 import { NotePrintDialog, type NoteSelector } from './PromissoryNotes'
@@ -54,6 +54,7 @@ export default function EnrollmentDetail() {
   const [editing, setEditing] = useState(false)
   const [priceOpen, setPriceOpen] = useState(false)
   const [signOpen, setSignOpen] = useState(false)
+  const [contractEdit, setContractEdit] = useState(false)
   const [notes, setNotes] = useState<NoteSelector | null>(null)
   const navigate = useNavigate()
   const invoiceDraft = useMutation({
@@ -215,8 +216,9 @@ export default function EnrollmentDetail() {
                   <Button size="sm" icon={<Download className="size-3.5" />} onClick={() => api.download(`/finance/enrollments/${e.id}/contract.pdf`, undefined, `sozlesme-${e.contract!.contract_no}.pdf`).catch((err) => toast.error(err.message))}>PDF</Button>
                   {!e.contract.signed_at && canContract && (
                     <>
+                      <Button size="sm" icon={<FilePen className="size-3.5" />} onClick={() => setContractEdit(true)}>Sözleşmeyi düzenle</Button>
                       <Button size="sm" variant="ghost" icon={<RefreshCw className="size-3.5" />} loading={prepare.isPending} onClick={() => prepare.mutate()}>Metni yenile</Button>
-                      <Button size="sm" variant="primary" icon={<FilePen className="size-3.5" />} onClick={() => setSignOpen(true)}>İmzalandı</Button>
+                      <Button size="sm" variant="primary" icon={<FileCheck2 className="size-3.5" />} onClick={() => setSignOpen(true)}>İmzalandı</Button>
                     </>
                   )}
                 </div>
@@ -224,7 +226,10 @@ export default function EnrollmentDetail() {
             ) : canContract ? (
               <div>
                 <p className="text-[13px] text-ink-3">Bu kayıt için sözleşme hazırlanmamış.</p>
-                <Button size="sm" className="mt-3" icon={<FileText className="size-3.5" />} loading={prepare.isPending} onClick={() => prepare.mutate()}>Sözleşme hazırla</Button>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <Button size="sm" icon={<FileText className="size-3.5" />} loading={prepare.isPending} onClick={() => prepare.mutate()}>Sözleşme hazırla</Button>
+                  <Button size="sm" variant="ghost" icon={<FilePen className="size-3.5" />} onClick={() => setContractEdit(true)}>Hazırla ve düzenle</Button>
+                </div>
               </div>
             ) : (
               <p className="text-[13px] text-ink-3">Sözleşme yok.</p>
@@ -235,6 +240,13 @@ export default function EnrollmentDetail() {
 
       <PriceModal open={priceOpen} onClose={() => setPriceOpen(false)} detail={e} onSaved={refresh} />
       <SignModal open={signOpen} onClose={() => setSignOpen(false)} detail={e} onSaved={refresh} />
+      <ContractEditor
+        open={contractEdit}
+        onClose={() => setContractEdit(false)}
+        enrollmentId={e.id}
+        onSaved={refresh}
+        onSign={() => { setContractEdit(false); setSignOpen(true) }}
+      />
     </div>
   )
 }
@@ -591,5 +603,180 @@ function SignModal({ open, onClose, detail, onSaved }: { open: boolean; onClose:
         </Field>
       </div>
     </Modal>
+  )
+}
+
+type Placeholder = { key: string; label: string; kind: string }
+type EditorData = {
+  contract: { id: number; contract_no: string; signed_at: string | null } | null
+  signed: boolean
+  body_template: string | null
+  effective_template: string
+  default_template: string
+  placeholders: Placeholder[]
+  preview_html: string
+}
+
+/** Belge önizlemesini yazıcı çıktısına yakın gösteren kapsanmış stiller (yalnız token/utility). */
+const PREVIEW_CLASS = cn(
+  'contract-preview text-[13px] leading-relaxed text-ink',
+  '[&_h1]:text-[15px] [&_h1]:font-semibold [&_h1]:mb-1',
+  '[&_h2]:text-[13px] [&_h2]:font-semibold [&_h2]:text-ink-2 [&_h2]:mt-4 [&_h2]:mb-1.5 [&_h2]:border-b [&_h2]:border-line [&_h2]:pb-1',
+  '[&_.meta]:text-[12px] [&_.meta]:text-ink-3 [&_.muted]:text-ink-3',
+  '[&_table]:w-full [&_table]:my-1 [&_table]:border-collapse',
+  '[&_.kv_td]:py-1 [&_.kv_td]:align-top [&_.k]:w-1/3 [&_.k]:text-ink-3',
+  '[&_.grid_th]:text-left [&_.grid_th]:font-normal [&_.grid_th]:text-ink-3 [&_.grid_th]:border-b [&_.grid_th]:border-line [&_.grid_th]:px-2 [&_.grid_th]:py-1',
+  '[&_.grid_td]:border-b [&_.grid_td]:border-line [&_.grid_td]:px-2 [&_.grid_td]:py-1 [&_.r]:text-right',
+  '[&_.total_td]:font-semibold [&_.total_td]:border-t [&_.total_td]:border-line',
+  '[&_.terms]:pl-5 [&_.terms]:list-decimal [&_.terms_li]:mb-1',
+  '[&_.signs]:mt-8 [&_.signs_td]:w-1/2 [&_.signs_td]:pt-8 [&_.signs_td]:text-center [&_.signs_td]:text-[12px] [&_.signs_td]:text-ink-3',
+  '[&_.signs_.line]:border-t [&_.signs_.line]:border-line [&_.signs_.line]:pt-1 [&_.signs_.line]:mx-4',
+)
+
+/**
+ * Kayda özel sözleşme editörü. İmzadan ÖNCE düzenlenebilir; ödeme planı ve ücret dökümü otomatik gömülür.
+ * Sol: yer tutucu ekleme + metin; sağ: canlı önizleme. İmzalıysa yalnız okunur.
+ */
+function ContractEditor({ open, onClose, enrollmentId, onSaved, onSign }: { open: boolean; onClose: () => void; enrollmentId: number; onSaved: () => void; onSign: () => void }) {
+  const qc = useQueryClient()
+  const taRef = useRef<HTMLTextAreaElement>(null)
+  const [text, setText] = useState('')
+  const [preview, setPreview] = useState('')
+  const [loadedFor, setLoadedFor] = useState<number | null>(null)
+
+  const { data, isLoading, refetch } = useQuery({
+    queryKey: ['finance', 'contract-editor', enrollmentId],
+    queryFn: () => api.get<{ data: EditorData }>(`/finance/enrollments/${enrollmentId}/contract-editor`).then((r) => r.data),
+    enabled: open,
+  })
+  const signed = !!data?.signed
+
+  // İlk yüklemede metni doldur (kayda özel metin yoksa kurum şablonundan başlar).
+  useEffect(() => {
+    if (data && loadedFor !== enrollmentId) {
+      setText(data.body_template ?? data.effective_template)
+      setPreview(data.preview_html)
+      setLoadedFor(enrollmentId)
+    }
+  }, [data, enrollmentId, loadedFor])
+  useEffect(() => { if (!open) setLoadedFor(null) }, [open])
+
+  // Canlı önizleme (debounce).
+  useEffect(() => {
+    if (!open || signed || loadedFor !== enrollmentId) return
+    const t = setTimeout(() => {
+      api.post<{ data: { html: string } }>(`/finance/enrollments/${enrollmentId}/contract/preview`, { body_template: text })
+        .then((r) => setPreview(r.data.html))
+        .catch(() => {})
+    }, 400)
+    return () => clearTimeout(t)
+  }, [text, open, signed, enrollmentId, loadedFor])
+
+  const insert = (token: string) => {
+    const ta = taRef.current
+    if (!ta) { setText((t) => t + token); return }
+    const start = ta.selectionStart ?? text.length
+    const end = ta.selectionEnd ?? text.length
+    const next = text.slice(0, start) + token + text.slice(end)
+    setText(next)
+    requestAnimationFrame(() => { ta.focus(); ta.setSelectionRange(start + token.length, start + token.length) })
+  }
+
+  const save = useMutation({
+    mutationFn: (opts?: { thenSign?: boolean }) =>
+      api.put<{ message: string }>(`/finance/enrollments/${enrollmentId}/contract`, { body_template: text }).then((r) => ({ ...r, thenSign: opts?.thenSign })),
+    onSuccess: (r) => {
+      toast.success(r.message)
+      qc.invalidateQueries({ queryKey: ['finance', 'contract-editor', enrollmentId] })
+      onSaved()
+      if (r.thenSign) onSign()
+    },
+    onError: (err) => toast.error(err instanceof ApiError ? err.firstError() : 'Sözleşme kaydedilemedi.'),
+  })
+
+  const reset = useMutation({
+    mutationFn: () => api.put<{ message: string }>(`/finance/enrollments/${enrollmentId}/contract`, { body_template: null }),
+    onSuccess: async (r) => {
+      toast.success(r.message)
+      const fresh = await refetch()
+      if (fresh.data) { setText(fresh.data.effective_template); setPreview(fresh.data.preview_html) }
+      onSaved()
+    },
+    onError: (err) => toast.error(err instanceof ApiError ? err.firstError() : 'İşlem başarısız.'),
+  })
+
+  return (
+    <Drawer
+      open={open}
+      onClose={onClose}
+      width={920}
+      title="Sözleşmeyi düzenle"
+      description={signed ? 'Sözleşme imzalı; metin donduruldu ve değiştirilemez.' : 'Yer tutucuları kullanın; ödeme planı ve ücret dökümü otomatik gömülür. İmzadan önce serbestçe düzenleyebilirsiniz.'}
+      footer={
+        signed ? (
+          <Button variant="ghost" onClick={onClose}>Kapat</Button>
+        ) : (
+          <div className="flex w-full flex-wrap items-center justify-between gap-2">
+            <Button variant="ghost" icon={<RotateCcw className="size-3.5" />} loading={reset.isPending} onClick={() => reset.mutate()}>Kurum şablonuna sıfırla</Button>
+            <div className="flex flex-wrap gap-2">
+              <Button variant="ghost" onClick={onClose}>Vazgeç</Button>
+              <Button icon={<Save className="size-3.5" />} loading={save.isPending && !save.variables?.thenSign} onClick={() => save.mutate(undefined)}>Kaydet</Button>
+              <Button variant="primary" icon={<FileCheck2 className="size-3.5" />} loading={save.isPending && save.variables?.thenSign} onClick={() => save.mutate({ thenSign: true })}>Kaydet ve imzala</Button>
+            </div>
+          </div>
+        )
+      }
+    >
+      {isLoading || !data ? (
+        <div className="space-y-3"><Skeleton className="h-8" /><Skeleton className="h-64" /></div>
+      ) : (
+        <div className="grid gap-4 lg:grid-cols-2">
+          <div className="min-w-0">
+            {!signed && (
+              <div className="mb-2">
+                <p className="mb-1.5 text-[12px] font-medium text-ink-2">Yer tutucu ekle</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {data.placeholders.map((p) => (
+                    <button
+                      key={p.key}
+                      type="button"
+                      onClick={() => insert(p.key)}
+                      title={p.label}
+                      className={cn('rounded-md px-2 py-1 text-[11.5px] ring-1 ring-line hover:bg-surface-2', p.kind === 'tablo' ? 'bg-primary-soft text-primary' : 'bg-surface-2 text-ink-2')}
+                    >
+                      {p.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+            <Field label="Sözleşme metni" hint={signed ? undefined : 'HTML biçimlendirme (başlık, tablo, liste) desteklenir. {yer_tutucu} etiketleri korunur.'}>
+              <Textarea
+                ref={taRef}
+                value={text}
+                onChange={(ev) => setText(ev.target.value)}
+                disabled={signed}
+                rows={22}
+                spellCheck={false}
+                className="font-mono text-[12px] leading-relaxed"
+                maxLength={20000}
+              />
+            </Field>
+          </div>
+          <div className="min-w-0">
+            <p className="mb-1.5 text-[12px] font-medium text-ink-2">Önizleme</p>
+            <div className="rounded-lg border border-line bg-surface p-4 max-h-[70vh] overflow-y-auto scroll-thin">
+              <div className={PREVIEW_CLASS} dangerouslySetInnerHTML={{ __html: preview }} />
+            </div>
+            {data.contract && (
+              <div className="mt-2 flex flex-wrap gap-2">
+                <Button size="sm" variant="ghost" icon={<Printer className="size-3.5" />} onClick={() => openPdf(`/finance/enrollments/${enrollmentId}/contract.pdf`).catch((err) => toast.error(err.message))}>Yazdır</Button>
+                <Button size="sm" variant="ghost" icon={<Download className="size-3.5" />} onClick={() => api.download(`/finance/enrollments/${enrollmentId}/contract.pdf`, undefined, `sozlesme-${data.contract!.contract_no}.pdf`).catch((err) => toast.error(err.message))}>PDF indir</Button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </Drawer>
   )
 }

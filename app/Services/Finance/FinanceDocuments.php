@@ -7,9 +7,9 @@ use App\Models\Contract;
 use App\Models\Enrollment;
 use App\Models\Payment;
 use App\Models\User;
+use App\Services\Accounting\FinanceSettings;
 use App\Support\Audit;
 use App\Support\InstitutionFormat;
-use App\Support\Money;
 use App\Support\Sequence;
 use App\Support\Settings;
 use Barryvdh\DomPDF\Facade\Pdf;
@@ -40,7 +40,7 @@ class FinanceDocuments
                 throw new BusinessRuleException('Sözleşme imzalanmış; metni değiştirilemez.', 'contract_signed');
             }
 
-            $body = $this->contractBody($enrollment);
+            $body = $this->contractBody($enrollment, $contract?->body_template);
 
             if (! $contract) {
                 $contract = Contract::query()->create([
@@ -58,6 +58,55 @@ class FinanceDocuments
         });
     }
 
+    /**
+     * Kayda özel sözleşme metnini (düzenlenebilir kaynak = body_template) kaydeder ve body_snapshot'ı yeniler.
+     * $bodyTemplate null/boş → kayıt kurum şablonuna döner (özel metin temizlenir).
+     * İmzalanmış sözleşme metni değişmez.
+     */
+    public function saveDraft(Enrollment $enrollment, ?string $bodyTemplate): Contract
+    {
+        return DB::transaction(function () use ($enrollment, $bodyTemplate) {
+            /** @var Contract|null $contract */
+            $contract = Contract::query()->where('enrollment_id', $enrollment->id)->lockForUpdate()->first();
+
+            if ($contract?->signed_at) {
+                throw new BusinessRuleException('Sözleşme imzalanmış; metni değiştirilemez.', 'contract_signed');
+            }
+
+            $template = is_string($bodyTemplate) && trim($bodyTemplate) !== '' ? $bodyTemplate : null;
+            $body = $this->contractBody($enrollment, $template);
+
+            if (! $contract) {
+                $contract = Contract::query()->create([
+                    'enrollment_id' => $enrollment->id,
+                    'contract_no' => Sequence::next('contract', 'SZL', $enrollment->branch_id),
+                    'body_snapshot' => $body,
+                    'body_template' => $template,
+                ]);
+            } else {
+                $contract->forceFill(['body_snapshot' => $body, 'body_template' => $template])->save();
+            }
+
+            Audit::log(
+                'contract.edited',
+                $template === null
+                    ? "{$contract->contract_no} numaralı sözleşme metnini kurum şablonuna döndürdü."
+                    : "{$contract->contract_no} numaralı sözleşme metnini bu kayıt için düzenledi.",
+                $enrollment,
+            );
+
+            return $contract;
+        });
+    }
+
+    /** Kaydetmeden canlı önizleme: verilen (henüz kaydedilmemiş) metni güncel bilgilerle render eder. */
+    public function previewBody(Enrollment $enrollment, ?string $bodyTemplate): string
+    {
+        $template = is_string($bodyTemplate) && trim($bodyTemplate) !== '' ? $bodyTemplate : null;
+
+        return $this->contractBody($enrollment, $template);
+    }
+
     /** İmza: metin o anki kayıt bilgileriyle son kez üretilir ve donar. */
     public function signContract(Enrollment $enrollment, string $signedByName): Contract
     {
@@ -70,7 +119,7 @@ class FinanceDocuments
             $contract = $this->prepareContract($enrollment);
             $contract = Contract::query()->whereKey($contract->id)->lockForUpdate()->firstOrFail();
             $contract->forceFill([
-                'body_snapshot' => $this->contractBody($enrollment, $signedByName, now()),
+                'body_snapshot' => $this->contractBody($enrollment, $contract->body_template, $signedByName, now()),
                 'signed_at' => now(),
                 'signed_by_name' => mb_substr($signedByName, 0, 160),
             ])->save();
@@ -93,24 +142,29 @@ class FinanceDocuments
         return $inline ? $pdf->stream($name) : $pdf->download($name);
     }
 
-    public function contractBody(Enrollment $enrollment, ?string $signedBy = null, ?\DateTimeInterface $signedAt = null): string
+    /**
+     * Sözleşme gövdesini (HTML) üretir. $bodyTemplate verilirse (kayda özel düzenlenmiş metin) o kullanılır;
+     * yoksa kurum şablonu (accounting.contract_template), o da yoksa makul varsayılan metin kullanılır.
+     * Yer tutucular (ödeme planı, ücret dökümü, imza) o anki güncel kayıt bilgileriyle doldurulur.
+     */
+    public function contractBody(Enrollment $enrollment, ?string $bodyTemplate = null, ?string $signedBy = null, ?\DateTimeInterface $signedAt = null): string
     {
-        $enrollment->loadMissing(['student', 'program', 'term', 'package', 'classGroup', 'financialGuardian', 'installments']);
-        $student = $enrollment->student;
-        $guardian = $enrollment->financialGuardian
-            ?? $student?->guardians()->orderByDesc('guardian_student.is_financially_responsible')->orderByDesc('guardian_student.is_primary')->first();
+        $signedAt = $signedAt instanceof \DateTimeInterface ? \Carbon\CarbonImmutable::instance($signedAt) : null;
 
-        return view('pdf.finance.contract-body', [
-            'institution' => $this->institution(),
-            'enrollment' => $enrollment,
-            'student' => $student,
-            'guardian' => $guardian,
-            'installments' => $enrollment->installments->where('status', '!=', 'cancelled')->values(),
-            'money' => fn ($v) => Money::format($v),
-            'netWords' => AmountInWords::lira((string) $enrollment->net_price),
-            'signedBy' => $signedBy,
-            'signedAt' => $signedAt,
-        ])->render();
+        return ContractTemplate::render(
+            $enrollment,
+            $this->institution(),
+            $bodyTemplate,
+            FinanceSettings::get('contract_template'),
+            $signedBy,
+            $signedAt,
+        );
+    }
+
+    /** Kurum genelinde geçerli, kayda özel metin olmadığında kullanılan şablon (düzenlenebilir). */
+    public function institutionTemplate(): string
+    {
+        return ContractTemplate::effective(FinanceSettings::get('contract_template'));
     }
 
     /** @return array<string, mixed> */

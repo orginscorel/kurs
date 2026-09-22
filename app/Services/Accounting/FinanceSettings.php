@@ -32,6 +32,8 @@ final class FinanceSettings
         'note_court' => 'Erbaa',
         'note_consideration' => 'eğitim hizmeti karşılığı',
         'note_acceleration' => true,
+        // Kayıt sözleşmesi şablonu (yer tutuculu). Boş → ContractTemplate::defaultTemplate() kullanılır.
+        'contract_template' => null,
     ];
 
     public static function all(?int $branchId = null): array

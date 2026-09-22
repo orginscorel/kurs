@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Contract extends Model
 {
-    protected $fillable = ['enrollment_id', 'contract_no', 'body_snapshot', 'pdf_path', 'signed_at', 'signed_by_name'];
+    protected $fillable = ['enrollment_id', 'contract_no', 'body_snapshot', 'body_template', 'pdf_path', 'signed_at', 'signed_by_name'];
 
     protected $casts = ['signed_at' => 'datetime'];
 

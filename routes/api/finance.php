@@ -32,6 +32,8 @@ Route::prefix('finance')->group(function () {
         Route::get('enrollments', [EnrollmentController::class, 'index']);
         Route::get('enrollments/{enrollment}', [EnrollmentController::class, 'show'])->whereNumber('enrollment');
         Route::get('enrollments/{enrollment}/contract.pdf', [EnrollmentController::class, 'contractPdf'])->whereNumber('enrollment');
+        Route::get('enrollments/{enrollment}/contract-editor', [EnrollmentController::class, 'contractEditor'])->whereNumber('enrollment')->middleware('permission:enrollments.create|installments.manage');
+        Route::post('enrollments/{enrollment}/contract/preview', [EnrollmentController::class, 'previewContract'])->whereNumber('enrollment')->middleware('permission:enrollments.create|installments.manage');
 
         Route::get('entries', [EntryController::class, 'index']);
         Route::get('entries/export', [EntryController::class, 'export'])->middleware('permission:reports.export');
@@ -59,6 +61,7 @@ Route::prefix('finance')->group(function () {
     Route::put('enrollments/{enrollment}/plan', [EnrollmentController::class, 'restructure'])->middleware(['permission:installments.manage', 'throttle:writes']);
     Route::post('enrollments/{enrollment}/price', [EnrollmentController::class, 'adjustPrice'])->middleware(['permission:installments.manage', 'throttle:writes']);
     Route::post('enrollments/{enrollment}/contract', [EnrollmentController::class, 'prepareContract'])->middleware('permission:enrollments.create|installments.manage');
+    Route::put('enrollments/{enrollment}/contract', [EnrollmentController::class, 'saveContract'])->middleware(['permission:enrollments.create|installments.manage', 'throttle:writes']);
     Route::post('enrollments/{enrollment}/contract/sign', [EnrollmentController::class, 'signContract'])->middleware('permission:enrollments.create|installments.manage');
 
     // ---------------------------------------------------------------- gelir / gider

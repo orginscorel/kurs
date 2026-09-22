@@ -1,5 +1,20 @@
 [
   {
+    "version": "1.17.0",
+    "date": "2026-09-22",
+    "title": "Sözleşme editörü + offline sağlamlık",
+    "items": [
+      {
+        "type": "yeni",
+        "text": "Kayıt sözleşmesi editörü — sözleşme metnini yer tutucularla (öğrenci, veli, ücret, ödeme planı tablosu) düzenleme, canlı önizleme, kurum geneli şablon; imzadan önce serbestçe düzenlenir, imzalandıktan sonra kilitlenir"
+      },
+      {
+        "type": "iyilestirme",
+        "text": "Çevrimdışı sağlamlık — personel (pozisyon boş) ve rehberlik görüşmesi (özet boş) gibi formlarda opsiyonel alan boş bırakılınca kayıt eklenmiyordu; artık sorunsuz"
+      }
+    ]
+  },
+  {
     "version": "1.16.2",
     "date": "2026-09-22",
     "title": "Ön kayıt hızlı ekleme düzeltmesi",

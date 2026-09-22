@@ -33,9 +33,12 @@ class GuidanceService
     public function create(array $data): GuidanceMeeting
     {
         return DB::transaction(function () use ($data) {
-            $meeting = GuidanceMeeting::query()->create(array_intersect_key($data, array_flip(self::FIELDS)) + [
+            $attrs = array_intersect_key($data, array_flip(self::FIELDS)) + [
                 'counselor_id' => $data['counselor_id'] ?? auth()->id(),
-            ]);
+            ];
+            // Offline/hızlı kayıt güvencesi: özet opsiyoneldir; NOT NULL kolon boş/null bırakılınca çökmesin.
+            $attrs['summary'] ??= '';
+            $meeting = GuidanceMeeting::query()->create($attrs);
             $student = Student::query()->find($meeting->student_id);
             // Audit kaydının "subject"ı öğrencidir (morph map'te GuidanceMeeting yok; ayrıca öğrenci bazlı denetim izi daha kullanışlı).
             Audit::log('guidance.meeting_created', sprintf('%s öğrencisi için rehberlik görüşmesi kaydetti.', $student?->full_name ?? '—'), $student);
@@ -50,6 +53,8 @@ class GuidanceService
     {
         return DB::transaction(function () use ($meeting, $data) {
             $meeting->fill(array_intersect_key($data, array_flip(self::FIELDS)));
+            // Güncellemede özet boşaltılırsa NOT NULL çökmesin.
+            $meeting->summary ??= '';
             $meeting->save();
             Audit::log('guidance.meeting_updated', sprintf('%s için rehberlik görüşme kaydını güncelledi.', $meeting->student?->full_name ?? '—'), $meeting->student);
 

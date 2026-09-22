@@ -11,6 +11,7 @@ use App\Models\Enrollment;
 use App\Models\Payment;
 use App\Models\Program;
 use App\Models\Student;
+use App\Services\Finance\ContractTemplate;
 use App\Services\Finance\EnrollmentService;
 use App\Services\Finance\FinanceDocuments;
 use App\Services\Finance\InstallmentPlanService;
@@ -242,6 +243,46 @@ class EnrollmentController extends FinanceController
         $contract = $documents->prepareContract($enrollment);
 
         return $this->ok('Sözleşme güncel bilgilerle hazırlandı.', ['contract_no' => $contract->contract_no]);
+    }
+
+    /** Sözleşme editörü verisi: düzenlenebilir kaynak metin, kurum şablonu, yer tutucular ve canlı önizleme. */
+    public function contractEditor(Enrollment $enrollment, FinanceDocuments $documents): JsonResponse
+    {
+        $contract = Contract::query()->where('enrollment_id', $enrollment->id)->first();
+
+        return response()->json(['data' => [
+            'contract' => $contract ? [
+                'id' => $contract->id, 'contract_no' => $contract->contract_no,
+                'signed_at' => $contract->signed_at?->toAtomString(), 'signed_by_name' => $contract->signed_by_name,
+                'updated_at' => $contract->updated_at?->toAtomString(),
+            ] : null,
+            'signed' => (bool) $contract?->signed_at,
+            'body_template' => $contract?->body_template,
+            'effective_template' => $documents->institutionTemplate(),
+            'default_template' => ContractTemplate::defaultTemplate(),
+            'placeholders' => ContractTemplate::placeholders(),
+            'preview_html' => $documents->previewBody($enrollment, $contract?->body_template),
+        ]]);
+    }
+
+    /** Kaydetmeden canlı önizleme (yan etkisiz). */
+    public function previewContract(Request $request, Enrollment $enrollment, FinanceDocuments $documents): JsonResponse
+    {
+        $data = $this->validateTr($request, ['body_template' => ['nullable', 'string', 'max:20000']]);
+
+        return response()->json(['data' => ['html' => $documents->previewBody($enrollment, $data['body_template'] ?? null)]]);
+    }
+
+    /** Kayda özel sözleşme metnini kaydeder. body_template boş → kurum şablonuna döner. İmzalıysa reddedilir. */
+    public function saveContract(Request $request, Enrollment $enrollment, FinanceDocuments $documents): JsonResponse
+    {
+        $data = $this->validateTr($request, ['body_template' => ['nullable', 'string', 'max:20000']]);
+        $contract = $documents->saveDraft($enrollment, $data['body_template'] ?? null);
+
+        return $this->ok(
+            ($data['body_template'] ?? null) ? 'Sözleşme metni kaydedildi.' : 'Sözleşme kurum şablonuna döndürüldü.',
+            ['contract_no' => $contract->contract_no],
+        );
     }
 
     public function signContract(Request $request, Enrollment $enrollment, FinanceDocuments $documents): JsonResponse

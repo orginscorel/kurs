@@ -20,6 +20,8 @@ class EmployeeService
         return DB::transaction(function () use ($data) {
             $employee = new Employee(Arr::only($data, self::FIELDS));
             $employee->is_active ??= true;
+            // Offline/hızlı ekleme güvencesi: pozisyon opsiyoneldir; NOT NULL kolon boş bırakılınca çökmesin.
+            $employee->position ??= '';
             $employee->save();
 
             $tempPassword = null;
@@ -39,6 +41,8 @@ class EmployeeService
     {
         return DB::transaction(function () use ($employee, $data) {
             $employee->fill(Arr::only($data, self::FIELDS));
+            // Güncellemede pozisyon boşaltılırsa NOT NULL çökmesin.
+            $employee->position ??= '';
             $employee->save();
             $changes = Audit::diff($employee);
 

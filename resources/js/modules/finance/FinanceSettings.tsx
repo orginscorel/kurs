@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { Lock, Plus, Save, X } from 'lucide-react'
@@ -36,9 +36,12 @@ type SettingsData = {
   note_court: string | null
   note_consideration: string | null
   note_acceleration: boolean
+  contract_template: string | null
+  contract_template_default: string
+  contract_placeholders: { key: string; label: string; kind: string }[]
 }
 
-type Form = Omit<SettingsData, 'integrators' | 'invoice_note' | 'pos_settlement_days' | 'invoice_due_days' | 'note_payee' | 'note_place' | 'note_court' | 'note_consideration'> & {
+type Form = Omit<SettingsData, 'integrators' | 'invoice_note' | 'pos_settlement_days' | 'invoice_due_days' | 'note_payee' | 'note_place' | 'note_court' | 'note_consideration' | 'contract_template' | 'contract_template_default' | 'contract_placeholders'> & {
   note_payee: string
   note_place: string
   note_court: string
@@ -46,6 +49,7 @@ type Form = Omit<SettingsData, 'integrators' | 'invoice_note' | 'pos_settlement_
   invoice_note: string
   pos_settlement_days: string
   invoice_due_days: string
+  contract_template: string
 }
 
 const normRate = (v: string) => {
@@ -89,6 +93,7 @@ export default function FinanceSettings() {
       note_court: data.note_court ?? 'Erbaa',
       note_consideration: data.note_consideration ?? 'eğitim hizmeti karşılığı',
       note_acceleration: data.note_acceleration ?? true,
+      contract_template: data.contract_template ?? '',
     })
   }, [data])
 
@@ -129,6 +134,20 @@ export default function FinanceSettings() {
   }
 
   const set = <K extends keyof Form>(k: K, v: Form[K]) => setForm((f) => (f ? { ...f, [k]: v } : f))
+  const tplRef = useRef<HTMLTextAreaElement>(null)
+  const insertToken = (token: string) => {
+    const ta = tplRef.current
+    setForm((f) => {
+      if (!f) return f
+      const cur = f.contract_template
+      if (!ta) return { ...f, contract_template: cur + token }
+      const start = ta.selectionStart ?? cur.length
+      const end = ta.selectionEnd ?? cur.length
+      const next = cur.slice(0, start) + token + cur.slice(end)
+      requestAnimationFrame(() => { ta.focus(); ta.setSelectionRange(start + token.length, start + token.length) })
+      return { ...f, contract_template: next }
+    })
+  }
   const err = (k: string) => errors[k]?.[0] ?? null
   const addRate = () => {
     const r = normRate(newRate)
@@ -264,6 +283,50 @@ export default function FinanceSettings() {
                 <div className="sm:col-span-2"><Switch checked={form.note_acceleration} disabled={!editable} onChange={(v) => set('note_acceleration', v)} label="Muacceliyet şartı (bir senet ödenmezse diğerleri de muaccel olur)" /></div>
               </div>
               <Alert tone="warning" className="mt-3">Senet metni ve şartları kurum hukukçusu/muhasebecisiyle teyit edilmelidir.</Alert>
+            </Panel>
+
+            <Panel
+              title="Kayıt sözleşmesi şablonu"
+              description="Tüm yeni kayıtlarda kullanılan sözleşme metni. Yer tutucular her kayıtta güncel bilgilerle doldurulur; ödeme planı ve ücret dökümü otomatik gömülür. Her kayıtta ayrıca imzadan önce metin özelleştirilebilir."
+            >
+              {data && (
+                <div className="mb-2">
+                  <div className="mb-1.5 flex items-center justify-between gap-2">
+                    <p className="text-[12px] font-medium text-ink-2">Yer tutucu ekle</p>
+                    {editable && (
+                      <Button size="sm" variant="ghost" onClick={() => set('contract_template', data.contract_template_default)}>Varsayılan metne dön</Button>
+                    )}
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {data.contract_placeholders.map((p) => (
+                      <button
+                        key={p.key}
+                        type="button"
+                        disabled={!editable}
+                        onClick={() => insertToken(p.key)}
+                        title={p.label}
+                        className={cn('rounded-md px-2 py-1 text-[11.5px] ring-1 ring-line disabled:opacity-50', p.kind === 'tablo' ? 'bg-primary-soft text-primary' : 'bg-surface-2 text-ink-2 hover:bg-surface-3')}
+                      >
+                        {p.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+              <Field label="Şablon metni" optional hint="Boş bırakılırsa makul bir Türkçe varsayılan sözleşme kullanılır. HTML biçimlendirme desteklenir.">
+                <Textarea
+                  ref={tplRef}
+                  value={form.contract_template}
+                  disabled={!editable}
+                  onChange={(e) => set('contract_template', e.target.value)}
+                  rows={16}
+                  spellCheck={false}
+                  className="font-mono text-[12px] leading-relaxed"
+                  placeholder={data?.contract_template_default}
+                  maxLength={20000}
+                />
+              </Field>
+              <Alert tone="info" className="mt-3">İmzalanmış sözleşmelerin metni değişmez; şablon değişiklikleri yalnız yeni ve imzalanmamış sözleşmeleri etkiler.</Alert>
             </Panel>
 
             <Panel title="Portal uyarıları" description="Veli ve öğrenci portalının ana sayfasında vadesi geçmiş ödeme uyarısı">

@@ -94,7 +94,7 @@ class EmployeeController extends ApiController
     {
         return $request->validate([
             'first_name' => ['required', 'string', 'max:80'], 'last_name' => ['required', 'string', 'max:80'],
-            'position' => ['required', 'string', 'max:80'], 'phone' => ['nullable', 'string', 'max:20'],
+            'position' => ['nullable', 'string', 'max:80'], 'phone' => ['nullable', 'string', 'max:20'],
             'email' => ['nullable', 'email', 'max:190'], 'hired_on' => ['nullable', 'date'], 'is_active' => ['sometimes', 'boolean'],
             'link_user_id' => ['nullable', 'integer', 'exists:users,id'], 'create_user' => ['sometimes', 'boolean'], 'username' => ['nullable', 'string', 'max:60'],
         ]);

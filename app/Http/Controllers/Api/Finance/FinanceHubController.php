@@ -289,6 +289,8 @@ class FinanceHubController extends FinanceController
             'invoice_due_days' => (int) (Settings::get('accounting.invoice_due_days', 0) ?? 0),
             'portal_show_student_overdue' => (bool) Settings::get('portal.show_student_overdue_alert', true),
             'portal_show_guardian_overdue' => (bool) Settings::get('portal.show_guardian_overdue_alert', true),
+            'contract_template_default' => \App\Services\Finance\ContractTemplate::defaultTemplate(),
+            'contract_placeholders' => \App\Services\Finance\ContractTemplate::placeholders(),
         ]]);
     }
 
@@ -318,6 +320,7 @@ class FinanceHubController extends FinanceController
             'note_consideration' => ['nullable', 'string', 'max:80'],
             'note_acceleration' => ['boolean'],
             'portal_show_guardian_overdue' => ['boolean'],
+            'contract_template' => ['nullable', 'string', 'max:20000'],
         ], ['invoice_prefix.regex' => 'Fatura öneki 3 harf/rakam olmalı (GİB biçimi).', 'return_prefix.different' => 'İade faturası öneki satış önekinden farklı olmalı.']);
 
         $rates = array_values(array_unique(array_map(fn ($r) => str_replace(',', '.', $r), $data['vat_rates'])));
@@ -341,6 +344,11 @@ class FinanceHubController extends FinanceController
             'note_consideration' => $data['note_consideration'] ?? 'eğitim hizmeti karşılığı',
             'note_acceleration' => (bool) ($data['note_acceleration'] ?? true),
         ];
+        // Sözleşme şablonu yalnız gönderildiğinde güncellenir (fatura ayar formu göndermeyebilir); boş → kurum varsayılanına döner.
+        if ($request->exists('contract_template')) {
+            $tpl = is_string($data['contract_template'] ?? null) ? trim($data['contract_template']) : '';
+            $values['contract_template'] = $tpl !== '' ? $tpl : null;
+        }
         Settings::put('accounting', $values);
         Settings::put('portal', [
             'show_student_overdue_alert' => (bool) ($data['portal_show_student_overdue'] ?? true),

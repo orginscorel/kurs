@@ -151,7 +151,7 @@ class GuidanceMeetingController extends ApiController
             'counselor_id' => ['nullable', 'integer', Rule::exists('users', 'id')],
             'met_at' => ['required', 'date'],
             'kind' => ['required', Rule::in(array_keys(GuidanceMeeting::KINDS))],
-            'summary' => ['required', 'string', 'max:3000'],
+            'summary' => ['nullable', 'string', 'max:3000'],
             'goal' => ['nullable', 'string', 'max:500'],
             'motivation' => ['nullable', 'integer', 'min:1', 'max:5'],
             'study_discipline' => ['nullable', 'integer', 'min:1', 'max:5'],
