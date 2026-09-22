@@ -63,38 +63,44 @@ final class ContractTemplate
     public static function defaultTemplate(): string
     {
         return <<<'HTML'
-<h1>Eğitim Hizmeti Kayıt Sözleşmesi</h1>
-<p class="meta">Kayıt no: <strong>{kayit_no}</strong> · Düzenlenme: {tarih}</p>
+<h1>EĞİTİM HİZMETİ KAYIT SÖZLEŞMESİ</h1>
 
-<h2>1. Taraflar</h2>
+<p class="intro">İşbu sözleşme; bir tarafta <strong>{kurum_adi}</strong> ({kurum_adres}) — bundan sonra "Kurum" olarak anılacaktır — ile diğer tarafta aşağıda kimlik bilgileri yer alan öğrenci ve öğrenci adına hareket eden veli / ödeme sorumlusu — bundan sonra "Veli" olarak anılacaktır — arasında, aşağıdaki şart ve hükümlerle {tarih} tarihinde düzenlenmiştir.</p>
+
+<h2>MADDE 1 — TARAFLAR</h2>
 <table class="kv">
   <tr><td class="k">Kurum</td><td>{kurum_adi} — {kurum_adres}</td></tr>
-  <tr><td class="k">Öğrenci</td><td>{ogrenci_ad} (No {ogrenci_no})</td></tr>
-  <tr><td class="k">Veli / ödeme sorumlusu</td><td>{veli_ad} · {veli_telefon}</td></tr>
+  <tr><td class="k">Öğrenci</td><td>{ogrenci_ad} (Öğrenci No: {ogrenci_no})</td></tr>
+  <tr><td class="k">Veli / Ödeme Sorumlusu</td><td>{veli_ad} · {veli_telefon}</td></tr>
 </table>
 
-<h2>2. Eğitim hizmeti</h2>
+<h2>MADDE 2 — SÖZLEŞMENİN KONUSU</h2>
+<p>İşbu sözleşmenin konusu; öğrencinin aşağıda belirtilen eğitim programına kaydı ile bu program kapsamında Kurum tarafından sunulacak eğitim ve öğretim hizmetinin şartlarının, ücretinin ve tarafların karşılıklı hak ve yükümlülüklerinin belirlenmesidir.</p>
 <table class="kv">
   <tr><td class="k">Program</td><td>{program}</td></tr>
   <tr><td class="k">Dönem</td><td>{donem}</td></tr>
-  <tr><td class="k">Eğitim paketi</td><td>{paket}</td></tr>
+  <tr><td class="k">Eğitim Paketi</td><td>{paket}</td></tr>
   <tr><td class="k">Sınıf</td><td>{sinif}</td></tr>
-  <tr><td class="k">Kayıt tarihi</td><td>{kayit_tarihi}</td></tr>
+  <tr><td class="k">Kayıt No / Tarihi</td><td>{kayit_no} · {kayit_tarihi}</td></tr>
 </table>
 
-<h2>3. Ücret</h2>
+<h2>MADDE 3 — EĞİTİM ÜCRETİ</h2>
+<p>Taraflarca kararlaştırılan net eğitim bedeli aşağıda gösterilmiştir. Bu tutar, dönem boyunca sunulacak eğitim ve öğretim hizmetinin toplam karşılığıdır.</p>
 {ucret_tablosu}
 
-<h2>4. Ödeme planı</h2>
+<h2>MADDE 4 — ÖDEME PLANI</h2>
+<p>Net eğitim bedeli, aşağıdaki ödeme planında belirtilen tutar ve vade tarihlerinde ödenecektir. Yapılan her ödeme için Kurum tarafından numaralı tahsilat makbuzu düzenlenir.</p>
 {taksit_tablosu}
 
-<h2>5. Genel hükümler</h2>
+<h2>MADDE 5 — GENEL HÜKÜMLER</h2>
 <ol class="terms">
-  <li>Kurum, yukarıda belirtilen program kapsamında eğitim hizmetini dönem boyunca sunmayı taahhüt eder.</li>
-  <li>Veli / ödeme sorumlusu, ödeme planındaki taksitleri vade tarihlerinde ödemeyi kabul eder. Yapılan her ödeme için numaralı tahsilat makbuzu düzenlenir.</li>
-  <li>Ödeme planında yapılacak değişiklikler (vade, tutar, indirim veya burs) kurum kayıtlarına işlenir ve yazılı olarak bildirilir; toplam net bedel taraflarca aksi kararlaştırılmadıkça değişmez.</li>
-  <li>Kayıt dondurma, ayrılma ve ücret iadesi talepleri kurum yönetimine yazılı olarak yapılır ve yürürlükteki mevzuat çerçevesinde değerlendirilir.</li>
-  <li>Öğrenci ve veliye ait kişisel veriler 6698 sayılı KVKK kapsamında, yalnızca eğitim hizmetinin yürütülmesi amacıyla işlenir.</li>
+  <li>Kurum, yukarıda belirtilen program kapsamındaki eğitim ve öğretim hizmetini dönem boyunca sunmayı taahhüt eder.</li>
+  <li>Veli, ödeme planında yer alan taksitleri vade tarihlerinde ödemeyi kabul ve taahhüt eder. Vadesinde ödenmeyen taksitler için Kurum yazılı bildirimde bulunur.</li>
+  <li>Ödeme planında yapılacak değişiklikler (vade, tutar, indirim veya burs) tarafların mutabakatı ile Kurum kayıtlarına işlenir ve yazılı olarak bildirilir; toplam net bedel, taraflarca aksi kararlaştırılmadıkça değişmez.</li>
+  <li>Kayıt dondurma, ayrılma ve ücret iadesi talepleri Kurum yönetimine yazılı olarak yapılır; yürürlükteki mevzuat ve Kurum yönetmeliği çerçevesinde değerlendirilir.</li>
+  <li>Öğrenci ve veliye ait kişisel veriler, 6698 sayılı Kişisel Verilerin Korunması Kanunu kapsamında yalnızca eğitim hizmetinin yürütülmesi amacıyla işlenir ve üçüncü kişilerle paylaşılmaz.</li>
+  <li>İşbu sözleşmeden doğabilecek uyuşmazlıkların çözümünde Kurumun bulunduğu yer mahkemeleri ve icra daireleri yetkilidir.</li>
+  <li>Yedi (7) maddeden ibaret işbu sözleşme, taraflarca okunup içeriği kabul edilerek imza altına alınmış olup imza tarihinde yürürlüğe girer.</li>
 </ol>
 
 {imza_bloklari}
@@ -228,8 +234,8 @@ HTML;
             : '';
 
         return '<table class="signs"><tr>'
-            .'<td><div class="line">Kurum yetkilisi<br><strong>'.e($institutionName).'</strong></div></td>'
-            .'<td><div class="line">Veli / ödeme sorumlusu<br><strong>'.e($signedBy).'</strong>'.$signerLine.'</div></td>'
+            .'<td><div class="line">Kurum Adına — Yetkili İmza / Kaşe<br><strong>'.e($institutionName).'</strong></div></td>'
+            .'<td><div class="line">Veli / Ödeme Sorumlusu — İmza<br><strong>'.e($signedBy).'</strong>'.$signerLine.'</div></td>'
             .'</tr></table>';
     }
 }

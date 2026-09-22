@@ -1,5 +1,16 @@
 [
   {
+    "version": "1.17.1",
+    "date": "2026-09-22",
+    "title": "Sözleşme PDF'i resmî biçim",
+    "items": [
+      {
+        "type": "duzeltme",
+        "text": "Kayıt sözleşmesi PDF'i resmî sözleşme biçimine getirildi — renkli/gayriresmî görünüm kaldırıldı (siyah-beyaz), resmi tipografi ve madde madde yapı (İşbu sözleşme… / MADDE 1-7), biçimsel imza ve kaşe alanları"
+      }
+    ]
+  },
+  {
     "version": "1.17.0",
     "date": "2026-09-22",
     "title": "Sözleşme editörü + offline sağlamlık",
