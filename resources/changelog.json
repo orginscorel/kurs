@@ -1,5 +1,16 @@
 [
   {
+    "version": "1.16.1",
+    "date": "2026-09-22",
+    "title": "Web paneli hata mesajları",
+    "items": [
+      {
+        "type": "duzeltme",
+        "text": "Cihaz web paneli \"Bağlantıyı test et\", kullanıcı okuma ve silme işlemleri başarısız olduğunda cihazın asıl yanıtı (ulaşılamadı / kullanıcı adı-şifre yanlış vb.) yerine genel \"bir sorun oluştu\" mesajı gösteriliyordu; artık gerçek neden görünüyor"
+      }
+    ]
+  },
+  {
     "version": "1.16.0",
     "date": "2026-09-21",
     "title": "Terminale otomatik kayıt (cihaza yazma)",

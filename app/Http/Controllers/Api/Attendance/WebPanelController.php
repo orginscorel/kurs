@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\Attendance;
 use App\Http\Controllers\Api\ApiController;
 use App\Models\Device;
 use App\Services\Devices\Terminal\Data\DeviceUser;
+use App\Services\Devices\Terminal\DriverResult;
 use App\Services\Devices\WebPanel\WebPanelDriver;
 use App\Support\Audit;
 use Illuminate\Http\JsonResponse;
@@ -61,7 +62,7 @@ class WebPanelController extends ApiController
     {
         $r = $this->panel->deviceInfo($device);
         if (! $r->isOk()) {
-            return response()->json($r->toArray(), 422);
+            return $this->driverFail($r);
         }
 
         $rd = is_array($r->data) ? $r->data : [];
@@ -82,7 +83,7 @@ class WebPanelController extends ApiController
     {
         $r = $this->panel->fetchUsers($device);
         if (! $r->isOk()) {
-            return response()->json($r->toArray(), 422);
+            return $this->driverFail($r);
         }
 
         return response()->json(['data' => array_map(fn (DeviceUser $u) => $u->toArray(), $r->data ?? [])]);
@@ -93,13 +94,27 @@ class WebPanelController extends ApiController
     {
         $r = $this->panel->deleteUsers($device, [$no]);
         if (! $r->isOk()) {
-            return response()->json($r->toArray(), 422);
+            return $this->driverFail($r);
         }
 
         DB::table('terminal_device_users')->where('device_id', $device->id)->where('user_no', $no)->delete();
         Audit::log('device.webpanel_user_deleted', "Cihaz #{$device->id} üzerinden {$no} numaralı kullanıcı silindi.", $device);
 
         return response()->json(['message' => "Cihazdan {$no} numaralı kullanıcı silindi. Kişinin PDKS eşlemesini kaldırmak isterseniz Kişiler listesinden yapabilirsiniz."]);
+    }
+
+    /**
+     * Başarısız sürücü sonucunu ön yüzün OKUYABİLECEĞİ biçime çevirir: ApiError `message` anahtarını okur;
+     * DriverResult'ın Türkçe `mesaj`/`oneri` alanları aksi hâlde yutulur ve genel hata görünürdü.
+     */
+    private function driverFail(DriverResult $r): JsonResponse
+    {
+        return response()->json(array_filter([
+            'message' => $r->message.($r->hint !== '' ? ' — '.$r->hint : ''),
+            'error_code' => $r->status->value,
+            'durum' => $r->status->value,
+            'oneri' => $r->hint !== '' ? $r->hint : null,
+        ], fn ($v) => $v !== null), 422);
     }
 
     private function describe(Device $device): array

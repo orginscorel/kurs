@@ -247,6 +247,25 @@ class WebPanelTest extends TestCase
         $this->assertDatabaseMissing('terminal_device_users', ['device_id' => $device->id, 'user_no' => '9001']);
     }
 
+    public function test_test_endpoint_surfaces_real_message_not_generic_fallback(): void
+    {
+        // Regresyon: uç, hata durumunda `message` anahtarıyla dönmeli; yoksa ön yüz (ApiError) genel
+        // "İşlem sırasında bir sorun oluştu" fallback'ini basıp cihazın asıl cevabını yutuyordu.
+        $device = $this->actingAdminOnLocalNode();
+        $device->panel_user = 'admin';
+        $device->panel_password = 'admin';
+        $device->panel_port = 80;
+        $device->save();
+
+        Http::fake(fn () => Http::response('401', 401));  // yanlış kimlik: challenge yok → cihaz 401 döner
+
+        $res = $this->postJson("/api/v1/attendance/pdks/panel/{$device->id}/test")->assertStatus(422);
+        $msg = (string) $res->json('message');
+        $this->assertNotSame('', $msg);
+        $this->assertStringContainsString('şifre', mb_strtolower($msg));   // gerçek neden görünüyor
+        $this->assertStringNotContainsString('bir sorun oluştu', $msg);   // genel fallback DEĞİL
+    }
+
     public function test_probe_command_adds_verifies_and_cleans_up_test_user(): void
     {
         $device = $this->actingAdminOnLocalNode();
