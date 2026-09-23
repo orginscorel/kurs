@@ -74,12 +74,27 @@ export default function OnboardingWizard() {
   const qc = useQueryClient()
   const me = useAuth((s) => s.me)
   const [params, setParams] = useSearchParams()
-  const stepParam = params.get('adim') as StepKey | null
-  const index = Math.max(0, STEPS.findIndex((s) => s.key === stepParam))
-  const current = STEPS[index]!
   const overview = useQuery({ queryKey: ['onboarding', 'overview'], queryFn: () => api.get<Overview>('/onboarding/overview') })
   const o = overview.data
+  const stepParam = params.get('adim')
+  const validKey = (k: string | null): k is StepKey => !!k && STEPS.some((s) => s.key === k)
+  // Kaldığı yerden devam: geçerli ?adim yoksa localStorage'daki son adım, o da yoksa ilk tamamlanmamış adım.
+  const resumeKey: StepKey = validKey(stepParam)
+    ? stepParam
+    : (() => {
+        try { const s = localStorage.getItem('onboarding.step'); if (validKey(s)) return s } catch { /* erişilemezse yok say */ }
+        if (o) return (STEPS.find((s) => !s.optional && !o.steps[s.key]) ?? STEPS.find((s) => !o.steps[s.key]))?.key ?? STEPS[0]!.key
+        return STEPS[0]!.key
+      })()
+  const index = Math.max(0, STEPS.findIndex((s) => s.key === resumeKey))
+  const current = STEPS[index]!
   const railRef = useRef<HTMLDivElement>(null)
+
+  // URL'yi çözülen adıma eşitle (yenileme/derin bağlantıya dayanıklı) + son adımı sakla.
+  useEffect(() => {
+    if (stepParam !== resumeKey) setParams((p) => { p.set('adim', resumeKey); return p }, { replace: true })
+    try { localStorage.setItem('onboarding.step', resumeKey) } catch { /* erişilemezse yok say */ }
+  }, [resumeKey, stepParam, setParams])
 
   // Mobilde seçili adım yatay şeritte görünür kalsın
   useEffect(() => {
