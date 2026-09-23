@@ -10,6 +10,7 @@ use App\Services\Messaging\Providers\EmailSimulationProvider;
 use App\Services\Messaging\Providers\SmsGenericHttpProvider;
 use App\Services\Messaging\Providers\WhatsAppGenericHttpProvider;
 use App\Services\Messaging\Providers\WhatsAppMetaCloudProvider;
+use App\Services\Messaging\Providers\WhatsAppWwebjsProvider;
 use App\Services\Messaging\Sms\Drivers\MutlucellGateway;
 use App\Services\Messaging\Sms\Drivers\NetGsmGateway;
 use App\Services\Messaging\Sms\Drivers\SimulationGateway;
@@ -55,6 +56,7 @@ class ProviderFactory
     {
         return match (true) {
             $kind === 'whatsapp' && $providerName === 'meta_cloud' => new WhatsAppMetaCloudProvider,
+            $kind === 'whatsapp' && $providerName === 'wwebjs' => new WhatsAppWwebjsProvider,
             $kind === 'whatsapp' => new WhatsAppGenericHttpProvider,
             $kind === 'sms' && isset(self::SMS_GATEWAYS[$providerName ?? '']) => app(self::SMS_GATEWAYS[$providerName]),
             $kind === 'sms' => new SmsGenericHttpProvider,

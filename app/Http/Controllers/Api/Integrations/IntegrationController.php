@@ -18,7 +18,7 @@ class IntegrationController extends ApiController
     public const KINDS = ['whatsapp', 'sms', 'email', 'payment', 'optical', 'biometric', 'storage'];
 
     private const PROVIDERS = [
-        'whatsapp' => ['meta_cloud' => 'Meta Cloud API', 'generic_http' => 'Genel HTTP'],
+        'whatsapp' => ['wwebjs' => 'WhatsApp QR (kalıcı oturum)', 'meta_cloud' => 'Meta Cloud API', 'generic_http' => 'Genel HTTP'],
         'sms' => ['netgsm' => 'NetGSM', 'mutlucell' => 'Mutlucell', 'vatansms' => 'VatanSMS', 'simulation' => 'Simülasyon (test)', 'generic_http' => 'Genel HTTP (NetGSM uyumlu)'],
         'email' => ['smtp' => 'SMTP', 'simulation' => 'Simülasyon (test)'],
         'payment' => ['iyzico' => 'iyzico', 'generic' => 'Diğer'],
@@ -35,6 +35,11 @@ class IntegrationController extends ApiController
      * tur: metin | sayi | gizli | secim | anahtar(boolean)
      */
     private const FIELDS = [
+        'wwebjs' => [
+            ['ad' => 'base_url', 'etiket' => 'Bot adresi (URL)', 'tur' => 'metin', 'zorunlu' => true, 'ipucu' => 'Örn. http://sunucu-ip:3000'],
+            ['ad' => 'api_key', 'etiket' => 'Bot jetonu (API Token)', 'tur' => 'gizli', 'zorunlu' => true],
+            ['ad' => 'session_id', 'etiket' => 'Oturum adı', 'tur' => 'metin', 'varsayilan' => 'kurs', 'ipucu' => 'Her kurum için ayrı numara = ayrı oturum adı.'],
+        ],
         'meta_cloud' => [
             ['ad' => 'phone_number_id', 'etiket' => 'Telefon numarası kimliği (Phone Number ID)', 'tur' => 'metin', 'zorunlu' => true],
             ['ad' => 'business_account_id', 'etiket' => 'İşletme hesabı kimliği (WABA ID)', 'tur' => 'metin', 'zorunlu' => true],

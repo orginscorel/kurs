@@ -201,11 +201,24 @@ class EventNotificationService
         $integration = $resolved['integration'] ?? null;
         $live = $integration && $integration->is_enabled && $integration->status === 'connected';
 
+        // ANTİ-BAN: gönderim gecikmesi + jitter (sends'i zamana yay), günlük limit ve ret (opt-out) listesi.
+        $config = $integration ? $integration->config() : [];
+        $delayMs = (int) ($config['send_delay_ms'] ?? 4000);
+        $jitterMs = (int) ($config['jitter_ms'] ?? 3000);
+        $dailyLimit = (int) ($config['daily_limit'] ?? 800);
+        $optOut = $this->optOutSet($config);
+        $sentToday = $live ? OutboundMessage::query()
+            ->where('branch_id', $batch->branch_id)->where('channel', 'whatsapp')
+            ->whereIn('status', ['queued', 'sending', 'sent', 'delivered', 'read'])
+            ->whereDate('created_at', now()->toDateString())->count() : 0;
+        $allowance = max(0, $dailyLimit - $sentToday);
+
         $sent = 0;
-        DB::transaction(function () use ($batch, $userId, $live, &$sent) {
+        DB::transaction(function () use ($batch, $userId, $live, &$sent, $delayMs, $jitterMs, $allowance, $optOut) {
             $batch->update(['status' => 'approved', 'approved_by' => $userId, 'approved_at' => now()]);
 
             $drafts = $batch->messages()->where('status', 'draft')->get();
+            $queued = 0;
             foreach ($drafts as $msg) {
                 if (empty($msg->to)) {
                     $msg->forceFill(['status' => 'failed', 'error' => 'Alıcı adresi/numarası bulunamadı.'])->save();
@@ -213,8 +226,20 @@ class EventNotificationService
                     continue;
                 }
                 if ($live) {
+                    if (isset($optOut[$this->digits($msg->to)])) {
+                        $msg->forceFill(['status' => 'cancelled', 'error' => 'Alıcı ret (opt-out) listesinde.'])->save();
+
+                        continue;
+                    }
+                    if ($queued >= $allowance) {
+                        $msg->forceFill(['status' => 'failed', 'error' => 'Günlük WhatsApp gönderim limiti aşıldı; yarın "yeniden dene" ile gönderebilirsiniz.'])->save();
+
+                        continue;
+                    }
+                    $wait = $queued * $delayMs + ($jitterMs > 0 ? random_int(0, $jitterMs) : 0);
                     $msg->forceFill(['status' => 'queued'])->save();
-                    SendOutboundMessage::dispatch($msg->id, $msg->branch_id);
+                    SendOutboundMessage::dispatch($msg->id, $msg->branch_id)->delay(now()->addMilliseconds($wait));
+                    $queued++;
                 } else {
                     // Simülasyon: gerçek gönderim YOK. Demo/önizleme için "gönderildi" olarak işaretlenir.
                     $msg->forceFill(['status' => 'sent', 'provider' => 'simulation', 'sent_at' => now()])->save();
@@ -229,15 +254,44 @@ class EventNotificationService
 
     // ----------------------------------------------------------------- Yardımcılar
 
+    /** Ret (opt-out) listesini normalize edilmiş rakam kümesine çevirir (hızlı arama). */
+    private function optOutSet(array $config): array
+    {
+        $raw = (string) ($config['opt_out'] ?? '');
+        if (trim($raw) === '') {
+            return [];
+        }
+        $set = [];
+        foreach (preg_split('/[\r\n,;]+/', $raw) ?: [] as $num) {
+            $d = $this->digits($num);
+            if ($d !== '') {
+                $set[$d] = true;
+            }
+        }
+
+        return $set;
+    }
+
+    /** Telefondan yalnız rakamlar; baştaki 0 ve 90 ülke kodu kırpılır (opt-out eşleşmesi için). */
+    private function digits(string $phone): string
+    {
+        $d = ltrim(preg_replace('/\D+/', '', $phone) ?? '', '0');
+        if (str_starts_with($d, '90') && strlen($d) === 12) {
+            $d = substr($d, 2);
+        }
+
+        return $d;
+    }
+
     private function students(array $input): Collection
     {
         if (! empty($input['student_ids'])) {
-            return Student::query()->whereIn('id', $input['student_ids'])->get();
+            return Student::query()->with('guardians')->whereIn('id', $input['student_ids'])->get();
         }
         if (! empty($input['class_group_id'])) {
             $group = ClassGroup::query()->find($input['class_group_id']);
 
-            return $group ? $group->students()->get() : collect();
+            return $group ? $group->students()->with('guardians')->get() : collect();
         }
 
         return collect();

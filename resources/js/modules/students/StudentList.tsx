@@ -122,8 +122,10 @@ export default function StudentList() {
         sortKey: 'student_no',
         cell: (s) => <span className="tabular text-ink-2">{s.student_no}</span>,
       },
-      { key: 'class', priority: 2, header: 'Sınıf / Şube', hideable: true, cell: (s) => (s.class_groups.length ? <span className="text-ink-2">{s.class_groups.map((g) => g.name).join(', ')}</span> : <span className="text-ink-3">Şubesiz</span>) },
-      { key: 'program', header: 'Kayıtlı program', hideable: true, defaultHidden: true, cell: (s) => <span className="text-ink-2">{s.program ?? '—'}</span> },
+      { key: 'class', priority: 2, header: 'Şube', hideable: true, cell: (s) => (s.class_groups.length ? <span className="text-ink-2">{s.class_groups.map((g) => g.name).join(', ')}</span> : <span className="text-ink-3">Şubesiz</span>) },
+      { key: 'grade', priority: 3, header: 'Sınıf', hideable: true, cell: (s) => <span className="text-ink-2">{s.school_grade ?? '—'}</span> },
+      { key: 'field', priority: 3, header: 'Alan', hideable: true, cell: (s) => <span className="text-ink-2">{s.field ?? '—'}</span> },
+      { key: 'program', priority: 4, header: 'Kayıtlı program', hideable: true, cell: (s) => <span className="text-ink-2">{s.program ?? '—'}</span> },
       {
         key: 'guardian', priority: 2,
         header: 'Veli',
@@ -139,7 +141,6 @@ export default function StudentList() {
           ),
       },
       { key: 'phone', header: 'Öğrenci telefonu', hideable: true, defaultHidden: true, cell: (s) => <PhoneText value={s.phone} whatsapp /> },
-      { key: 'grade', header: 'Sınıf seviyesi / alan', hideable: true, defaultHidden: true, cell: (s) => <span className="text-ink-2">{s.school_grade ?? '—'}{s.field ? ` · ${s.field}` : ''}</span> },
       { key: 'registered', header: 'Kayıt tarihi', sortKey: 'registered_on', hideable: true, defaultHidden: true, cell: (s) => <span className="tabular text-ink-2 whitespace-nowrap">{s.registered_on ? date(s.registered_on) : '—'}</span> },
       {
         key: 'tags',

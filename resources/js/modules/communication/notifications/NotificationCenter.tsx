@@ -8,8 +8,9 @@ import type { Catalog } from './types'
 import BatchesPanel from './BatchesPanel'
 import TemplatesPanel from './TemplatesPanel'
 import SettingsPanel from './SettingsPanel'
+import WhatsAppConnectionPanel from './WhatsAppConnectionPanel'
 
-type Tab = 'gonderimler' | 'sablonlar' | 'ayarlar'
+type Tab = 'gonderimler' | 'sablonlar' | 'ayarlar' | 'baglanti'
 
 /**
  * Bildirim Merkezi: tek menü altında üç sekme — Gönderimler (olay bildirimleri), Şablonlar (olay×kitle metinleri),
@@ -18,6 +19,7 @@ type Tab = 'gonderimler' | 'sablonlar' | 'ayarlar'
 export default function NotificationCenter() {
   const can = useCan()
   const canManage = can('templates.manage')
+  const canConnect = can('integrations.manage')
   const [tab, setTab] = useState<Tab>('gonderimler')
 
   const { data: catalog, isLoading } = useQuery({ queryKey: ['notif', 'catalog'], queryFn: () => api.get<Catalog>('/notifications/catalog'), staleTime: 10 * 60_000 })
@@ -36,6 +38,7 @@ export default function NotificationCenter() {
           { value: 'gonderimler', label: 'Gönderimler' },
           { value: 'sablonlar', label: 'Şablonlar', hidden: !canManage },
           { value: 'ayarlar', label: 'Ayarlar', hidden: !canManage },
+          { value: 'baglanti', label: 'WhatsApp Bağlantısı', hidden: !canConnect },
         ]}
         className="mb-4"
       />
@@ -46,8 +49,10 @@ export default function NotificationCenter() {
         <BatchesPanel catalog={catalog} />
       ) : tab === 'sablonlar' ? (
         <TemplatesPanel catalog={catalog} />
-      ) : (
+      ) : tab === 'ayarlar' ? (
         <SettingsPanel catalog={catalog} />
+      ) : (
+        <WhatsAppConnectionPanel />
       )}
     </div>
   )

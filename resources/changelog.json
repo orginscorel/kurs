@@ -1,5 +1,28 @@
 [
   {
+    "version": "1.22.0",
+    "date": "2026-09-23",
+    "title": "WhatsApp QR bağlantısı ve öğrenci tablosu iyileştirmeleri",
+    "items": [
+      {
+        "type": "yeni",
+        "text": "WhatsApp QR bağlantısı — İletişim → Bildirim Merkezi'nde QR okutup kalıcı 7/24 oturum aç; bildirimler (ders programı, rehberlik, etüt, koçluk, birebir, ödeme, yoklama) öğrenci/veli/öğretmen/yönetici ayrı şablonlarla WhatsApp'tan iletilir"
+      },
+      {
+        "type": "yeni",
+        "text": "WhatsApp gönderiminde hız-sınırlama ve anti-ban (mesajlar zamana yayılır, günlük limit, opt-out); bağlı değilken güvenli simülasyon"
+      },
+      {
+        "type": "iyilestirme",
+        "text": "Öğrenciler tablosunda Öğrenci no, Şube, Sınıf, Alan ve Kayıtlı program artık varsayılan görünür ayrı sütunlar"
+      },
+      {
+        "type": "iyilestirme",
+        "text": "Telefon alanlarındaki WhatsApp kısayolu artık net WhatsApp logolu, yazılı yeşil rozet"
+      }
+    ]
+  },
+  {
     "version": "1.21.0",
     "date": "2026-09-23",
     "title": "Bildirim Merkezi, sadeleşen menü ve çevrimdışı kararlılık",
