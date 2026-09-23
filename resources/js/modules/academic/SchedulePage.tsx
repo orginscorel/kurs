@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { AlertTriangle, CalendarDays, ChevronLeft, ChevronRight, Plus, Search } from 'lucide-react'
+import { AlertTriangle, BellRing, CalendarDays, ChevronLeft, ChevronRight, Plus, Search } from 'lucide-react'
 import { api, ApiError } from '@/lib/api'
 import { date, todayISO } from '@/lib/format'
 import { useCan } from '@/app/auth'
@@ -135,7 +135,14 @@ export default function SchedulePage() {
       <PageHeader
         title="Ders programı"
         description="Haftalık şablonu sürükleyerek taşıyın; boş bir saate tıklayarak ders ekleyin. Çakışmalar kaydedilmez."
-        actions={manage && <Button variant="primary" icon={<Plus className="size-4" />} onClick={() => { setPreset(undefined); setEditItem(null); setP({ yeni: '1' }) }}>Ders ekle</Button>}
+        actions={
+          <>
+            {view === 'class_group' && id > 0 && can('messages.send') && (
+              <ButtonLink variant="secondary" icon={<BellRing className="size-4" />} to={`/iletisim/bildirim-merkezi/gonder?event=schedule.published&class_group=${id}`}>Programı bildir</ButtonLink>
+            )}
+            {manage && <Button variant="primary" icon={<Plus className="size-4" />} onClick={() => { setPreset(undefined); setEditItem(null); setP({ yeni: '1' }) }}>Ders ekle</Button>}
+          </>
+        }
       />
 
       <div className="mb-4 flex flex-col gap-3 rounded-[var(--radius-lg)] bg-surface ring-1 ring-line p-3">

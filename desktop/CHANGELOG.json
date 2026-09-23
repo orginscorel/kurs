@@ -1,5 +1,32 @@
 [
   {
+    "version": "1.21.0",
+    "date": "2026-09-23",
+    "title": "Bildirim Merkezi, sadeleşen menü ve çevrimdışı kararlılık",
+    "items": [
+      {
+        "type": "yeni",
+        "text": "Bildirim Merkezi — olay ve kitleye göre WhatsApp şablonları, taslak önizleme + PDF + onaylı gönderim"
+      },
+      {
+        "type": "yeni",
+        "text": "Ders programı/takvim ve deneme sınavında konu seçimi ve satır-içi yeni konu oluşturma"
+      },
+      {
+        "type": "iyilestirme",
+        "text": "Kenar çubuğu sadeleştirildi (Öğrenciler/Veliler/Öğretmenler ayrı başlıklar)"
+      },
+      {
+        "type": "duzeltme",
+        "text": "Yeniden başlatmadan sonra yanlış \"çevrimdışı\" durumu ve gereksiz internet uyarıları düzeltildi"
+      },
+      {
+        "type": "iyilestirme",
+        "text": "Öğrenciler tablosunda ayrı \"Öğrenci no\" ve \"Sınıf / Şube\" sütunları"
+      }
+    ]
+  },
+  {
     "version": "1.20.0",
     "date": "2026-09-23",
     "title": "Kararlılık ve arayüz iyileştirmeleri",

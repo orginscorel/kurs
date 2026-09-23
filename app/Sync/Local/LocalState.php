@@ -91,6 +91,13 @@ class LocalState
         if (in_array($phase, ['offline', 'error'], true) && $lastAttempt && strtotime($lastAttempt) < now()->getTimestamp() - 300) {
             $phase = 'stale';
         }
+        // Planlanan yeniden deneme zamanı geçtiği hâlde durum tazelenmemişse (tipik olarak uygulama YENİ AÇILDI ve ilk
+        // eşitleme turu henüz inmedi; state.json kapanmadan önceki "çevrimdışı"yı taşıyor) bayat "Çevrimdışı" yerine
+        // "Eşitleme bekliyor" göster — kullanıcı yeniden başlatınca yanlışlıkla "internete bağlı değil" izlenimi olmasın.
+        $nextAttempt = $file['next_attempt_at'] ?? null;
+        if (in_array($phase, ['offline', 'error'], true) && $nextAttempt && strtotime($nextAttempt) < now()->getTimestamp() - 30) {
+            $phase = 'stale';
+        }
 
         return [
             'phase' => $paired ? $phase : 'unpaired',

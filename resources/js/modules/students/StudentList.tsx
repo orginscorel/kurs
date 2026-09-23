@@ -80,7 +80,7 @@ export default function StudentList() {
         sortKey: 'full_name',
         maxWidth: 380,
         cell: (s) => {
-          const sub = [`Öğrenci no ${s.student_no}`, s.class_groups.map((g) => g.name).join(', ') || 'Sınıfsız', s.program].filter(Boolean).join(' · ')
+          const sub = s.program ?? ''
           return (
             <div className="flex items-center gap-3">
               <div className="relative shrink-0">
@@ -92,7 +92,7 @@ export default function StudentList() {
                   <span className="truncate">{s.full_name}</span>
                   {s.risk_level && s.risk_level !== 'low' && <Badge tone={riskMeta[s.risk_level].tone} className="h-[20px] px-1.5">{riskMeta[s.risk_level].label} risk</Badge>}
                 </p>
-                <p className="truncate text-[12px] text-ink-3 tabular" title={sub}>{sub}</p>
+                {sub && <p className="truncate text-[12px] text-ink-3" title={sub}>{sub}</p>}
               </div>
             </div>
           )
@@ -117,12 +117,12 @@ export default function StudentList() {
           ),
       },
       {
-        key: 'no', priority: 3,
-        header: 'Okul no',
+        key: 'no', priority: 2,
+        header: 'Öğrenci no',
         sortKey: 'student_no',
         cell: (s) => <span className="tabular text-ink-2">{s.student_no}</span>,
       },
-      { key: 'class', header: 'Sınıf', hideable: true, defaultHidden: true, cell: (s) => (s.class_groups.length ? <span className="text-ink-2">{s.class_groups.map((g) => g.name).join(', ')}</span> : <span className="text-ink-3">—</span>) },
+      { key: 'class', priority: 2, header: 'Sınıf / Şube', hideable: true, cell: (s) => (s.class_groups.length ? <span className="text-ink-2">{s.class_groups.map((g) => g.name).join(', ')}</span> : <span className="text-ink-3">Şubesiz</span>) },
       { key: 'program', header: 'Kayıtlı program', hideable: true, defaultHidden: true, cell: (s) => <span className="text-ink-2">{s.program ?? '—'}</span> },
       {
         key: 'guardian', priority: 2,

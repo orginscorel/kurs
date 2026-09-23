@@ -10,13 +10,18 @@ import type { RouteObject } from 'react-router-dom'
  */
 
 export type SectionKey =
-  | 'main' | 'people' | 'crm' | 'academic' | 'exams' | 'attendance' | 'guidance' | 'coaching' | 'discipline'
+  | 'main' | 'people' | 'students' | 'teachers' | 'guardians' | 'crm' | 'academic' | 'exams' | 'attendance' | 'guidance' | 'coaching' | 'discipline'
   | 'finance' | 'communication' | 'reports' | 'settings' | 'portal'
 
 export const SECTIONS: Record<SectionKey, { label?: string; order: number }> = {
   main: { order: 0 },
   portal: { order: 5 },
+  // Kişiler artık tek çatı yerine üç ayrı ana alandır (Öğrenciler / Veliler / Öğretmenler).
+  // Modüller hâlâ section:'people' bildirir; navigation.ts › MOVE_TO bunları alt alanlara dağıtır.
   people: { label: 'Kişiler', order: 10 },
+  students: { label: 'Öğrenciler', order: 10 },
+  guardians: { label: 'Veliler', order: 11 },
+  teachers: { label: 'Öğretmenler', order: 12 },
   crm: { label: 'Kayıt ve CRM', order: 20 },
   academic: { label: 'Akademik', order: 30 },
   coaching: { label: 'Koçluk', order: 35 },

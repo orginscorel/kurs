@@ -1,6 +1,6 @@
 import type { LucideIcon } from 'lucide-react'
 import {
-  BarChart3, CalendarDays, Gavel, ClipboardCheck, Compass, GraduationCap, LayoutDashboard, MessageCircle, Settings, Target, UserPlus, Users, Wallet,
+  BarChart3, BookUser, CalendarDays, Contact, Gavel, ClipboardCheck, Compass, GraduationCap, LayoutDashboard, MessageCircle, Settings, Target, UserPlus, Users, Wallet,
 } from 'lucide-react'
 import { modules, type ModuleNavItem, type SectionKey } from '@/app/modules'
 
@@ -23,7 +23,10 @@ export type NavGroup = {
 const GROUPS: { key: SectionKey; label: string; icon: LucideIcon }[] = [
   { key: 'main', label: 'Genel Bakış', icon: LayoutDashboard },
   { key: 'crm', label: 'Ön Kayıt', icon: UserPlus },
-  { key: 'people', label: 'Kişiler', icon: Users },
+  // "Kişiler" tek çatısı ayrıldı: her rol kenar çubuğunda kendi net başlığı ve ikonuyla durur.
+  { key: 'students', label: 'Öğrenciler', icon: Users },
+  { key: 'guardians', label: 'Veliler', icon: Contact },
+  { key: 'teachers', label: 'Öğretmenler', icon: BookUser },
   { key: 'attendance', label: 'Yoklama', icon: ClipboardCheck },
   { key: 'academic', label: 'Akademik', icon: CalendarDays },
   { key: 'coaching', label: 'Koçluk', icon: Target },
@@ -68,6 +71,11 @@ const orderRank = (to: string) => {
 
 /** Yapılandırma niteliğindeki sayfalar günlük iş alanlarından Ayarlar'a taşınır. */
 const MOVE_TO: Record<string, SectionKey> = {
+  // Kişiler tek çatısını üç ayrı ana alana böl (modül kodları hâlâ section:'people' bildirir).
+  '/ogrenciler': 'students',
+  '/veliler': 'guardians',
+  '/ogretmenler': 'teachers',
+  '/personel': 'teachers',
   '/yoklama/cihazlar': 'settings',
   '/akademik': 'settings',
   '/finans/paketler': 'settings',

@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class MessageTemplate extends Model
 {
-    protected $fillable = ['branch_id', 'key', 'channel', 'name', 'subject', 'body', 'provider_template', 'language', 'is_active'];
+    protected $fillable = ['branch_id', 'key', 'event_type', 'audience', 'channel', 'name', 'subject', 'body', 'provider_template', 'language', 'is_active'];
 
     protected $casts = ['is_active' => 'boolean'];
 

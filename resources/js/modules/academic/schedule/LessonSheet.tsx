@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useMutation, useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { Ban, CalendarClock, CheckCircle2, DoorOpen, Lock, LockOpen, NotebookPen, Pencil, RotateCcw, Trash2, UserRound, UserRoundCheck } from 'lucide-react'
 import { api, ApiError } from '@/lib/api'
@@ -8,6 +8,7 @@ import { useCan } from '@/app/auth'
 import { Modal, ConfirmDialog } from '@/components/ui/overlay'
 import { Button } from '@/components/ui/Button'
 import { Field, Select, Textarea } from '@/components/ui/form'
+import { TopicQuickAdd } from '@/components/ui/TopicQuickAdd'
 import { Alert, Badge } from '@/components/ui/feedback'
 import { DescriptionList } from '@/components/ui/layout'
 import { ColorChip } from '../ui'
@@ -35,6 +36,7 @@ type Props = {
 
 export function LessonSheet({ target, onClose, onChanged, onEdit, options }: Props) {
   const can = useCan()
+  const qc = useQueryClient()
   const manage = can('schedule.manage')
   const [mode, setMode] = useState<'view' | 'cancel' | 'reassign' | 'topic' | 'delete' | 'substitute' | 'move'>('view')
   const [reason, setReason] = useState('')
@@ -185,6 +187,11 @@ export function LessonSheet({ target, onClose, onChanged, onEdit, options }: Pro
           <div className="flex flex-col gap-3">
             <Field label="İşlenen konu (müfredattan)" optional>
               <Select value={topicId} onChange={(e) => setTopicId(e.target.value)} placeholder="Seçin" options={(topics.data?.topics ?? []).map((t) => ({ value: t.id, label: `${t.parent_id ? '— ' : ''}${t.outcome_code ? `${t.outcome_code} · ` : ''}${t.name}` }))} />
+              {target && (
+                <div className="mt-1.5">
+                  <TopicQuickAdd subjectId={target.subject.id} onCreated={(t) => { qc.invalidateQueries({ queryKey: ['subject', target.subject.id, 'topics'] }); setTopicId(String(t.id)) }} />
+                </div>
+              )}
             </Field>
             <Field label="Not" optional>
               <Textarea value={note} onChange={(e) => setNote(e.target.value)} placeholder="İşlenen konu, verilen ödev, notlar" />

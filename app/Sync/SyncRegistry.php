@@ -212,6 +212,8 @@ final class SyncRegistry
         'message_templates' => ['kind' => self::LOCAL, 'reason' => 'Şablonlar gönderimde kullanılır; gönderim yalnız sunucuda.'],
         'message_campaigns' => ['kind' => self::LOCAL, 'reason' => 'Toplu gönderim yalnız sunucuda.'],
         'message_campaign_recipients' => ['kind' => self::LOCAL, 'reason' => 'Toplu gönderim yalnız sunucuda.'],
+        'notification_batches' => ['kind' => self::LOCAL, 'reason' => 'Bildirim gönderim akışı (taslak/onay/gönder) yalnız sunucuda.'],
+        'notification_settings' => ['kind' => self::LOCAL, 'reason' => 'Olay bazlı bildirim ayarları; gönderim yalnız sunucuda.'],
         'communication_consents' => ['kind' => self::SERVER, 'fk' => ['consentable_id' => 'morph:consentable_type']],
         'communication_suppressions' => ['kind' => self::LOCAL, 'reason' => 'Ret listesi gönderim tarafında (sunucu).'],
         'automation_rules' => ['kind' => self::LOCAL, 'reason' => 'Otomasyon yalnız sunucuda çalışır.'],

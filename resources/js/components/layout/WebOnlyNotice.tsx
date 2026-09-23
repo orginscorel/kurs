@@ -1,14 +1,44 @@
 import { useState } from 'react'
-import { Copy, ExternalLink, Globe } from 'lucide-react'
+import { useQuery } from '@tanstack/react-query'
+import { Copy, ExternalLink, Globe, WifiOff } from 'lucide-react'
+import { api } from '@/lib/api'
 import { Button } from '@/components/ui/Button'
 import { EmptyState } from '@/components/ui/feedback'
 import { openOnWeb, serverUrl } from '@/lib/webOnly'
 
-/** Masaüstünde "yalnız web" bölümü: boş liste yerine açık durum + "Web'de aç". */
+/** Masaüstünde "yalnız web" bölümü: boş liste yerine açık durum + "Web'de aç". Çevrimdışıysa nazikçe kısıtlar. */
 export function WebOnlyNotice({ title, reason, path }: { title: string; reason: string; path: string }) {
   const [note, setNote] = useState<string | null>(null)
   const base = serverUrl()
   const url = base ? base + path : null
+
+  // Üst çubuktaki eşitleme göstergesiyle AYNI önbellek anahtarı: ekstra istek atmadan çevrimiçi/çevrimdışı bilinir.
+  const { data: status } = useQuery({
+    queryKey: ['sync', 'local-status'],
+    queryFn: () => api.get<{ phase?: string }>('/sync/local-status'),
+    refetchInterval: 15_000,
+    staleTime: 8_000,
+  })
+  const browserOnline = typeof navigator === 'undefined' || navigator.onLine
+  const offline = !browserOnline || status?.phase === 'offline'
+
+  if (offline) {
+    return (
+      <div className="rounded-[var(--radius-lg)] border border-line bg-surface">
+        <EmptyState
+          icon={<WifiOff />}
+          title={`${title} için internet bağlantısı gerekiyor`}
+          description={
+            <>
+              Bu bölüm çevrimiçiyken kurumun web adresinde yönetilir; {reason.charAt(0).toLocaleLowerCase('tr') + reason.slice(1)} Şu an bağlantı yok
+              — internet gelince bu ekrandan “Web'de aç” ile ulaşabilirsiniz. Diğer ekranlar (öğrenci, yoklama, finans…) çevrimdışı da çalışır.
+              {url && <span className="mt-2 block break-all text-[12px] text-ink-3">{url}</span>}
+            </>
+          }
+        />
+      </div>
+    )
+  }
 
   return (
     <div className="rounded-[var(--radius-lg)] border border-line bg-surface">

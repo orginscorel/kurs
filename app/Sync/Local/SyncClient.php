@@ -76,9 +76,33 @@ class SyncClient
         try {
             return $this->decode($fn($this->http()), $what);
         } catch (ConnectionException $e) {
+            // Bağlantının KURULAMADIĞI (isteğin sunucuya hiç ulaşmadığı) hatalar — DNS gecikmesi, uykudan/uygulama
+            // açılışından hemen sonraki soğuk bağlantı — çoğu zaman anlıktır. Bir kez kısa bekleyip yeniden deneriz;
+            // böylece kullanıcı işlemi (parola değişikliği, numara bloğu) tek bir geçici kesintide "internet yok" hatası
+            // almaz. İstek sunucuya ulaşmadığı için POST'ları da yeniden denemek güvenlidir (çift uygulama riski yok).
+            if (self::isConnectPhase($e->getMessage())) {
+                usleep(600_000);
+                try {
+                    return $this->decode($fn($this->http()), $what);
+                } catch (ConnectionException $retry) {
+                    $e = $retry;
+                }
+            }
             \Illuminate\Support\Facades\Log::warning('Eşitleme sunucusuna ulaşılamadı', ['what' => $what, 'error' => $e->getMessage()]);
             throw new SyncHttpException('Sunucuya ulaşılamıyor. İnternet bağlantısı yok ya da sunucu yanıt vermiyor; değişiklikler bekletiliyor.', 0, 'offline', self::shortDetail($e->getMessage()));
         }
+    }
+
+    /**
+     * İstek sunucuya HİÇ ulaşmadan başarısız oldu mu? (cURL 6 host çözülemedi, 7 bağlanılamadı, "Connection refused"…)
+     * Yalnız bu durumda yeniden denemek güvenlidir; okuma zaman aşımı gibi belirsiz hatalarda denenmez.
+     */
+    private static function isConnectPhase(string $message): bool
+    {
+        return (bool) preg_match(
+            '~could not resolve host|could ?n\'?t resolve host|failed to connect|connection refused|could not connect to server|curl error (?:6|7)\b~i',
+            $message,
+        );
     }
 
     /** "cURL error 6: Could not resolve host: x (see https://curl.haxx.se/…) for https://…" → "cURL error 6: Could not resolve host: x" */

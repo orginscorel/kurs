@@ -1,12 +1,13 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { AlertTriangle, CalendarClock, ClipboardList, Users } from 'lucide-react'
+import { AlertTriangle, BellRing, CalendarClock, ClipboardList, Users } from 'lucide-react'
 import { api } from '@/lib/api'
 import { date, relative } from '@/lib/format'
 import { useCan } from '@/app/auth'
 import { PageHeader, Panel, Stat } from '@/components/ui/layout'
 import { Badge, EmptyState, ProgressBar, Skeleton } from '@/components/ui/feedback'
+import { ButtonLink } from '@/components/ui/Button'
 import { Select } from '@/components/ui/form'
 import type { CoachingOptions, Dashboard } from './types'
 
@@ -26,10 +27,15 @@ export default function CoachDashboard() {
   return (
     <div className="animate-fade-in">
       <PageHeader title="Koç Panom" description="Öğrencilerim, yaklaşan görüşmeler ve bu haftanın planları"
-        actions={isManager && (
-          <Select value={coachId} onChange={(e) => setCoachId(e.target.value)} placeholder={can('coaching.manage') ? 'Tüm koçlar' : 'Kendi öğrencilerim'} aria-label="Koç seçin"
-            options={(options.data?.coaches ?? []).map((c) => ({ value: c.id, label: c.name }))} className="w-[220px]" />
-        )}
+        actions={
+          <>
+            {can('messages.send') && <ButtonLink variant="secondary" icon={<BellRing className="size-4" />} to="/iletisim/bildirim-merkezi/gonder?event=coaching.session">Bildirim gönder</ButtonLink>}
+            {isManager && (
+              <Select value={coachId} onChange={(e) => setCoachId(e.target.value)} placeholder={can('coaching.manage') ? 'Tüm koçlar' : 'Kendi öğrencilerim'} aria-label="Koç seçin"
+                options={(options.data?.coaches ?? []).map((c) => ({ value: c.id, label: c.name }))} className="w-[220px]" />
+            )}
+          </>
+        }
       />
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query'
-import { CalendarClock, Plus, Search, Users, X } from 'lucide-react'
+import { BellRing, CalendarClock, Plus, Search, Users, X } from 'lucide-react'
 import { api, type Paginated } from '@/lib/api'
 import { date, dateTime, relative } from '@/lib/format'
 import { useCan } from '@/app/auth'
@@ -9,7 +9,7 @@ import { useListState, useDebounced } from '@/hooks/useListState'
 import { PageHeader } from '@/components/ui/layout'
 import { DataTable, type Column } from '@/components/ui/DataTable'
 import { EmptyState, Badge } from '@/components/ui/feedback'
-import { Button } from '@/components/ui/Button'
+import { Button, ButtonLink } from '@/components/ui/Button'
 import { Input, Select, Switch } from '@/components/ui/form'
 import type { MeetingOptions, MeetingRow } from './types'
 import { MeetingFormDrawer } from './MeetingFormDrawer'
@@ -71,7 +71,12 @@ export default function MeetingList() {
       <PageHeader
         title="Rehberlik Görüşmeleri"
         description="Öğrenci görüşme kayıtları ve takip"
-        actions={can('guidance.manage') && <Button variant="primary" icon={<Plus className="size-4" />} onClick={() => setDrawer({ id: null })}>Yeni görüşme</Button>}
+        actions={
+          <>
+            {can('messages.send') && <ButtonLink variant="secondary" icon={<BellRing className="size-4" />} to="/iletisim/bildirim-merkezi/gonder?event=guidance.meeting">Bildirim gönder</ButtonLink>}
+            {can('guidance.manage') && <Button variant="primary" icon={<Plus className="size-4" />} onClick={() => setDrawer({ id: null })}>Yeni görüşme</Button>}
+          </>
+        }
       />
 
       <DataTable

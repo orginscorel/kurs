@@ -11,6 +11,7 @@ import { Alert, Badge, EmptyState, Kbd, Skeleton } from '@/components/ui/feedbac
 import { Button, ButtonLink } from '@/components/ui/Button'
 import { Field, Input, Segmented, Select, Textarea } from '@/components/ui/form'
 import { ConfirmDialog } from '@/components/ui/overlay'
+import { TopicQuickAdd } from '@/components/ui/TopicQuickAdd'
 import type { ExamStatus } from './types'
 import { ExamStatusBadge, useExamOptions } from './shared'
 
@@ -299,6 +300,9 @@ export default function AnswerKeyEditor() {
             </div>
             <Field label="Konu / kazanım">
               <Select value={activeTopic ? String(activeTopic) : ''} onChange={(e) => update((s) => ({ ...s, topics: { ...s.topics, [cursor + 1]: e.target.value ? Number(e.target.value) : null } }))} placeholder="Konu seçin" options={topicOptions} />
+              <div className="mt-1.5">
+                <TopicQuickAdd subjectId={sec.subject_id} onCreated={(t) => { qc.invalidateQueries({ queryKey: ['exams', 'options'] }); update((s) => ({ ...s, topics: { ...s.topics, [cursor + 1]: t.id } })) }} />
+              </div>
             </Field>
             {activeQid ? (
               <div className="mt-3 flex items-center justify-between rounded-[var(--radius-sm)] bg-surface-2 px-3 py-2 text-[12.5px]">
@@ -316,6 +320,7 @@ export default function AnswerKeyEditor() {
               <Field label="Bitiş"><Input type="number" min={1} max={sec.n} value={bulk.to} onChange={(e) => setBulk((b) => ({ ...b, to: e.target.value }))} /></Field>
             </div>
             <Field label="Konu" className="mt-2"><Select value={bulk.topic} onChange={(e) => setBulk((b) => ({ ...b, topic: e.target.value }))} placeholder="Konu (boş = temizle)" options={topicOptions} /></Field>
+            <div className="mt-1.5"><TopicQuickAdd subjectId={sec.subject_id} onCreated={(t) => { qc.invalidateQueries({ queryKey: ['exams', 'options'] }); setBulk((b) => ({ ...b, topic: String(t.id) })) }} /></div>
             <Button className="mt-3 w-full" size="sm" onClick={applyBulkTopic}>Aralığa uygula</Button>
             <ul className="mt-3 max-h-48 overflow-y-auto scroll-thin divide-y divide-line text-[12px]">
               {Object.entries(sec.topics).filter(([, t]) => t).map(([q, t]) => (
