@@ -80,7 +80,7 @@ const FIELD_DEFS: Record<string, { key: string; label: string; type?: 'password'
 function providerDefaults(card: Card, provider: string): Record<string, string> {
   if (card.kind === 'whatsapp' && provider === 'wwebjs') {
     const d: Record<string, string> = {}
-    if (!card.config.base_url) d.base_url = 'http://5.180.32.49:3000'
+    if (!card.config.base_url) d.base_url = 'http://127.0.0.1:3100'
     if (!card.config.session_id) d.session_id = 'kurs'
     return d
   }
