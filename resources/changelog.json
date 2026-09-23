@@ -1,5 +1,16 @@
 [
   {
+    "version": "1.22.3",
+    "date": "2026-09-23",
+    "title": "Canlı gönderim takibi",
+    "items": [
+      {
+        "type": "yeni",
+        "text": "Bildirim Merkezi → Gönderimler artık CANLI — her gönderide iletildi/toplam ilerleme çubuğu, başarısız/bekleyen kırıkları, üstte canlı özet; detayda büyük sayaçlar (Gönderildi/İletildi/Okundu/Başarısız/Bekliyor) + yüzdeli ilerleme ve her mesajın durum rozeti; aktif gönderim varken otomatik yenilenir"
+      }
+    ]
+  },
+  {
     "version": "1.22.2",
     "date": "2026-09-23",
     "title": "Yerel WhatsApp botu varsayılanı",

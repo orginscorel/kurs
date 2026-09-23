@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\Notifications;
 use App\Http\Controllers\Api\ApiController;
 use App\Models\MessageTemplate;
 use App\Models\NotificationBatch;
+use App\Models\OutboundMessage;
 use App\Services\Notifications\EventNotificationService;
 use App\Support\BranchContext;
 use App\Support\Notifications\NotificationCatalog;
@@ -143,7 +144,10 @@ class NotificationController extends ApiController
             $query->where('status', $request->query('status'));
         }
 
-        return $this->paginated($query->paginate($this->perPage($request)), fn (NotificationBatch $b) => $this->batchJson($b));
+        $page = $query->paginate($this->perPage($request));
+        $countsMap = $this->statusCounts($page->getCollection()->pluck('id')->all());
+
+        return $this->paginated($page, fn (NotificationBatch $b) => $this->batchJson($b, false, $countsMap[$b->id] ?? null));
     }
 
     public function store(Request $request): JsonResponse
@@ -208,8 +212,12 @@ class NotificationController extends ApiController
 
     // ----------------------------------------------------------------- Yardımcı
 
-    private function batchJson(NotificationBatch $batch, bool $withMessages = false): array
+    private function batchJson(NotificationBatch $batch, bool $withMessages = false, ?array $counts = null): array
     {
+        $c = $counts ?? ($this->statusCounts([$batch->id])[$batch->id]);
+        $reached = $c['sent'] + $c['delivered'] + $c['read'];
+        $pending = $c['queued'] + $c['sending'];
+
         $out = [
             'id' => $batch->id,
             'event_type' => $batch->event_type,
@@ -220,6 +228,14 @@ class NotificationController extends ApiController
             'audiences' => $batch->audiences ?? [],
             'total' => $batch->total,
             'sent' => $batch->sent,
+            // Canlı gönderim sayaçları (outbound_messages'tan)
+            'counts' => $c,
+            'reached' => $reached,            // sent + delivered + read
+            'delivered_like' => $c['delivered'] + $c['read'],
+            'failed' => $c['failed'],
+            'pending' => $pending,            // queued + sending
+            'simulation' => $c['simulation'],
+            'live' => $pending > 0,           // hâlâ işleniyor mu (canlı yenileme için)
             'pdf_available' => true,
             'created_at' => $batch->created_at,
             'approved_at' => $batch->approved_at,
@@ -236,6 +252,7 @@ class NotificationController extends ApiController
                         'id' => $m->id,
                         'to' => $m->to,
                         'status' => $m->status,
+                        'provider' => $m->provider,
                         'body' => $m->body,
                         'student_id' => $m->student_id,
                     ])->values(),
@@ -244,5 +261,38 @@ class NotificationController extends ApiController
         }
 
         return $out;
+    }
+
+    /**
+     * Toplu: verilen batch id'leri için outbound_messages durum sayaçları (tek sorgu, N+1 yok).
+     *
+     * @param  list<int>  $ids
+     * @return array<int, array<string, int>>
+     */
+    private function statusCounts(array $ids): array
+    {
+        $keys = ['queued', 'sending', 'sent', 'delivered', 'read', 'failed'];
+        $map = [];
+        foreach ($ids as $id) {
+            $map[$id] = array_fill_keys($keys, 0) + ['simulation' => 0];
+        }
+        if (! $ids) {
+            return $map;
+        }
+
+        foreach (OutboundMessage::query()->whereIn('batch_id', $ids)
+            ->selectRaw('batch_id, status, count(*) as c')->groupBy('batch_id', 'status')->get() as $r) {
+            if (isset($map[$r->batch_id]) && array_key_exists($r->status, $map[$r->batch_id])) {
+                $map[$r->batch_id][$r->status] = (int) $r->c;
+            }
+        }
+        foreach (OutboundMessage::query()->whereIn('batch_id', $ids)->where('provider', 'simulation')
+            ->selectRaw('batch_id, count(*) as c')->groupBy('batch_id')->get() as $r) {
+            if (isset($map[$r->batch_id])) {
+                $map[$r->batch_id]['simulation'] = (int) $r->c;
+            }
+        }
+
+        return $map;
     }
 }

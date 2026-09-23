@@ -54,6 +54,8 @@ export type EventTemplate = {
 
 export type BatchStatus = 'draft' | 'pending' | 'approved' | 'sent' | 'cancelled' | string
 
+export type BatchCounts = { queued: number; sending: number; sent: number; delivered: number; read: number; failed: number; simulation: number }
+
 export type BatchJson = {
   id: number
   event_type: string
@@ -64,14 +66,46 @@ export type BatchJson = {
   audiences: string[]
   total: number
   sent: number
+  // canlı gönderim sayaçları
+  counts: BatchCounts
+  reached: number
+  delivered_like: number
+  failed: number
+  pending: number
+  simulation: number
+  live: boolean
   pdf_available: boolean
   created_at: string
   approved_at: string | null
 }
 
-export type BatchMessage = { id: number; to: string; status: string; body: string; student_id: number | null }
+export type BatchMessage = { id: number; to: string; status: string; provider?: string | null; body: string; student_id: number | null }
 export type BatchGroup = { audience: string; audience_label: string; count: number; messages: BatchMessage[] }
 export type BatchDetail = BatchJson & { groups: BatchGroup[] }
+
+/** Mesaj (outbound) durumu → Türkçe etiket. */
+export const MSG_STATUS_LABEL: Record<string, string> = {
+  queued: 'Bekliyor', sending: 'Gönderiliyor', sent: 'Gönderildi', delivered: 'İletildi', read: 'Okundu', failed: 'Başarısız',
+}
+
+/** Mesaj durumu → Badge tonu. Simülasyon (gerçek gönderim değil) sarı gösterilir. */
+export function msgStatusTone(status: string, simulation = false): 'neutral' | 'warning' | 'info' | 'success' | 'danger' {
+  if (simulation) return 'warning'
+  switch (status) {
+    case 'delivered':
+    case 'read':
+      return 'success'
+    case 'sent':
+      return 'info'
+    case 'failed':
+      return 'danger'
+    case 'queued':
+    case 'sending':
+      return 'warning'
+    default:
+      return 'neutral'
+  }
+}
 
 /** Durum → görsel ton eşlemesi (Badge). */
 export function statusTone(status: string): 'neutral' | 'warning' | 'info' | 'success' | 'danger' {
