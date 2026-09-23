@@ -30,7 +30,7 @@ const QR_ENDPOINT = '/api/v1/whatsapp/connection/qr.png'
  * WhatsApp QR (kalıcı oturum) bağlantısı: numarayı QR ile bağlar, durumu canlı izler, kesebilir ve
  * anti-ban hız/limit ayarlarını yönetir. Bot sunucu servisidir → masaüstünde web'e yönlendirilir.
  */
-export default function WhatsAppConnectionPanel() {
+export default function WhatsAppConnectionPanel({ embedded = false }: { embedded?: boolean } = {}) {
   const qc = useQueryClient()
   const local = isLocalNode()
   const [pairing, setPairing] = useState(false)
@@ -85,6 +85,13 @@ export default function WhatsAppConnectionPanel() {
   if (isLoading) return <Panel><Skeleton className="h-64" /></Panel>
 
   if (!data?.configured) {
+    if (embedded) {
+      return (
+        <Alert tone="info" title="Bağlantı için son adım">
+          Yukarıdaki alanlara bot adresi ve jetonunu girip <strong>Kaydet</strong>'e basın; ardından QR kodu burada görünür ve numaranızı okutabilirsiniz.
+        </Alert>
+      )
+    }
     return (
       <Panel title="WhatsApp Bağlantısı">
         <Alert tone="info" title="WhatsApp QR sağlayıcısı seçilmemiş">

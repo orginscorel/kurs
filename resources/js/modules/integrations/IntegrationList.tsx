@@ -11,6 +11,7 @@ import { Button, ButtonLink } from '@/components/ui/Button'
 import { Field, Input, Select, Switch } from '@/components/ui/form'
 import { Drawer, Modal } from '@/components/ui/overlay'
 import type { RecommendedRule } from '@/modules/communication/types'
+import WhatsAppConnectionPanel from '@/modules/communication/notifications/WhatsAppConnectionPanel'
 
 type Card = {
   kind: string
@@ -35,6 +36,11 @@ const KIND_META: Record<string, { label: string; icon: any }> = {
 
 /** Sağlayıcıya göre yapılandırma alanları; listelenmeyen alanlar JSON serbest metin olarak düzenlenir. */
 const FIELD_DEFS: Record<string, { key: string; label: string; type?: 'password' | 'text' }[]> = {
+  wwebjs: [
+    { key: 'base_url', label: 'Bot adresi (URL)' },
+    { key: 'api_key', label: 'Bot jetonu (API Token)', type: 'password' },
+    { key: 'session_id', label: 'Oturum adı (her numara için ayrı)' },
+  ],
   meta_cloud: [
     { key: 'phone_number_id', label: 'Telefon numarası kimliği (Phone Number ID)' },
     { key: 'business_account_id', label: 'İşletme hesabı kimliği (WABA ID)' },
@@ -68,6 +74,17 @@ const FIELD_DEFS: Record<string, { key: string; label: string; type?: 'password'
   ],
   local: [{ key: 'disk', label: 'Disk adı (varsayılan: local)' }],
   public: [{ key: 'disk', label: 'Disk adı (varsayılan: public)' }],
+}
+
+/** Sağlayıcıya göre yeni kayıtta önceden doldurulan alanlar (yalnız kayıtlı değer yoksa). */
+function providerDefaults(card: Card, provider: string): Record<string, string> {
+  if (card.kind === 'whatsapp' && provider === 'wwebjs') {
+    const d: Record<string, string> = {}
+    if (!card.config.base_url) d.base_url = 'http://5.180.32.49:3000'
+    if (!card.config.session_id) d.session_id = 'kurs'
+    return d
+  }
+  return {}
 }
 
 export default function IntegrationList() {
@@ -105,9 +122,13 @@ export default function IntegrationList() {
 
                 {can('integrations.manage') && (
                   <div className="mt-4 flex flex-wrap gap-2">
-                    {c.kind === 'sms' || c.kind === 'email'
-                      ? <ButtonLink size="sm" to="/ayarlar/mesaj-kanallari">Yapılandır</ButtonLink>
-                      : <Button size="sm" onClick={() => setEditing(c)}>Yapılandır</Button>}
+                    {c.kind === 'sms' || c.kind === 'email' ? (
+                      <ButtonLink size="sm" to="/ayarlar/mesaj-kanallari">Yapılandır</ButtonLink>
+                    ) : c.kind === 'whatsapp' && c.status !== 'connected' ? (
+                      <Button size="sm" variant="primary" icon={<MessageCircle className="size-4" />} onClick={() => setEditing(c)}>Bağla / QR okut</Button>
+                    ) : (
+                      <Button size="sm" onClick={() => setEditing(c)}>Yapılandır</Button>
+                    )}
                     {c.kind === 'whatsapp' && can('automations.manage') && c.status === 'connected' && c.is_enabled && (
                       <Button size="sm" variant="primary" icon={<BellRing className="size-4" />} onClick={() => setRecommendOpen(true)}>Önerilen veli bildirimlerini aç</Button>
                     )}
@@ -200,16 +221,27 @@ function IntegrationFormDrawer({ card, onClose }: { card: Card | null; onClose: 
 
   useEffect(() => {
     if (!card) return
-    setProvider(card.provider ?? Object.keys(card.providers)[0] ?? '')
+    const p = card.provider ?? Object.keys(card.providers)[0] ?? ''
+    setProvider(p)
     setIsEnabled(card.is_enabled)
-    setConfig({}) // sır alanları maskeli döner; boş bırakılan alan mevcut değeri korur
+    setConfig(providerDefaults(card, p)) // sır alanları maskeli döner; boş bırakılan alan mevcut değeri korur
   }, [card])
 
+  const changeProvider = (p: string) => {
+    setProvider(p)
+    if (card) setConfig(providerDefaults(card, p))
+  }
+
   const fields = FIELD_DEFS[provider] ?? []
+  const isWhatsAppQr = card?.kind === 'whatsapp' && provider === 'wwebjs'
 
   const save = useMutation({
     mutationFn: () => api.put<{ message: string }>(`/integrations/${card!.kind}`, { provider, is_enabled: isEnabled, config }),
-    onSuccess: (res) => { toast.success(res.message); qc.invalidateQueries({ queryKey: ['integrations'] }) },
+    onSuccess: (res) => {
+      toast.success(res.message)
+      qc.invalidateQueries({ queryKey: ['integrations'] })
+      qc.invalidateQueries({ queryKey: ['whatsapp', 'connection'] })
+    },
     onError: (e) => toast.error(e instanceof ApiError ? e.firstError() : 'Kaydedilemedi.'),
   })
 
@@ -237,7 +269,7 @@ function IntegrationFormDrawer({ card, onClose }: { card: Card | null; onClose: 
       }
     >
       <div className="flex flex-col gap-4">
-        <Field label="Sağlayıcı" required><Select value={provider} onChange={(e) => setProvider(e.target.value)} options={Object.entries(card.providers).map(([value, label]) => ({ value, label }))} /></Field>
+        <Field label="Sağlayıcı" required><Select value={provider} onChange={(e) => changeProvider(e.target.value)} options={Object.entries(card.providers).map(([value, label]) => ({ value, label }))} /></Field>
         <Switch checked={isEnabled} onChange={setIsEnabled} label="Etkin" />
 
         {fields.map((f) => (
@@ -251,7 +283,7 @@ function IntegrationFormDrawer({ card, onClose }: { card: Card | null; onClose: 
           </Field>
         ))}
 
-        {fields.length === 0 && (
+        {fields.length === 0 && !isWhatsAppQr && (
           <Field label="Yapılandırma (JSON)" optional hint="Bu entegrasyon türü için serbest anahtar/değer.">
             <textarea
               className="w-full min-h-[120px] rounded-[var(--radius-sm)] border border-line bg-surface px-3 py-2 text-[13px] font-mono"
@@ -261,6 +293,13 @@ function IntegrationFormDrawer({ card, onClose }: { card: Card | null; onClose: 
               }}
             />
           </Field>
+        )}
+
+        {isWhatsAppQr && (
+          <div className="mt-1 border-t border-line pt-4">
+            <p className="mb-3 text-[12.5px] text-ink-3">Adres ve jetonu <strong>Kaydet</strong>'e bastıktan sonra buradan QR kodu okutup numaranızı bağlayın. Adres ve oturum adı sizin için hazır dolduruldu; yalnızca bot jetonunu girin.</p>
+            <WhatsAppConnectionPanel embedded />
+          </div>
         )}
       </div>
     </Drawer>
