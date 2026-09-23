@@ -68,7 +68,7 @@ export default function EnrollmentList() {
         header: 'Öğrenci',
         cell: (e) => (
           <div className="min-w-0">
-            <p className="font-medium text-ink">{e.student?.full_name}</p>
+            <p className="truncate font-medium text-ink" title={e.student?.full_name}>{e.student?.full_name}</p>
             <p className="text-[12px] text-ink-3 tabular">Kayıt no: {e.enrollment_no}</p>
           </div>
         ),
@@ -78,7 +78,7 @@ export default function EnrollmentList() {
         header: 'Program / dönem',
         cell: (e) => (
           <div className="min-w-0">
-            <p className="text-ink-2">{e.program}</p>
+            <p className="truncate text-ink-2" title={e.program ?? undefined}>{e.program}</p>
             <p className="text-[12px] text-ink-3">{e.term} · Kayıt: {date(e.enrolled_on)}</p>
           </div>
         ),

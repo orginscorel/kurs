@@ -53,7 +53,7 @@ export function ResultsTable({ examId, storageKey = 'exam-results' }: { examId: 
           </div>
         ),
       },
-      { key: 'booklet', header: 'Kitapçık', align: 'center', hideable: true, cell: (r) => <span className="text-ink-2">{r.booklet}</span> },
+      { key: 'booklet', header: 'Kitapçık', align: 'center', hideable: true, defaultHidden: true, cell: (r) => <span className="text-ink-2">{r.booklet}</span> },
       ...sections.map<Column<ResultRow>>((s) => ({
         key: `sec-${s.code}`,
         header: <span title={`${s.name} neti (doğru/yanlış/boş)`}>{s.name}</span>,

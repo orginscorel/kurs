@@ -66,6 +66,7 @@ export default function FinanceSettings() {
   const [form, setForm] = useState<Form | null>(null)
   const [newRate, setNewRate] = useState('')
   const [journalOffConfirm, setJournalOffConfirm] = useState(false)
+  const tplRef = useRef<HTMLTextAreaElement>(null)  // sözleşme şablonu textarea'sı — HOOK, erken return'den ÖNCE olmalı (React #310)
   const [errors, setErrors] = useState<Record<string, string[]>>({})
 
   useEffect(() => {
@@ -134,7 +135,6 @@ export default function FinanceSettings() {
   }
 
   const set = <K extends keyof Form>(k: K, v: Form[K]) => setForm((f) => (f ? { ...f, [k]: v } : f))
-  const tplRef = useRef<HTMLTextAreaElement>(null)
   const insertToken = (token: string) => {
     const ta = tplRef.current
     setForm((f) => {

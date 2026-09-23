@@ -41,7 +41,7 @@ export default function TemplateList() {
   })
 
   const columns: Column<MessageTemplateRow>[] = [
-    { key: 'name', header: 'Şablon adı', cell: (t) => <div><p className="text-ink font-medium">{t.name}</p><p className="text-[12px] text-ink-3">Sistem anahtarı: <span className="font-mono">{t.key}</span></p></div> },
+    { key: 'name', header: 'Şablon adı', cell: (t) => <div className="min-w-0"><p className="truncate text-ink font-medium" title={t.name}>{t.name}</p><p className="truncate text-[12px] text-ink-3">Sistem anahtarı: <span className="font-mono">{t.key}</span></p></div> },
     { key: 'channel', header: 'Kanal', cell: (t) => <Badge tone="neutral">{CHANNEL_LABEL[t.channel] ?? t.channel}</Badge> },
     { key: 'body', header: 'Mesaj metni', hideable: true, cell: (t) => <span className="text-ink-2 line-clamp-2 max-w-[360px]">{t.body}</span> },
     { key: 'status', header: 'Durum', cell: (t) => <Badge tone={t.is_active ? 'success' : 'neutral'} dot>{t.is_active ? 'Aktif' : 'Pasif'}</Badge> },

@@ -47,7 +47,7 @@ export default function MeetingList() {
   const columns = useMemo<Column<MeetingRow>[]>(() => {
     if (isStale) {
       return [
-        { key: 'student', header: 'Öğrenci', cell: (m) => <div><p className="font-medium text-ink">{m.student?.full_name}</p><p className="text-[12px] text-ink-3 tabular">Öğrenci no: {m.student?.student_no}</p></div> },
+        { key: 'student', header: 'Öğrenci', cell: (m) => <div className="min-w-0"><p className="truncate font-medium text-ink" title={m.student?.full_name}>{m.student?.full_name}</p><p className="text-[12px] text-ink-3 tabular">Öğrenci no: {m.student?.student_no}</p></div> },
         { key: 'grade', header: 'Okul sınıfı', cell: (m) => <span className="text-ink-2">{m.student?.school_grade ?? '—'}</span> },
         { key: 'last', header: 'Son görüşme tarihi', cell: (m) => m.last_meeting_at ? <span className="text-ink-2">{date(m.last_meeting_at)} · {relative(m.last_meeting_at)}</span> : <span className="text-danger font-medium">Hiç görüşülmedi</span> },
         {
@@ -58,7 +58,7 @@ export default function MeetingList() {
       ]
     }
     return [
-      { key: 'student', header: 'Öğrenci', cell: (m) => <div><p className="font-medium text-ink">{m.student?.full_name}</p><p className="text-[12px] text-ink-3 tabular">Öğrenci no: {m.student?.student_no}</p></div> },
+      { key: 'student', header: 'Öğrenci', cell: (m) => <div className="min-w-0"><p className="truncate font-medium text-ink" title={m.student?.full_name}>{m.student?.full_name}</p><p className="text-[12px] text-ink-3 tabular">Öğrenci no: {m.student?.student_no}</p></div> },
       { key: 'counselor', header: 'Rehber öğretmen', hideable: true, cell: (m) => <span className="text-ink-2">{m.counselor?.name ?? '—'}</span> },
       { key: 'kind', header: 'Görüşme türü', cell: (m) => <Badge tone="neutral">{m.kind_label}</Badge> },
       { key: 'met_at', header: 'Görüşme tarihi', sortKey: 'met_at', cell: (m) => <span className="text-ink-2 tabular">{dateTime(m.met_at)}</span> },

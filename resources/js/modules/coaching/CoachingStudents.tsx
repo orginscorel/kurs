@@ -45,9 +45,9 @@ export default function CoachingStudents() {
   }
 
   const columns = useMemo<Column<AssignmentRow>[]>(() => [
-    { key: 'student', header: 'Öğrenci', cell: (r) => <div><p className="font-medium text-ink">{r.full_name}</p><p className="text-[12px] text-ink-3 tabular">Öğrenci no: {r.student_no}</p></div> },
+    { key: 'student', header: 'Öğrenci', cell: (r) => <div className="min-w-0"><p className="truncate font-medium text-ink" title={r.full_name}>{r.full_name}</p><p className="text-[12px] text-ink-3 tabular">Öğrenci no: {r.student_no}</p></div> },
     { key: 'grade', header: 'Sınıf / alan', hideable: true, cell: (r) => <span className="text-ink-2">{[r.school_grade, r.field].filter(Boolean).join(' · ') || '—'}</span> },
-    { key: 'coach', header: 'Koç', cell: (r) => r.coach ? <Badge tone="primary">{r.coach.name}</Badge> : <span className="text-ink-3">Atanmadı</span> },
+    { key: 'coach', header: 'Koç', cell: (r) => r.coach ? <Badge tone="primary">{r.coach.name}</Badge> : <Badge tone="warning">Atanmadı</Badge> },
     { key: 'last', header: 'Son görüşme', hideable: true, cell: (r) => r.last_session_at ? <span className="text-ink-2">{date(r.last_session_at)} · {relative(r.last_session_at)}</span> : <span className="text-ink-3">—</span> },
     {
       key: 'action', header: '', align: 'right', cell: (r) => can('coaching.manage') && (

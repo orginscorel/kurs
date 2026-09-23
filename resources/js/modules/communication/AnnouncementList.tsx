@@ -34,7 +34,7 @@ export default function AnnouncementList() {
   })
 
   const columns: Column<AnnouncementRow>[] = [
-    { key: 'title', header: 'Duyuru', cell: (a) => <div><p className="text-ink font-medium">{a.title}</p><p className="text-[12.5px] text-ink-3 line-clamp-1">{a.body}</p></div> },
+    { key: 'title', header: 'Duyuru', cell: (a) => <div className="min-w-0"><p className="truncate text-ink font-medium" title={a.title}>{a.title}</p><p className="text-[12.5px] text-ink-3 line-clamp-1">{a.body}</p></div> },
     {
       key: 'audience',
       header: 'Hedef kitle',

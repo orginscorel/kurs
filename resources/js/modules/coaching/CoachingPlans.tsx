@@ -30,7 +30,7 @@ export default function CoachingPlans() {
   })
 
   const columns: Column<PlanRow>[] = [
-    { key: 'student', header: 'Öğrenci', cell: (p) => <div><Link to={`/kocluk/ogrenci/${p.student?.id}`} className="font-medium text-ink hover:underline" onClick={(e) => e.stopPropagation()}>{p.student?.full_name}</Link><p className="text-[12px] text-ink-3 tabular">No: {p.student?.student_no}</p></div> },
+    { key: 'student', header: 'Öğrenci', cell: (p) => <div className="min-w-0"><Link to={`/kocluk/ogrenci/${p.student?.id}`} className="block truncate font-medium text-ink hover:underline" title={p.student?.full_name} onClick={(e) => e.stopPropagation()}>{p.student?.full_name}</Link><p className="text-[12px] text-ink-3 tabular">No: {p.student?.student_no}</p></div> },
     { key: 'week', header: 'Hafta', sortKey: 'week_start', cell: (p) => <Badge tone="neutral">{date(p.week_start)}</Badge> },
     { key: 'coach', header: 'Koç', hideable: true, cell: (p) => <span className="text-ink-2">{p.coach?.name ?? '—'}</span> },
     { key: 'items', header: 'Kalem', hideable: true, cell: (p) => <span className="text-ink-2 tabular">{p.items_done}/{p.items_total}</span> },

@@ -117,17 +117,10 @@ export default function StudentList() {
           ),
       },
       {
-        key: 'last_exam', priority: 4,
-        header: 'Son deneme neti',
-        sortKey: 'last_exam',
-        align: 'right',
-        hideable: true,
-        cell: (s) =>
-          s.last_exam ? (
-            <span className="tabular font-medium text-ink" title={date(s.last_exam.date)}>{Number(s.last_exam.net).toLocaleString('tr-TR', { minimumFractionDigits: 1, maximumFractionDigits: 2 })}</span>
-          ) : (
-            <span className="text-ink-3">—</span>
-          ),
+        key: 'no', priority: 3,
+        header: 'Okul no',
+        sortKey: 'student_no',
+        cell: (s) => <span className="tabular text-ink-2">{s.student_no}</span>,
       },
       { key: 'class', header: 'Sınıf', hideable: true, defaultHidden: true, cell: (s) => (s.class_groups.length ? <span className="text-ink-2">{s.class_groups.map((g) => g.name).join(', ')}</span> : <span className="text-ink-3">—</span>) },
       { key: 'program', header: 'Kayıtlı program', hideable: true, defaultHidden: true, cell: (s) => <span className="text-ink-2">{s.program ?? '—'}</span> },

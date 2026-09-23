@@ -11,6 +11,7 @@ use App\Models\Student;
 use App\Services\Placement\Core\PlacementEngine;
 use App\Support\Audit;
 use Carbon\CarbonImmutable;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -44,15 +45,12 @@ class ClassChangeService
             return ['term' => null, 'current' => null, 'level' => null, 'options' => [], 'waitlist' => null, 'history' => $history];
         }
 
-        $groups = $this->structure->groups($term->id);
-        $current = $this->currentStructured($student, $term);
+        $groups = $this->groupSet($term->id);
+        $current = $this->currentStructured($student, $term, $groups);
         $level = $current?->grade_level ?? ClassStructure::gradeOf($student->school_grade);
         $counts = DB::table('class_group_student')->whereNull('left_on')->whereIn('class_group_id', $groups->pluck('id'))
             ->selectRaw('class_group_id, COUNT(*) c')->groupBy('class_group_id')->pluck('c', 'class_group_id');
-        $options = $level === null ? collect() : $groups->filter(fn ($g) => $g->grade_level === $level)->values()->map(fn ($g) => [
-            'class_group_id' => $g->id, 'name' => $g->name, 'section' => $g->section, 'capacity' => $g->capacity,
-            'count' => (int) ($counts[$g->id] ?? 0), 'full' => (int) ($counts[$g->id] ?? 0) >= $g->capacity, 'is_current' => $current?->id === $g->id,
-        ]);
+        $options = ClassStructure::levelOptions($groups, $level, $counts->map(fn ($c) => (int) $c)->all(), $current?->id);
         $wait = ClassWaitlistEntry::query()->where('student_id', $student->id)->where('academic_term_id', $term->id)->where('status', 'waiting')->first();
         $otherOpen = $history->first(fn ($h) => $h['is_current'] && $h['class_group_id'] !== $current?->id);
 
@@ -77,8 +75,8 @@ class ClassChangeService
         $full = $count >= $group->capacity;
         $suggestions = [];
 
-        if ($full && $current) {
-            $levelGroups = $this->structure->groups($term->id)->filter(fn ($g) => $g->grade_level === $level)->keyBy('section');
+        $levelGroups = $this->structure->groups($term->id)->filter(fn ($g) => $g->grade_level === $level)->keyBy('section');
+        if ($full && $current && $levelGroups->isNotEmpty()) {
             $roster = $this->data->roster($term->id, $level, $levelGroups)->filter(fn ($s) => $s->class_group_id !== null);
             $ids = $roster->keys()->map(fn ($v) => (int) $v)->all();
             $scores = $this->data->scores($ids);
@@ -187,7 +185,7 @@ class ClassChangeService
     private function validateTarget(Student $student, ClassGroup $target): array
     {
         $term = AcademicTerm::query()->findOrFail($target->academic_term_id);
-        $groups = $this->structure->groups($term->id);
+        $groups = $this->groupSet($term->id);
         $group = $groups->first(fn ($g) => $g->id === $target->id);
         if (! $group) {
             throw new BusinessRuleException("{$target->name} seviye/şube yapısında bir sınıf değil (ör. 10-A) ya da pasif.", 'placement_target_invalid');
@@ -210,16 +208,33 @@ class ClassChangeService
         return [$term, $group, $current, $level];
     }
 
-    private function currentStructured(Student $student, AcademicTerm $term): ?object
+    private function currentStructured(Student $student, AcademicTerm $term, ?Collection $groups = null): ?object
     {
-        $groups = $this->structure->groups($term->id);
+        $groups ??= $this->groupSet($term->id);
         $row = DB::table('class_group_student')->where('student_id', $student->id)->whereNull('left_on')->whereIn('class_group_id', $groups->pluck('id'))->orderByDesc('id')->first();
         if (! $row) {
             return null;
         }
         $g = $groups->first(fn ($x) => $x->id === (int) $row->class_group_id);
+        if (! $g) {
+            return null;
+        }
 
         return (object) ((array) $g + ['joined_on' => $row->joined_on, 'is_pinned' => (bool) $row->is_pinned]);
+    }
+
+    /**
+     * Tekil değişim/yerleştirme için sınıf grupları: kurum sınıf yapısı kaydedilmişse onu (groups()),
+     * kaydedilmemişse dönemin aktif şubelerini (activeGroups()) döndürür. Böylece yapı hiç tanımlanmamış
+     * kurumlarda da mevcut şubelere yerleştirme yapılabilir. Değerlerle (id ile erişilebilir) döner.
+     *
+     * @return Collection<int, object>
+     */
+    private function groupSet(int $termId): Collection
+    {
+        $groups = $this->structure->groups($termId);
+
+        return $groups->isNotEmpty() ? $groups->values() : $this->structure->activeGroups($termId);
     }
 
     private function memberCount(int $groupId): int

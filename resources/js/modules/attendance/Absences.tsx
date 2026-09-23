@@ -71,10 +71,10 @@ export default function Absences() {
       ),
     },
     { key: 'class', header: 'Sınıf', cell: (r) => r.class_group || <span className="text-ink-3">—</span> },
-    { key: 'subject', priority: 3, header: 'Ders', hideable: true, cell: (r) => r.subject },
+    { key: 'subject', priority: 3, header: 'Ders', hideable: true, truncate: true, title: (r) => r.subject ?? undefined, cell: (r) => r.subject },
     { key: 'status', priority: 1, header: 'Durum', cell: (r) => <Badge tone={STATUS_TONE[r.status]}>{STATUS_LABEL[r.status]}{r.status === 'late' && r.late_minutes ? ` (${r.late_minutes} dk)` : ''}</Badge> },
-    { key: 'method', priority: 4, header: 'Yoklama yöntemi', hideable: true, cell: (r) => <span className="text-ink-3">{r.method}</span> },
-    { key: 'note', priority: 4, header: 'Not', hideable: true, cell: (r) => r.note || <span className="text-ink-3">—</span> },
+    { key: 'method', priority: 4, header: 'Yoklama yöntemi', hideable: true, defaultHidden: true, cell: (r) => <span className="text-ink-3">{r.method}</span> },
+    { key: 'note', priority: 4, header: 'Not', hideable: true, truncate: true, maxWidth: 280, title: (r) => r.note ?? undefined, cell: (r) => r.note || <span className="text-ink-3">—</span> },
   ]
 
   return (

@@ -73,7 +73,7 @@ export default function UserList() {
       { key: 'contact', priority: 3, header: 'İletişim', hideable: true, cell: (u) => u.phone || u.email ? <div className="flex flex-col gap-0.5"><PhoneText value={u.phone} />{u.email && <MailText value={u.email} />}</div> : <span className="text-ink-3">—</span> },
       { key: 'status', header: 'Durum', cell: (u) => <Badge tone={u.is_active ? 'success' : 'neutral'} dot>{u.is_active ? 'Aktif' : 'Pasif'}</Badge> },
       { key: 'last_login', priority: 4, header: 'Son giriş zamanı', hideable: true, cell: (u) => <span className="text-ink-2">{u.last_login_at ? relative(u.last_login_at) : '—'}</span> },
-      { key: 'last_ip', priority: 4, header: 'Son giriş IP adresi', hideable: true, cell: (u) => <span className="text-ink-2 tabular">{u.last_login_ip ?? '—'}</span> },
+      { key: 'last_ip', priority: 4, header: 'Son giriş IP adresi', hideable: true, defaultHidden: true, cell: (u) => <span className="text-ink-2 tabular">{u.last_login_ip ?? '—'}</span> },
       {
         key: 'actions', header: '', align: 'right',
         cell: (u) =>

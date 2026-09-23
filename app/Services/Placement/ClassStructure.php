@@ -352,16 +352,66 @@ class ClassStructure
         return ClassGroup::query()->where('academic_term_id', $termId)
             ->when($activeOnly, fn ($q) => $q->where('is_active', true))
             ->orderBy('name')->get(['id', 'name', 'grade_level', 'section', 'track', 'capacity', 'program_id', 'is_active'])
-            ->map(function (ClassGroup $g) {
-                [$level, $section] = self::resolve($g->name, $g->grade_level === null ? null : (int) $g->grade_level, $g->section);
-
-                return (object) ['id' => $g->id, 'name' => $g->name, 'grade_level' => $level, 'section' => $section, 'track' => $g->track,
-                    'capacity' => (int) $g->capacity, 'program_id' => (int) $g->program_id, 'is_active' => (bool) $g->is_active];
-            })
+            ->map(fn (ClassGroup $g) => self::asGroup($g))
             ->filter(fn ($g) => $g->grade_level !== null && isset($allowed[$g->grade_level]) && in_array($g->section, $allowed[$g->grade_level], true))
             ->sortBy(fn ($g) => sprintf('%02d-%s-%010d', $g->grade_level, $g->section, $g->id))
             ->unique(fn ($g) => self::key($g->grade_level, $g->section))
             ->keyBy(fn ($g) => self::key($g->grade_level, $g->section));
+    }
+
+    /** Sınıf kaydını yapı nesnesine çevirir (seviye/şube adı ya da kolondan çözülür). */
+    private static function asGroup(ClassGroup $g): object
+    {
+        [$level, $section] = self::resolve($g->name, $g->grade_level === null ? null : (int) $g->grade_level, $g->section);
+
+        return (object) ['id' => $g->id, 'name' => $g->name, 'grade_level' => $level, 'section' => $section, 'track' => $g->track,
+            'capacity' => (int) $g->capacity, 'program_id' => (int) $g->program_id, 'is_active' => (bool) $g->is_active];
+    }
+
+    /**
+     * Ayardan BAĞIMSIZ: dönemin seviyesi çözülebilen tüm aktif sınıf grupları (id ile).
+     * Kurum sınıf yapısını (classes.structure) hiç kaydetmemişse bile mevcut şubelere (ör. "12-SAY-A")
+     * tekil yerleştirme/değişim yapılabilsin diye kullanılır. groups() gibi şube harfine göre TEKİLLEŞTİRMEZ,
+     * böylece aynı seviyede farklı alanlar (12-SAY-A ve 12-EA-A) ayrı seçenek kalır.
+     *
+     * @return Collection<int, object>
+     */
+    public function activeGroups(int $termId): Collection
+    {
+        return ClassGroup::query()->where('academic_term_id', $termId)->where('is_active', true)
+            ->orderBy('name')->get(['id', 'name', 'grade_level', 'section', 'track', 'capacity', 'program_id', 'is_active'])
+            ->map(fn (ClassGroup $g) => self::asGroup($g))
+            ->filter(fn ($g) => $g->grade_level !== null)
+            ->values();
+    }
+
+    /**
+     * Panel/önizleme seçenekleri: verilen grup kümesinden seviyeye uyan şubeler (id ile; çakışma yok).
+     * Saf işlev — veritabanına dokunmaz; birim testi için.
+     *
+     * @param  iterable<object|array>  $groups  asGroup/activeGroups çıktısı ({id,name,section,grade_level,capacity})
+     * @param  array<int,int>  $counts  class_group_id => aktif öğrenci sayısı
+     * @return list<array{class_group_id:int, name:string, section:string, capacity:int, count:int, full:bool, is_current:bool}>
+     */
+    public static function levelOptions(iterable $groups, ?int $level, array $counts = [], ?int $currentId = null): array
+    {
+        if ($level === null) {
+            return [];
+        }
+        $out = [];
+        foreach ($groups as $g) {
+            $g = (object) $g;
+            if ((int) $g->grade_level !== $level) {
+                continue;
+            }
+            $count = (int) ($counts[$g->id] ?? 0);
+            $out[] = [
+                'class_group_id' => (int) $g->id, 'name' => $g->name, 'section' => $g->section, 'capacity' => (int) $g->capacity,
+                'count' => $count, 'full' => $count >= (int) $g->capacity, 'is_current' => $currentId !== null && (int) $g->id === (int) $currentId,
+            ];
+        }
+
+        return $out;
     }
 
     /**

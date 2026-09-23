@@ -48,7 +48,7 @@ export default function MessageList() {
       ),
     },
     { key: 'channel', priority: 3, header: 'Kanal', cell: (m) => <Badge tone="neutral">{CHANNEL_LABEL[m.channel] ?? m.channel}</Badge> },
-    { key: 'template', priority: 4, header: 'Kullanılan şablon', hideable: true, cell: (m) => <span className="text-ink-2 font-mono text-[12.5px]">{m.template_key ?? '—'}</span> },
+    { key: 'template', priority: 4, header: 'Kullanılan şablon', hideable: true, defaultHidden: true, cell: (m) => <span className="text-ink-2 font-mono text-[12.5px]">{m.template_key ?? '—'}</span> },
     {
       key: 'status', header: 'Durum', cell: (m) => (
         <div>

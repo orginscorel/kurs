@@ -93,7 +93,7 @@ function ConsentsTab() {
   })
 
   const columns: Column<PersonRow>[] = [
-    { key: 'name', header: 'Kişi', cell: (r) => <span className="font-medium text-ink">{r.name}</span> },
+    { key: 'name', header: 'Kişi', truncate: true, title: (r) => r.name, cell: (r) => <span className="font-medium text-ink">{r.name}</span> },
     { key: 'phone', header: 'Telefon', cell: (r) => <PhoneText value={r.phone} /> },
     { key: 'email', header: 'E-posta', cell: (r) => <MailText value={r.email} className="break-all" /> },
     { key: 'sms', header: 'SMS izni', cell: (r) => <ConsentBadge state={r.sms} suppressed={r.sms_suppressed} /> },

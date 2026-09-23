@@ -113,6 +113,7 @@ export default function GuardianList() {
         key: 'contact',
         header: 'Son iletişim (mesaj/arama)',
         hideable: true,
+        defaultHidden: true,
         cell: (g) => (g.last_contact_at ? <span className="text-ink-2 whitespace-nowrap">{relative(g.last_contact_at)}</span> : <span className="text-ink-3">—</span>),
       },
       { key: 'email', header: 'E-posta', hideable: true, defaultHidden: true, cell: (g) => <MailText value={g.email} /> },

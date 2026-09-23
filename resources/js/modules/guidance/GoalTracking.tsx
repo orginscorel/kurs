@@ -60,13 +60,13 @@ export default function GoalTracking() {
     {
       key: 'student', header: 'Öğrenci',
       cell: (g) => (
-        <button className="text-left" onClick={() => navigate(`/ogrenciler/${g.student?.id}`)}>
-          <p className="font-medium text-ink hover:text-primary">{g.student?.full_name}</p>
+        <button className="block min-w-0 max-w-full text-left" onClick={() => navigate(`/ogrenciler/${g.student?.id}`)}>
+          <p className="truncate font-medium text-ink hover:text-primary" title={g.student?.full_name}>{g.student?.full_name}</p>
           <p className="text-[12px] text-ink-3 tabular">Öğrenci no: {g.student?.student_no}</p>
         </button>
       ),
     },
-    { key: 'target', header: 'Hedef üniversite / bölüm', hideable: true, cell: (g) => <span className="text-ink-2">{[g.university, g.department].filter(Boolean).join(' — ') || '—'}{g.target_rank ? ` · Hedef sıra: ${num(g.target_rank)}` : ''}</span> },
+    { key: 'target', header: 'Hedef üniversite / bölüm', hideable: true, truncate: true, maxWidth: 280, title: (g) => [g.university, g.department].filter(Boolean).join(' — ') || undefined, cell: (g) => <span className="text-ink-2">{[g.university, g.department].filter(Boolean).join(' — ') || '—'}{g.target_rank ? ` · Hedef sıra: ${num(g.target_rank)}` : ''}</span> },
     { key: 'tyt', header: 'TYT neti (son / hedef)', cell: (g) => g.progress ? <CompareCell label="TYT" c={g.progress.tyt} /> : <span className="text-ink-3">—</span> },
     { key: 'ayt', header: 'AYT neti (son / hedef)', cell: (g) => g.progress ? <CompareCell label="AYT" c={g.progress.ayt} /> : <span className="text-ink-3">—</span> },
     {

@@ -34,7 +34,7 @@ export function StudentClassPanel({ studentId }: { studentId: number }) {
     <Panel
       title="Sınıf"
       description={data.term ? `${data.term.name} dönemi` : undefined}
-      actions={changeable && <Button size="sm" icon={<ArrowLeftRight className="size-3.5" />} onClick={() => setOpen(true)}>Sınıf değiştir</Button>}
+      actions={changeable && <Button size="sm" icon={<ArrowLeftRight className="size-3.5" />} onClick={() => setOpen(true)}>{c ? 'Sınıf değiştir' : 'Şubeye yerleştir'}</Button>}
     >
       <div className="flex flex-col gap-4">
         {c ? (

@@ -167,8 +167,8 @@ export default function CampaignDetail() {
         </Panel>
         <Panel title="Bilgiler">
           <DescriptionList columns={1} items={[
-            { label: 'Alıcı grupları', value: a.groups.map((g) => GROUP_LABEL[g] ?? g).join(', ') || '—' },
-            { label: 'Filtre', value: [a.class_group_ids.length && `${a.class_group_ids.length} sınıf`, a.program_ids.length && `${a.program_ids.length} program`, a.student_statuses.length && `${a.student_statuses.length} öğrenci durumu`, a.manual.length && `${a.manual.length} elle eklenen`].filter(Boolean).join(' · ') || 'Yok', hidden: false },
+            { label: 'Alıcı grupları', value: (a.groups ?? []).map((g) => GROUP_LABEL[g] ?? g).join(', ') || '—' },
+            { label: 'Filtre', value: [(a.class_group_ids ?? []).length && `${a.class_group_ids!.length} sınıf`, (a.program_ids ?? []).length && `${a.program_ids!.length} program`, (a.student_statuses ?? []).length && `${a.student_statuses!.length} öğrenci durumu`, (a.manual ?? []).length && `${a.manual!.length} elle eklenen`].filter(Boolean).join(' · ') || 'Yok', hidden: false },
             { label: 'Hazırlayan', value: c.created_by ?? '—' },
             { label: 'Onaylayan', value: c.approved_by ? `${c.approved_by} · ${dateTime(c.approved_at)}` : '—' },
             { label: 'Başlangıç', value: c.started_at ? dateTime(c.started_at) : '—' },

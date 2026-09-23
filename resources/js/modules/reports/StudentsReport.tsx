@@ -41,11 +41,11 @@ function StudentsReport() {
 
   const columns = useMemo<Column<StudentRow>[]>(() => [
     { key: 'no', header: 'Öğrenci no', cell: (r) => <span className="tabular text-ink-3">{r.student_no}</span> },
-    { key: 'name', header: 'Ad soyad', cell: (r) => <span className="font-medium text-ink">{r.full_name}</span> },
+    { key: 'name', header: 'Ad soyad', truncate: true, title: (r) => r.full_name, cell: (r) => <span className="font-medium text-ink">{r.full_name}</span> },
     { key: 'status', header: 'Durum', cell: (r) => <Badge tone={r.status === 'active' ? 'success' : r.status === 'withdrawn' ? 'danger' : r.status === 'frozen' ? 'warning' : 'neutral'}>{r.status_label}</Badge> },
     { key: 'class', header: 'Sınıf', cell: (r) => r.class_names ?? <span className="text-ink-3">Sınıfsız</span> },
     { key: 'program', header: 'Program', hideable: true, cell: (r) => r.program_names ?? '—' },
-    { key: 'school', header: 'Okulu / okul sınıfı', hideable: true, cell: (r) => <span className="text-ink-2">{[r.school_name, r.school_grade].filter(Boolean).join(' · ') || '—'}</span> },
+    { key: 'school', header: 'Okulu / okul sınıfı', hideable: true, truncate: true, maxWidth: 240, title: (r) => [r.school_name, r.school_grade].filter(Boolean).join(' · ') || undefined, cell: (r) => <span className="text-ink-2">{[r.school_name, r.school_grade].filter(Boolean).join(' · ') || '—'}</span> },
     { key: 'phone', header: 'Telefon', hideable: true, defaultHidden: true, cell: (r) => <PhoneText value={r.phone} /> },
     { key: 'registered', header: 'Kayıt tarihi', align: 'right', cell: (r) => <span className="tabular text-ink-2">{fmtDate(r.registered_on)}</span> },
   ], [])

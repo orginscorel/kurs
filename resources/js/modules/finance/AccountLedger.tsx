@@ -40,7 +40,7 @@ export default function AccountLedger() {
       header: 'Açıklama',
       cell: (t) => (
         <div className="min-w-0">
-          <p className="text-ink">{t.description}</p>
+          <p className="truncate text-ink" title={t.description ?? undefined}>{t.description}</p>
           <p className="text-[12px] text-ink-3">
             <Badge className="mr-1.5">{SOURCE_LABELS[t.source_type] ?? t.source_type}</Badge>
             {t.source_type === 'payment' && t.receipt_no && <Link to={`/finans/tahsilatlar?makbuz=${encodeURIComponent(t.receipt_no)}`} className="hover:underline">{t.receipt_no}</Link>}

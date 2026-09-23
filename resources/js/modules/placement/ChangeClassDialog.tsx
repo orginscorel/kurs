@@ -80,7 +80,7 @@ export function ChangeClassDialog({
     <Modal
       open
       onClose={onClose}
-      title="Sınıf değiştir"
+      title={currentName ? 'Sınıf değiştir' : 'Şubeye yerleştir'}
       description={`${studentName}${currentName ? ` · Şu anki şubesi: ${currentName}` : ' · Henüz şubesi yok'}`}
       footer={
         <>

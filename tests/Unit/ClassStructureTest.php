@@ -161,4 +161,38 @@ class ClassStructureTest extends TestCase
         $this->assertCount(1, $r['warnings']);
         $this->assertStringContainsString('Sözel', $r['warnings'][0]);
     }
+
+    /**
+     * Yerleştirme paneli seçenekleri: seviyeye uyan aktif şubeler döner; aynı seviyede farklı alanlar
+     * (12-SAY-A ve 12-EA-A aynı şube harfi "A") çakışıp elenmez — kurum sınıf yapısı hiç tanımlanmamış
+     * öğrencilerin (ör. "12-SAY-A") yine de bir şubeye yerleştirilebilmesi için gerekir.
+     */
+    public function test_level_options_lists_all_active_branches_without_section_collision(): void
+    {
+        $groups = [
+            (object) ['id' => 1, 'name' => '12-SAY-A', 'grade_level' => 12, 'section' => 'A', 'capacity' => 24],
+            (object) ['id' => 2, 'name' => '12-SAY-B', 'grade_level' => 12, 'section' => 'B', 'capacity' => 22],
+            (object) ['id' => 3, 'name' => '12-EA-A', 'grade_level' => 12, 'section' => 'A', 'capacity' => 24],
+            (object) ['id' => 4, 'name' => '11-EA-A', 'grade_level' => 11, 'section' => 'A', 'capacity' => 20],
+        ];
+        $counts = [1 => 11, 2 => 22, 3 => 5];
+
+        $options = ClassStructure::levelOptions($groups, 12, $counts, 1);
+
+        // 12. seviyenin üç şubesi de gelir (aynı "A" harfli iki şube ayrı seçenek kalır), 11 elenir
+        $this->assertSame([1, 2, 3], array_column($options, 'class_group_id'));
+        $this->assertSame(['12-SAY-A', '12-SAY-B', '12-EA-A'], array_column($options, 'name'));
+        // is_current yalnız mevcut şube (id=1) için; dolu (count >= capacity) yalnız 12-SAY-B (22/22)
+        $this->assertSame([true, false, false], array_column($options, 'is_current'));
+        $this->assertSame([false, true, false], array_column($options, 'full'));
+        $this->assertSame([11, 22, 5], array_column($options, 'count'));
+
+        // Yerleşmemiş öğrenci (mevcut yok): hepsi seçilebilir, hiçbiri "is_current" değil
+        $unplaced = ClassStructure::levelOptions($groups, 12, $counts, null);
+        $this->assertCount(3, $unplaced);
+        $this->assertSame([false, false, false], array_column($unplaced, 'is_current'));
+
+        // Seviye bilinmiyorsa (okul sınıfı girilmemiş) seçenek yok
+        $this->assertSame([], ClassStructure::levelOptions($groups, null, $counts, null));
+    }
 }

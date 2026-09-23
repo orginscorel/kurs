@@ -59,8 +59,8 @@ export default function Inventory() {
         sortKey: 'name',
         cell: (p) => (
           <div className="min-w-0">
-            <p className="font-medium text-ink">{p.name}</p>
-            <p className="text-[12px] text-ink-3">{[p.publisher, p.subject, p.barcode].filter(Boolean).join(' · ') || '—'}</p>
+            <p className="truncate font-medium text-ink" title={p.name}>{p.name}</p>
+            <p className="truncate text-[12px] text-ink-3">{[p.publisher, p.subject, p.barcode].filter(Boolean).join(' · ') || '—'}</p>
           </div>
         ),
       },
@@ -183,10 +183,10 @@ function Movements({ productId, onClearProduct }: { productId?: string; onClearP
   })
   const columns: Column<Movement>[] = [
     { key: 'at', header: 'Hareket tarihi', cell: (m) => <span className="tabular whitespace-nowrap">{dateTime(m.created_at)}</span> },
-    { key: 'product', header: 'Ürün', cell: (m) => <span className="font-medium">{m.product?.name}</span> },
+    { key: 'product', header: 'Ürün', truncate: true, title: (m) => m.product?.name, cell: (m) => <span className="font-medium">{m.product?.name}</span> },
     { key: 'kind', header: 'Hareket türü', cell: (m) => <Badge tone={m.kind === 'purchase' || m.kind === 'return' ? 'success' : m.kind === 'delivery' ? 'primary' : 'neutral'}>{m.kind_label}</Badge> },
     { key: 'student', header: 'Öğrenci', cell: (m) => (m.student ? <Link to={`/ogrenciler/${m.student.id}`} className="hover:underline">{m.student.full_name}</Link> : <span className="text-ink-3">—</span>) },
-    { key: 'note', header: 'Not', hideable: true, cell: (m) => <span className="text-ink-3">{m.note ?? '—'}{m.finance_entry_id ? ' · gelir/gider kaydı var' : ''}</span> },
+    { key: 'note', header: 'Not', hideable: true, truncate: true, maxWidth: 280, title: (m) => `${m.note ?? ''}${m.finance_entry_id ? ' · gelir/gider kaydı var' : ''}`.trim() || undefined, cell: (m) => <span className="text-ink-3">{m.note ?? '—'}{m.finance_entry_id ? ' · gelir/gider kaydı var' : ''}</span> },
     { key: 'user', header: 'Kaydeden', hideable: true, defaultHidden: true, cell: (m) => <span className="text-ink-3">{m.created_by ?? '—'}</span> },
     { key: 'qty', header: 'Adet (+giren / −çıkan)', align: 'right', cell: (m) => <span className={cn('font-semibold', m.quantity < 0 ? 'text-danger' : 'text-success')}>{m.quantity > 0 ? '+' : ''}{m.quantity}</span> },
   ]
