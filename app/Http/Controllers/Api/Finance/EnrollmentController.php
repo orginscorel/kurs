@@ -238,6 +238,37 @@ class EnrollmentController extends FinanceController
         return $this->ok('İndirim / burs güncellendi; fark ödenmemiş taksitlere dağıtıldı.');
     }
 
+    public function changePackage(Request $request, Enrollment $enrollment, EnrollmentService $service): JsonResponse
+    {
+        $data = $this->validateTr($request, [
+            'program_id' => ['required', 'integer'],
+            'education_package_id' => ['nullable', 'integer'],
+            'discount_reason' => ['nullable', 'string', 'max:200'],
+            'scholarship_reason' => ['nullable', 'string', 'max:200'],
+            ...$this->priceRules(),
+        ]);
+
+        Program::query()->findOrFail($data['program_id']);
+        if (! empty($data['education_package_id'])) {
+            EducationPackage::query()->findOrFail($data['education_package_id']);
+        }
+
+        $enrollment = $service->changePackage($enrollment, [
+            'program_id' => (int) $data['program_id'],
+            'education_package_id' => $data['education_package_id'] ?? null,
+            'list_price' => Money::of($data['list_price']),
+            'discount_amount' => Money::of($data['discount_amount'] ?? '0'),
+            'discount_reason' => $data['discount_reason'] ?? null,
+            'scholarship_amount' => Money::of($data['scholarship_amount'] ?? '0'),
+            'scholarship_reason' => $data['scholarship_reason'] ?? null,
+            'down_payment' => Money::of($data['down_payment'] ?? '0'),
+            'installment_count' => (int) $data['installment_count'],
+            'first_due_date' => $data['first_due_date'],
+        ]);
+
+        return response()->json(['message' => 'Paket değiştirildi ve ödeme planı yeniden oluşturuldu.', 'id' => $enrollment->id, 'enrollment_no' => $enrollment->enrollment_no]);
+    }
+
     public function prepareContract(Enrollment $enrollment, FinanceDocuments $documents): JsonResponse
     {
         $contract = $documents->prepareContract($enrollment);

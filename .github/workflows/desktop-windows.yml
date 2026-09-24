@@ -1,0 +1,265 @@
+# Erbaa Kurs — Windows masaüstü derlemesi (Tauri + gömülü statik PHP)
+# macOS akışının (desktop-macos.yml) Windows kardeşi; onu BOZMAZ, ayrı etiket kullanır.
+#
+# Tetik:
+#   - etiket:  desktop-win-v<sürüm>  (ör. desktop-win-v1.22.4)  → derle + GitHub Release
+#   - elle:    Actions › desktop-windows › Run workflow          → derle (isteğe bağlı: yayımla)
+#
+# Çıktı: imzasız NSIS kurulumu (.exe) + MSI. Kod imzası yok → Windows SmartScreen uyarısı çıkabilir
+# ("Daha fazla bilgi › Yine de çalıştır"). Sertifika eklendiğinde imzalanabilir (bkz. docs/WINDOWS.md).
+name: desktop-windows
+
+on:
+  push:
+    tags: ['desktop-win-v*']
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: 'GitHub Release olarak yayımla (etiket yoksa desktop-win-v<sürüm> oluşturur)'
+        type: boolean
+        default: false
+      run_web_tests:
+        description: 'Web uygulaması testlerini (php artisan test) çalıştır'
+        type: boolean
+        default: false
+
+concurrency:
+  group: desktop-windows-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  SPC_VERSION: '2.8.5'
+  PHP_VERSION: '8.4'
+  NODE_VERSION: '22'
+  KURS_APP_SOURCE: ${{ vars.KURS_APP_SOURCE || 'repo' }}
+
+jobs:
+  # ------------------------------------------------------------------ 1) Statik PHP (Windows x64, önbellekli)
+  php:
+    name: Statik PHP (windows x64)
+    runs-on: windows-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: dirs
+        shell: bash
+        run: |
+          if [ -f desktop/scripts/build-static-php-win.ps1 ]; then echo "d=desktop" >> "$GITHUB_OUTPUT"; else echo "d=." >> "$GITHUB_OUTPUT"; fi
+
+      - id: cache
+        uses: actions/cache@v4
+        with:
+          path: out/php-x86_64-pc-windows-msvc.exe
+          key: static-php-win-x64-spc${{ env.SPC_VERSION }}-php${{ env.PHP_VERSION }}-${{ hashFiles(format('{0}/scripts/build-static-php-win.ps1', steps.dirs.outputs.d)) }}
+
+      - name: static-php-cli ile derle
+        if: steps.cache.outputs.cache-hit != 'true'
+        shell: pwsh
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          SPC_WORK_DIR: ${{ runner.temp }}\spc
+        run: pwsh "${{ steps.dirs.outputs.d }}/scripts/build-static-php-win.ps1" "out/php-x86_64-pc-windows-msvc.exe"
+
+      - name: Doğrula
+        shell: pwsh
+        run: |
+          & "out/php-x86_64-pc-windows-msvc.exe" -v
+          & "out/php-x86_64-pc-windows-msvc.exe" -r "exit(extension_loaded('intl') && extension_loaded('pdo_sqlite') && extension_loaded('sodium') ? 0 : 1);"
+
+  # ------------------------------------------------------------------ 2) Laravel paketi (vendor --no-dev + derlenmiş ön yüz) — platformdan bağımsız
+  laravel:
+    name: Laravel paketi
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+        if: env.KURS_APP_SOURCE != 'remote'
+
+      - uses: actions/checkout@v4
+        if: env.KURS_APP_SOURCE == 'remote'
+        with:
+          path: desktop-src
+
+      - uses: actions/checkout@v4
+        if: env.KURS_APP_SOURCE == 'remote'
+        with:
+          repository: ${{ vars.KURS_APP_REPO }}
+          token: ${{ secrets.KURS_APP_REPO_TOKEN }}
+          path: web-src
+
+      - id: dirs
+        run: |
+          case "$KURS_APP_SOURCE" in
+            remote) echo "desktop=desktop-src" >> "$GITHUB_OUTPUT"; echo "web=web-src" >> "$GITHUB_OUTPUT" ;;
+            *) if [ -f desktop/scripts/bundle-laravel.sh ]; then echo "desktop=desktop" >> "$GITHUB_OUTPUT"; else echo "desktop=." >> "$GITHUB_OUTPUT"; fi
+               echo "web=." >> "$GITHUB_OUTPUT" ;;
+          esac
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ env.PHP_VERSION }}
+          extensions: bcmath, intl, gd, zip, mbstring, sodium, pdo_sqlite, sqlite3, fileinfo, dom, xml, curl
+          coverage: none
+          tools: composer:v2
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Masaüstü sürüm tutarlılığı
+        run: node "${{ steps.dirs.outputs.desktop }}/scripts/release.mjs" check
+
+      - name: Web testleri
+        if: env.KURS_APP_SOURCE != 'tarball' && (github.event_name == 'push' || inputs.run_web_tests)
+        working-directory: ${{ steps.dirs.outputs.web }}
+        run: |
+          composer install --no-interaction --no-progress --prefer-dist
+          cp .env.example .env
+          php artisan key:generate --force
+          php artisan test --testsuite=Unit
+
+      - name: Paketle
+        env:
+          KURS_APP_SOURCE: ${{ env.KURS_APP_SOURCE == 'tarball' && 'tarball' || 'dir' }}
+          KURS_APP_DIR: ${{ github.workspace }}/${{ steps.dirs.outputs.web }}
+          KURS_APP_TARBALL_URL: ${{ secrets.KURS_APP_TARBALL_URL }}
+          KURS_APP_TARBALL_SHA256: ${{ secrets.KURS_APP_TARBALL_SHA256 }}
+          OUT_DIR: ${{ runner.temp }}/laravel
+        run: |
+          bash "${{ steps.dirs.outputs.desktop }}/scripts/bundle-laravel.sh"
+          mkdir -p "$GITHUB_WORKSPACE/_bundle"
+          tar -C "$OUT_DIR" -czf "$GITHUB_WORKSPACE/_bundle/laravel.tar.gz" .
+
+      - uses: actions/cache/save@v4
+        with:
+          path: _bundle/laravel.tar.gz
+          key: laravel-bundle-win-${{ github.run_id }}
+          enableCrossOsArchive: true
+
+  # ------------------------------------------------------------------ 3) Tauri derleme + NSIS/MSI + Release
+  build:
+    name: Windows paketi (NSIS + MSI)
+    needs: [php, laravel]
+    runs-on: windows-latest
+    timeout-minutes: 90
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Masaüstü klasörü
+        shell: bash
+        run: |
+          if [ -f desktop/src-tauri/tauri.conf.json ]; then d=desktop; else d=.; fi
+          echo "DESKTOP_DIR=$d" >> "$GITHUB_ENV"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: ${{ env.DESKTOP_DIR }}/package-lock.json
+
+      - name: Sürüm tutarlılığı (package.json = tauri.conf = Cargo.toml = CHANGELOG)
+        shell: bash
+        working-directory: ${{ env.DESKTOP_DIR }}
+        run: |
+          v="$(node scripts/release.mjs check)"
+          [ -n "$v" ] || { echo "::error::Sürüm okunamadı"; exit 1; }
+          echo "VERSION=$v" >> "$GITHUB_ENV"
+          echo "Sürüm: $v"
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: ${{ env.DESKTOP_DIR }}/src-tauri -> target
+          key: windows-x64
+
+      - uses: actions/cache/restore@v4
+        with:
+          path: _bundle/laravel.tar.gz
+          key: laravel-bundle-win-${{ github.run_id }}
+          enableCrossOsArchive: true
+          fail-on-cache-miss: true
+
+      - uses: actions/cache/restore@v4
+        with:
+          path: out/php-x86_64-pc-windows-msvc.exe
+          key: static-php-win-x64-spc${{ env.SPC_VERSION }}-php${{ env.PHP_VERSION }}-${{ hashFiles(format('{0}/scripts/build-static-php-win.ps1', env.DESKTOP_DIR)) }}
+          fail-on-cache-miss: true
+
+      - name: Paket içeriğini yerleştir
+        shell: bash
+        working-directory: ${{ env.DESKTOP_DIR }}
+        run: |
+          W="$GITHUB_WORKSPACE"
+          # Laravel bundle
+          rm -rf build/laravel && mkdir -p build/laravel
+          tar -xzf "$W/_bundle/laravel.tar.gz" -C build/laravel
+          # Statik PHP (Tauri sidecar: hedef üçlü + .exe)
+          mkdir -p src-tauri/binaries
+          cp "$W/out/php-x86_64-pc-windows-msvc.exe" src-tauri/binaries/php-x86_64-pc-windows-msvc.exe
+          # Mozilla CA listesi (statik PHP sistem deposunu görmez)
+          curl -fsSL --retry 3 -o runtime/cacert.pem https://curl.se/ca/cacert.pem
+
+      - name: Paketlenmiş PHP duman testi
+        shell: pwsh
+        working-directory: ${{ env.DESKTOP_DIR }}
+        run: |
+          $php = "src-tauri/binaries/php-x86_64-pc-windows-msvc.exe"
+          & $php -v
+          & $php -r "exit(extension_loaded('intl') && extension_loaded('sodium') && extension_loaded('pdo_sqlite') && extension_loaded('gd') ? 0 : 1);"
+          & $php -r "`$p=new PDO('sqlite::memory:'); echo 'sqlite '.`$p->query('select sqlite_version()')->fetchColumn().PHP_EOL;"
+
+      - name: Bağımlılıklar + Tauri derleme (NSIS + MSI)
+        shell: bash
+        working-directory: ${{ env.DESKTOP_DIR }}
+        env:
+          # Güncelleyici imzası varsa kullanılır; yoksa createUpdaterArtifacts=false olduğundan gerekmez
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: |
+          npm ci
+          npx tauri build --target x86_64-pc-windows-msvc --config src-tauri/tauri.windows.conf.json --ci
+
+      - name: Kurulum dosyalarını topla
+        id: collect
+        shell: bash
+        working-directory: ${{ env.DESKTOP_DIR }}
+        run: |
+          B="src-tauri/target/x86_64-pc-windows-msvc/release/bundle"
+          mkdir -p "$GITHUB_WORKSPACE/dist-win"
+          find "$B/nsis" -maxdepth 1 -name '*-setup.exe' -exec cp {} "$GITHUB_WORKSPACE/dist-win/" \; 2>/dev/null || true
+          find "$B/msi"  -maxdepth 1 -name '*.msi'       -exec cp {} "$GITHUB_WORKSPACE/dist-win/" \; 2>/dev/null || true
+          echo "İçerik:"; ls -la "$GITHUB_WORKSPACE/dist-win" || true
+          [ -n "$(ls -A "$GITHUB_WORKSPACE/dist-win" 2>/dev/null)" ] || { echo "::error::Kurulum dosyası üretilmedi ($B altında nsis/msi yok)"; exit 1; }
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: erbaa-kurs-windows-${{ env.VERSION }}
+          path: dist-win/*
+          if-no-files-found: error
+
+      - name: GitHub Release
+        if: startsWith(github.ref, 'refs/tags/desktop-win-v') || (github.event_name == 'workflow_dispatch' && inputs.publish)
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="desktop-win-v$VERSION"
+          NOTES=$'Erbaa Kurs — Windows '"$VERSION"$'\n\nİmzasız kurulum: Windows SmartScreen uyarısı çıkarsa "Daha fazla bilgi" › "Yine de çalıştır".'
+          gh release view "$TAG" >/dev/null 2>&1 || gh release create "$TAG" --title "Erbaa Kurs Windows $VERSION" --notes "$NOTES" --target "$GITHUB_SHA"
+          for f in dist-win/*; do
+            for n in 1 2 3 4 5; do
+              if gh release upload "$TAG" "$f" --clobber; then break; fi
+              [ "$n" = 5 ] && { echo "::error::Yüklenemedi: $f"; exit 1; }
+              echo "::warning::Yükleme denemesi $n başarısız: $(basename "$f"); $((n*20)) sn sonra tekrar"
+              sleep $((n*20))
+            done
+          done

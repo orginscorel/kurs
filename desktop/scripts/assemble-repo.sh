@@ -63,6 +63,7 @@ mkdir -p "$TARGET/desktop/src-tauri/binaries"
 echo "▶ İş akışı ve kök .gitignore"
 mkdir -p "$TARGET/.github/workflows"
 cp "$DESKTOP_DIR/.github/workflows/desktop-macos.yml" "$TARGET/.github/workflows/desktop-macos.yml"
+cp "$DESKTOP_DIR/.github/workflows/desktop-windows.yml" "$TARGET/.github/workflows/desktop-windows.yml"
 cp "$DESKTOP_DIR/repo-gitignore" "$TARGET/.gitignore"
 
 echo "▶ Sır taraması"

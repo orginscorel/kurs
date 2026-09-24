@@ -26,13 +26,12 @@ import { StudentDisciplineTab } from '@/modules/discipline/StudentDisciplineTab'
 import { SendMessageDialog } from '@/modules/communication/SendMessageDialog'
 import { StudentClassPanel } from '@/modules/placement/StudentClassPanel'
 import { ImpersonateButton, StudentPortalAccountPanel } from './StudentPortalAccountPanel'
+import { StudentPackagesPanel } from './StudentPackages'
 import { NotePrintDialog } from '@/modules/finance/PromissoryNotes'
 import { openPdf } from '@/modules/finance/shared'
 import { INVOICE_STATUS, type InvoiceRow } from '@/modules/finance/ledger'
 
 type TabKey = 'overview' | 'exams' | 'attendance' | 'finance' | 'homework' | 'notes' | 'messages' | 'timeline' | 'guidance' | 'discipline' | 'observations'
-
-const enrollmentLabel: Record<string, string> = { active: 'Aktif', frozen: 'Donduruldu', withdrawn: 'Ayrıldı', completed: 'Tamamlandı', pending: 'Bekliyor' }
 
 export default function StudentDetail() {
   const { id } = useParams()
@@ -246,6 +245,7 @@ function InfoRow({ label, value }: { label: string; value: ReactNode }) {
 
 function Overview({ data, studentId }: { data: StudentDetailData; studentId: number }) {
   const can = useCan()
+  const qc = useQueryClient()
   const s = data.student
   const [nationalId, setNationalId] = useState<string | null>(null)
   const types = [...new Set(data.exams.map((e) => e.type))]
@@ -427,21 +427,7 @@ function Overview({ data, studentId }: { data: StudentDetailData; studentId: num
           </ul>
         </Panel>
 
-        {data.enrollments.length > 0 && (
-          <Panel title="Dönem kayıtları" flush>
-            <ul>
-              {data.enrollments.map((e) => (
-                <li key={e.id} className="border-t border-line px-4 py-2.5 text-[13px]">
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="truncate font-medium">{e.program}</span>
-                    <Badge tone={e.status === 'active' ? 'success' : 'neutral'}>{enrollmentLabel[e.status] ?? e.status}</Badge>
-                  </div>
-                  <p className="truncate text-[12px] text-ink-3 tabular">Kayıt no {e.enrollment_no} · {e.term}{e.net_price ? ` · Net ücret ${money(e.net_price, { short: true })}` : ''}</p>
-                </li>
-              ))}
-            </ul>
-          </Panel>
-        )}
+        <StudentPackagesPanel studentId={studentId} enrollments={data.enrollments} onChanged={() => qc.invalidateQueries({ queryKey: ['student', String(studentId)] })} />
       </div>
     </div>
   )

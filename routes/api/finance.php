@@ -60,6 +60,7 @@ Route::prefix('finance')->group(function () {
     Route::post('enrollments', [EnrollmentController::class, 'store'])->middleware(['permission:enrollments.create', 'throttle:writes']);
     Route::put('enrollments/{enrollment}/plan', [EnrollmentController::class, 'restructure'])->middleware(['permission:installments.manage', 'throttle:writes']);
     Route::post('enrollments/{enrollment}/price', [EnrollmentController::class, 'adjustPrice'])->middleware(['permission:installments.manage', 'throttle:writes']);
+    Route::post('enrollments/{enrollment}/change-package', [EnrollmentController::class, 'changePackage'])->middleware(['permission:enrollments.create', 'throttle:writes']);
     Route::post('enrollments/{enrollment}/contract', [EnrollmentController::class, 'prepareContract'])->middleware('permission:enrollments.create|installments.manage');
     Route::put('enrollments/{enrollment}/contract', [EnrollmentController::class, 'saveContract'])->middleware(['permission:enrollments.create|installments.manage', 'throttle:writes']);
     Route::post('enrollments/{enrollment}/contract/sign', [EnrollmentController::class, 'signContract'])->middleware('permission:enrollments.create|installments.manage');

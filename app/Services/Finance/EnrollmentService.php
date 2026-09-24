@@ -152,6 +152,77 @@ class EnrollmentService
         return $rows;
     }
 
+    /**
+     * Mevcut kaydın paketini/ücretini değiştirir ve ödeme planını yeniden kurar.
+     * GÜVENLİK: yalnız tahsilat yapılmamış (ödenmemiş) kayıtlarda çalışır; aksi hâlde
+     * yeni kayıt açılmalı veya plan düzenlenmeli (finans tutarlılığı korunur).
+     *
+     * @param array{
+     *   program_id:int, education_package_id?:?int, list_price:string|float,
+     *   discount_amount?:string|float, discount_reason?:?string, scholarship_amount?:string|float,
+     *   scholarship_reason?:?string, down_payment?:string|float, installment_count:int, first_due_date:string
+     * } $data
+     */
+    public function changePackage(Enrollment $enrollment, array $data): Enrollment
+    {
+        if (! in_array($enrollment->status, ['pending', 'active', 'frozen'], true)) {
+            throw new BusinessRuleException('Ayrılmış/tamamlanmış kayıtta paket değiştirilemez.', 'enrollment_not_editable');
+        }
+        if ($enrollment->installments()->where('paid_amount', '>', 0)->exists()) {
+            throw new BusinessRuleException('Tahsilat yapılmış kayıtta paket değiştirilemez. Planı düzenleyin ya da yeni kayıt açın.', 'enrollment_has_payments');
+        }
+
+        $list = Money::of($data['list_price']);
+        $discount = Money::of($data['discount_amount'] ?? 0);
+        $scholarship = Money::of($data['scholarship_amount'] ?? 0);
+        $net = bcsub(bcsub($list, $discount, 2), $scholarship, 2);
+        if (bccomp($net, '0', 2) < 0) {
+            throw new BusinessRuleException('İndirim ve burs toplamı liste fiyatını aşamaz.', 'negative_net_price');
+        }
+
+        $enrolledOn = CarbonImmutable::parse($enrollment->enrolled_on?->toDateString() ?? $data['first_due_date']);
+        $plan = $this->buildPlan(
+            $net,
+            Money::of($data['down_payment'] ?? 0),
+            (int) $data['installment_count'],
+            $enrolledOn,
+            CarbonImmutable::parse($data['first_due_date']),
+        );
+
+        return DB::transaction(function () use ($enrollment, $data, $list, $discount, $scholarship, $net, $plan) {
+            // Ödenmemiş kayıtta tüm taksitler serbest → temizlenip yeni plan kurulur.
+            $enrollment->installments()->delete();
+
+            $enrollment->forceFill([
+                'program_id' => (int) $data['program_id'],
+                'education_package_id' => $data['education_package_id'] ?? null,
+                'list_price' => $list,
+                'discount_amount' => $discount,
+                'discount_reason' => $data['discount_reason'] ?? null,
+                'scholarship_amount' => $scholarship,
+                'scholarship_reason' => $data['scholarship_reason'] ?? null,
+                'net_price' => $net,
+            ])->save();
+
+            foreach ($plan as $i => $row) {
+                Installment::query()->create([
+                    'enrollment_id' => $enrollment->id,
+                    'student_id' => $enrollment->student_id,
+                    'sequence' => $i + 1,
+                    'due_date' => $row['due_date'],
+                    'amount' => $row['amount'],
+                ]);
+            }
+
+            Audit::log('enrollment.package_changed', sprintf(
+                '%s kaydının paketi/ücreti değiştirildi: yeni net bedel %s TL (%d taksit).',
+                $enrollment->enrollment_no, Money::format($net), count($plan),
+            ), $enrollment);
+
+            return $enrollment->load('installments');
+        });
+    }
+
     public function assignClassGroup(Student $student, ClassGroup $group, string $joinedOn): void
     {
         $activeCount = $group->activeStudents()->count();
