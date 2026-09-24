@@ -1,7 +1,7 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { ArrowLeftRight, Clock, Pin } from 'lucide-react'
+import { ArrowLeftRight, Clock, Pin, GraduationCap, Plus } from 'lucide-react'
 import { api } from '@/lib/api'
 import { date } from '@/lib/format'
 import { useCan } from '@/app/auth'
@@ -15,8 +15,9 @@ import type { StudentPanelData } from './types'
  * Öğrenci profili için sınıf paneli: mevcut şube, bekleme listesi, "Sınıf değiştir", tüm sınıf geçmişi.
  * Kullanım: <StudentClassPanel studentId={student.id} />
  */
-export function StudentClassPanel({ studentId }: { studentId: number }) {
+export function StudentClassPanel({ studentId, onEditStudent }: { studentId: number; onEditStudent?: () => void }) {
   const can = useCan()
+  const navigate = useNavigate()
   const canChange = can(['academic.manage', 'students.update'])
   const [open, setOpen] = useState(false)
   const { data, isLoading, error } = useQuery({
@@ -28,13 +29,18 @@ export function StudentClassPanel({ studentId }: { studentId: number }) {
   if (error || !data) return <Panel title="Sınıf"><EmptyState compact title="Sınıf bilgisi alınamadı" /></Panel>
 
   const c = data.current
-  const changeable = canChange && data.options.some((o) => !o.is_current)
+  const selectable = data.options.filter((o) => !o.is_current)
+  const hasLevel = data.level !== null
+  const headerAction = !canChange ? undefined
+    : !hasLevel ? (onEditStudent ? <Button size="sm" icon={<GraduationCap className="size-3.5" />} onClick={onEditStudent}>Okul sınıfını belirle</Button> : undefined)
+    : selectable.length > 0 ? <Button size="sm" icon={<ArrowLeftRight className="size-3.5" />} onClick={() => setOpen(true)}>{c ? 'Sınıf değiştir' : 'Şubeye yerleştir'}</Button>
+    : (can('academic.manage') ? <Button size="sm" icon={<Plus className="size-3.5" />} onClick={() => navigate('/siniflar?yeni=1')}>Şube oluştur</Button> : undefined)
 
   return (
     <Panel
       title="Sınıf"
       description={data.term ? `${data.term.name} dönemi` : undefined}
-      actions={changeable && <Button size="sm" icon={<ArrowLeftRight className="size-3.5" />} onClick={() => setOpen(true)}>{c ? 'Sınıf değiştir' : 'Şubeye yerleştir'}</Button>}
+      actions={headerAction}
     >
       <div className="flex flex-col gap-4">
         {c ? (
@@ -53,8 +59,15 @@ export function StudentClassPanel({ studentId }: { studentId: number }) {
             <p className="text-[14px] font-medium">Şubeye yerleşmemiş</p>
             <p className="mt-0.5 text-[12.5px] text-ink-3">
               {data.unstructured_class ? `Eski yapıdaki sınıfı: ${data.unstructured_class.name}. ` : ''}
-              {data.level === null ? 'Okul sınıfı (9-12) girilmemiş.' : `${data.level}. sınıf şubelerinden birine yerleştirilebilir.`}
+              {!hasLevel ? 'Önce okul sınıfını (9-12) belirleyin.' : selectable.length > 0 ? `${data.level}. sınıf şubelerinden birine yerleştirebilirsiniz.` : `${data.level}. sınıf için henüz şube yok — önce şube oluşturun.`}
             </p>
+            {canChange && (
+              <div className="mt-2.5 flex flex-wrap gap-2">
+                {!hasLevel && onEditStudent && <Button size="sm" variant="primary" icon={<GraduationCap className="size-3.5" />} onClick={onEditStudent}>Okul sınıfını belirle</Button>}
+                {hasLevel && selectable.length > 0 && <Button size="sm" variant="primary" icon={<ArrowLeftRight className="size-3.5" />} onClick={() => setOpen(true)}>Şubeye yerleştir</Button>}
+                {hasLevel && selectable.length === 0 && can('academic.manage') && <Button size="sm" variant="primary" icon={<Plus className="size-3.5" />} onClick={() => navigate('/siniflar?yeni=1')}>Şube oluştur</Button>}
+              </div>
+            )}
           </div>
         )}
 

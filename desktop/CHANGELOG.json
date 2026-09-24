@@ -1,5 +1,16 @@
 [
   {
+    "version": "1.23.3",
+    "date": "2026-09-24",
+    "title": "Sınıf ve Bilgiler panellerine hızlı işlemler",
+    "items": [
+      {
+        "type": "yeni",
+        "text": "Öğrenci profili Sınıf/Bilgiler panellerine satır-içi hızlı işlemler (okul sınıfı, şube yerleştir/oluştur, bilgileri düzenle)"
+      }
+    ]
+  },
+  {
     "version": "1.23.2",
     "date": "2026-09-24",
     "title": "Yönetim Paneli ve liste/yoklama çıktısı",

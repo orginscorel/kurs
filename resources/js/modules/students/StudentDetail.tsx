@@ -194,7 +194,7 @@ export default function StudentDetail() {
       </div>
 
       <div className="mt-4">
-        {tab === 'overview' && <Overview data={data} studentId={s.id} />}
+        {tab === 'overview' && <Overview data={data} studentId={s.id} onEdit={() => setEditOpen(true)} />}
         {tab === 'exams' && <ExamsTab data={data} />}
         {tab === 'attendance' && <AttendanceTab studentId={s.id} />}
         {tab === 'finance' && <FinanceTab studentId={s.id} studentName={s.full_name} />}
@@ -243,7 +243,7 @@ function InfoRow({ label, value }: { label: string; value: ReactNode }) {
   )
 }
 
-function Overview({ data, studentId }: { data: StudentDetailData; studentId: number }) {
+function Overview({ data, studentId, onEdit }: { data: StudentDetailData; studentId: number; onEdit?: () => void }) {
   const can = useCan()
   const qc = useQueryClient()
   const s = data.student
@@ -321,7 +321,7 @@ function Overview({ data, studentId }: { data: StudentDetailData; studentId: num
       </div>
 
       <div className="flex min-w-0 flex-col gap-4">
-        <StudentClassPanel studentId={studentId} />
+        <StudentClassPanel studentId={studentId} onEditStudent={can('students.update') ? onEdit : undefined} />
         <StudentPackagesPanel studentId={studentId} enrollments={data.enrollments} onChanged={() => qc.invalidateQueries({ queryKey: ['student', String(studentId)] })} />
         {data.finance && (
           <Panel title="Ödeme durumu">
@@ -342,7 +342,7 @@ function Overview({ data, studentId }: { data: StudentDetailData; studentId: num
           guardianName={(s.guardians.find((g) => g.is_primary) ?? s.guardians[0])?.name}
           guardianPhone={(() => { const g = s.guardians.find((x) => x.is_primary) ?? s.guardians[0]; return g?.whatsapp_phone || g?.phone })()}
         />
-        <Panel title="Bilgiler">
+        <Panel title="Bilgiler" actions={can('students.update') && onEdit && <Button size="sm" variant="ghost" icon={<Pencil className="size-3.5" />} onClick={onEdit}>Düzenle</Button>}>
           <div>
             <InfoRow label="Okul" value={s.school_name ?? '—'} />
             <InfoRow label="Hedef bölüm / üniversite" value={s.target_department || s.target_university ? `${s.target_department ?? ''}${s.target_university ? ` · ${s.target_university}` : ''}` : '—'} />

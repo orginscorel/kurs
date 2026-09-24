@@ -1,5 +1,20 @@
 [
   {
+    "version": "1.23.3",
+    "date": "2026-09-24",
+    "title": "Sınıf ve Bilgiler panellerine hızlı işlemler",
+    "items": [
+      {
+        "type": "yeni",
+        "text": "Öğrenci profili Sınıf panelinde kısayollar — Okul sınıfını (9-12) belirle, Şubeye yerleştir, ve şube yoksa \"Şube oluştur\""
+      },
+      {
+        "type": "yeni",
+        "text": "Bilgiler paneline \"Düzenle\" kalem kısayolu (okul, hedef bölüm, rehber öğretmen, doğum/TC/telefon doğrudan düzenlenir)"
+      }
+    ]
+  },
+  {
     "version": "1.23.2",
     "date": "2026-09-24",
     "title": "Yönetim Paneli ve liste/yoklama çıktısı",
