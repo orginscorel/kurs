@@ -322,6 +322,20 @@ function Overview({ data, studentId }: { data: StudentDetailData; studentId: num
 
       <div className="flex min-w-0 flex-col gap-4">
         <StudentClassPanel studentId={studentId} />
+        <StudentPackagesPanel studentId={studentId} enrollments={data.enrollments} onChanged={() => qc.invalidateQueries({ queryKey: ['student', String(studentId)] })} />
+        {data.finance && (
+          <Panel title="Ödeme durumu">
+            <ProgressBar value={Number(data.finance.total) ? (Number(data.finance.paid) / Number(data.finance.total)) * 100 : 0} tone="success" />
+            <p className="mt-2 text-[12.5px] text-ink-3 tabular">{money(data.finance.paid, { short: true })} / {money(data.finance.total, { short: true })} ödendi</p>
+            {Number(data.finance.overdue) > 0 && <Alert tone="danger" className="mt-3">{data.finance.overdue_count} taksit gecikmiş · {money(data.finance.overdue)}</Alert>}
+            {data.finance.next_installment && (
+              <div className="mt-3 flex items-center justify-between gap-2 rounded-[var(--radius-sm)] bg-surface-2 px-3 py-2 text-[12.5px]">
+                <span className="text-ink-2">Sıradaki taksit: {date(data.finance.next_installment.due_date)}</span>
+                <span className="whitespace-nowrap font-medium tabular">{money(Number(data.finance.next_installment.amount) - Number(data.finance.next_installment.paid_amount))}</span>
+              </div>
+            )}
+          </Panel>
+        )}
         <StudentPortalAccountPanel
           studentId={studentId}
           studentName={s.full_name}
@@ -381,20 +395,6 @@ function Overview({ data, studentId }: { data: StudentDetailData; studentId: num
           )}
         </Panel>
 
-        {data.finance && (
-          <Panel title="Ödeme durumu">
-            <ProgressBar value={Number(data.finance.total) ? (Number(data.finance.paid) / Number(data.finance.total)) * 100 : 0} tone="success" />
-            <p className="mt-2 text-[12.5px] text-ink-3 tabular">{money(data.finance.paid, { short: true })} / {money(data.finance.total, { short: true })} ödendi</p>
-            {Number(data.finance.overdue) > 0 && <Alert tone="danger" className="mt-3">{data.finance.overdue_count} taksit gecikmiş · {money(data.finance.overdue)}</Alert>}
-            {data.finance.next_installment && (
-              <div className="mt-3 flex items-center justify-between gap-2 rounded-[var(--radius-sm)] bg-surface-2 px-3 py-2 text-[12.5px]">
-                <span className="text-ink-2">Sıradaki taksit: {date(data.finance.next_installment.due_date)}</span>
-                <span className="whitespace-nowrap font-medium tabular">{money(Number(data.finance.next_installment.amount) - Number(data.finance.next_installment.paid_amount))}</span>
-              </div>
-            )}
-          </Panel>
-        )}
-
         <Panel title="Yaklaşan dersler" flush>
           {data.upcoming_lessons.length === 0 ? (
             <p className="px-4 pb-4 text-[13px] text-ink-3">Planlanmış ders yok.</p>
@@ -427,7 +427,6 @@ function Overview({ data, studentId }: { data: StudentDetailData; studentId: num
           </ul>
         </Panel>
 
-        <StudentPackagesPanel studentId={studentId} enrollments={data.enrollments} onChanged={() => qc.invalidateQueries({ queryKey: ['student', String(studentId)] })} />
       </div>
     </div>
   )

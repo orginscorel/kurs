@@ -1,5 +1,20 @@
 [
   {
+    "version": "1.23.1",
+    "date": "2026-09-24",
+    "title": "Öğrenci paketleri ve profil düzeni",
+    "items": [
+      {
+        "type": "yeni",
+        "text": "Öğrenci profilinde paket tanımlama/değiştirme ve kayıt yönetimi"
+      },
+      {
+        "type": "iyilestirme",
+        "text": "Öğrenci profili düzeni sadeleştirildi; WhatsApp bağlı durumu düzeltildi"
+      }
+    ]
+  },
+  {
     "version": "1.23.0",
     "date": "2026-09-24",
     "title": "Öğrenci profilinde hızlı paket işlemleri",
