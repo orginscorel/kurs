@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { MoreHorizontal, Package, Pencil, Plus, Trash2 } from 'lucide-react'
@@ -35,6 +36,14 @@ export default function Packages() {
     onError: (e) => toast.error(e instanceof ApiError ? e.firstError() : 'İşlem yapılamadı.'),
   })
   const manage = can('installments.manage')
+  // "Paket tanımla" kısayolu (Yönetim Paneli / komut paleti) ?yeni=1 ile create modalını açar.
+  const [params, setParams] = useSearchParams()
+  useEffect(() => {
+    if (params.get('yeni') === '1' && manage) {
+      setEdit('new')
+      setParams((p) => { p.delete('yeni'); return p }, { replace: true })
+    }
+  }, [params, manage, setParams])
 
   return (
     <div className="animate-fade-in">

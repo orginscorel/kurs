@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { APP_VERSION } from '@/components/app/version'
 import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom'
-import { Bell, ChevronDown, ChevronsLeft, ChevronsRight, KeyRound, LogOut, Menu as MenuIcon, Monitor, Moon, Search, Sparkles, Sun, X } from 'lucide-react'
+import { Bell, ChevronDown, ChevronsLeft, ChevronsRight, KeyRound, LayoutGrid, LogOut, Menu as MenuIcon, Monitor, Moon, Search, Sparkles, Sun, X } from 'lucide-react'
 import { cn } from '@/lib/cn'
 import { apply as applyTheme, readMode, resolve as resolveTheme, saveMode, watchSystem, type ThemeMode } from '@/lib/theme'
 import { useAuth, useCan } from '@/app/auth'
@@ -12,6 +12,7 @@ import { Menu, Tooltip } from '@/components/ui/overlay'
 import { Button } from '@/components/ui/Button'
 import { VendorInfo } from '@/components/app/VendorInfo'
 import { CommandPalette } from './CommandPalette'
+import { ManagementHub } from './ManagementHub'
 import { NotificationCenter } from './NotificationCenter'
 import { SyncStatus } from './SyncStatus'
 import { WebOnlyNotice } from './WebOnlyNotice'
@@ -62,6 +63,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   })
   const [mobileOpen, setMobileOpen] = useState(false)
   const [paletteOpen, setPaletteOpen] = useState(false)
+  const [hubOpen, setHubOpen] = useState(false)
   const location = useLocation()
   // Masaüstünde yalnız web bölümleri: boş liste yerine açık durum + "Web'de aç" (lib/webOnly.ts)
   const webOnly = webOnlyFor(location.pathname)
@@ -83,6 +85,10 @@ export function AppShell({ children }: { children: ReactNode }) {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault()
         setPaletteOpen((v) => !v)
+      }
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'j') {
+        e.preventDefault()
+        setHubOpen((v) => !v)
       }
     }
     window.addEventListener('keydown', onKey)
@@ -110,7 +116,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       )}
 
       <div className={cn('transition-[padding] duration-200', collapsed ? 'lg:pl-[64px]' : 'lg:pl-[232px]')}>
-        <Topbar onMenu={() => setMobileOpen(true)} onSearch={() => setPaletteOpen(true)} />
+        <Topbar onMenu={() => setMobileOpen(true)} onSearch={() => setPaletteOpen(true)} onHub={() => setHubOpen(true)} />
         <main className="mx-auto w-full max-w-[1480px] px-4 sm:px-6 lg:px-8 pt-5 pb-24">
           {/* Sayfa geçişi: yol değişince içerik yumuşak girer (hareket azaltılmışsa CSS'te durur) */}
           <div key={location.pathname} className="page-enter">
@@ -126,6 +132,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       </div>
 
       <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} />
+      <ManagementHub open={hubOpen} onClose={() => setHubOpen(false)} />
     </div>
   )
 }
@@ -363,7 +370,7 @@ function Sidebar({
   )
 }
 
-function Topbar({ onMenu, onSearch }: { onMenu: () => void; onSearch: () => void }) {
+function Topbar({ onMenu, onSearch, onHub }: { onMenu: () => void; onSearch: () => void; onHub: () => void }) {
   const me = useAuth((s) => s.me)
   const logout = useAuth((s) => s.logout)
   const navigate = useNavigate()
@@ -388,6 +395,17 @@ function Topbar({ onMenu, onSearch }: { onMenu: () => void; onSearch: () => void
           <Kbd>{isMac ? '⌘' : 'Ctrl'}</Kbd>
           <Kbd>K</Kbd>
         </span>
+      </button>
+
+      <button
+        type="button"
+        onClick={onHub}
+        title="Yönetim Paneli — tüm işlemler tek yerde (Ctrl/⌘ J)"
+        className="flex h-9 shrink-0 items-center gap-2 rounded-[var(--radius-sm)] border border-line bg-surface px-2.5 sm:px-3 text-[13.5px] font-medium text-ink transition-colors hover:border-line-strong hover:bg-surface-2"
+        aria-label="Yönetim Paneli"
+      >
+        <LayoutGrid className="size-[18px] shrink-0 text-primary" />
+        <span className="hidden md:block">Yönetim Paneli</span>
       </button>
 
       <div className="ml-auto flex items-center gap-1">

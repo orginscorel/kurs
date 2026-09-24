@@ -106,6 +106,7 @@ export default {
     { id: 'finance-overdue', label: 'Gecikmiş ödemeler', to: '/finans/alacaklar?status=overdue', icon: AlarmClock, permission: 'finance.view', hint: 'Finans', keywords: ['gecikmiş', 'geciken', 'borç', 'vadesi geçmiş'] },
     { id: 'finance-payments', label: 'Tahsilat listesi', to: '/finans/tahsilatlar', icon: ReceiptText, permission: 'finance.view', hint: 'Finans', keywords: ['makbuz', 'tahsilatlar'] },
     { id: 'finance-enroll', label: 'Yeni dönem kaydı', to: '/finans/kayitlar/yeni', icon: UserPlus, permission: 'enrollments.create', hint: 'Finans', keywords: ['kayıt', 'sözleşme', 'ödeme planı'] },
+    { id: 'package-new', label: 'Paket tanımla', to: '/finans/paketler?yeni=1', icon: Package, permission: 'installments.manage', hint: 'Eğitim paketi', keywords: ['paket', 'tanımla', 'ekle', 'yeni', 'fiyat', 'eğitim paketi'] },
     { id: 'finance-package-requests', label: 'Paket talepleri', to: '/finans/paket-talepleri', icon: Inbox, permission: 'package_requests.manage', hint: 'Finans', keywords: ['paket talebi', 'koçluk talebi', 'portal talep', 'paket ekle'] },
     { id: 'finance-dayend', label: 'Gün sonu kasa özeti', to: '/finans/hesaplar?sekme=gun-sonu', icon: Landmark, permission: 'finance.view', hint: 'Finans', keywords: ['gün sonu', 'kasa', 'banka'] },
     { id: 'finance-invoice-new', label: 'Fatura kes', to: '/finans/faturalar/yeni', icon: FilePlus2, permission: 'finance.invoice', hint: 'Finans', keywords: ['fatura', 'e-arşiv', 'e-fatura', 'kdv'] },

@@ -100,19 +100,20 @@ class StudentRosterController extends ApiController
         Audit::log('students.roster_exported', sprintf('%s çıktısı alındı (%s, %d öğrenci, %d sınıf).', $title, strtoupper($data['format'] ?? 'pdf'), $rows->count(), $groups->count()));
 
         if (($data['format'] ?? 'pdf') === 'xlsx') {
-            $header = ['Sıra', 'Öğrenci No', 'Sınıf', 'Adı', 'Soyadı', 'Telefon', 'Veli Adı Soyadı', 'Yakınlık', 'Veli Telefonu', ...$columns];
+            $mark = $mode === 'attendance' ? 'İşaret / Mazeret' : 'İşaret';
+            $header = ['Grup', 'Ad', 'Soyad', $mark];
 
-            return response()->streamDownload(function () use ($groups, $header, $columns) {
+            return response()->streamDownload(function () use ($groups, $header) {
                 $writer = new Writer();
                 $writer->openToFile('php://output');
                 $writer->addRow(Row::fromValues($header));
                 foreach ($groups as $list) {
-                    foreach ($list->values() as $i => $r) {
-                        $writer->addRow(Row::fromValues([$i + 1, $r['student_no'], $r['class_name'], $r['first_name'], $r['last_name'], $r['phone'], $r['guardian_name'], $r['relationship'], $r['guardian_phone'], ...array_fill(0, count($columns), '')]));
+                    foreach ($list->values() as $r) {
+                        $writer->addRow(Row::fromValues([$r['class_name'], $r['first_name'], $r['last_name'], '']));
                     }
                 }
                 $writer->close();
-            }, "ogrenci-listesi-{$stamp}.xlsx", ['Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet']);
+            }, ($mode === 'attendance' ? 'yoklama-cizelgesi-' : 'ogrenci-listesi-')."{$stamp}.xlsx", ['Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet']);
         }
 
         $pdf = Pdf::loadView('pdf.students.roster', [
@@ -125,7 +126,7 @@ class StudentRosterController extends ApiController
             'term' => $term?->name,
             'pagePerClass' => (bool) ($data['page_per_class'] ?? true),
             'total' => $rows->count(),
-        ])->setPaper('a4', $mode === 'attendance' && count($columns) > 6 ? 'landscape' : 'portrait');
+        ])->setPaper('a4', 'portrait');
 
         return $pdf->download(($mode === 'attendance' ? 'yoklama-cizelgesi-' : 'ogrenci-listesi-')."{$stamp}.pdf");
     }

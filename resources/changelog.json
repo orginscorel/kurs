@@ -1,5 +1,24 @@
 [
   {
+    "version": "1.23.2",
+    "date": "2026-09-24",
+    "title": "Yönetim Paneli ve liste/yoklama çıktısı",
+    "items": [
+      {
+        "type": "yeni",
+        "text": "Yönetim Paneli — üst çubukta görünür, kategorili ve aranabilir merkez; tüm ekle/oluştur kısayolları tek yerde (⌘/Ctrl+J). \"Ne nerede\" derdi biter"
+      },
+      {
+        "type": "yeni",
+        "text": "\"Sınıf/şube ekle\" ve \"Paket tanımla\" kısayolları eklendi; boş ekranlarda doğrudan \"+ Ekle\" butonları"
+      },
+      {
+        "type": "iyilestirme",
+        "text": "Öğrenci liste ve yoklama çıktısı yeniden tasarlandı — yan yana 2 sütun, sade siyah grid (Grup/Ad/Soyad), altta boş satırlar; yoklamada geniş \"İşaret/Mazeret\" alanı + Tarih/Ders/Öğretmen; Excel de aynı düzende; Türkçe büyük harf düzeltildi"
+      }
+    ]
+  },
+  {
     "version": "1.23.1",
     "date": "2026-09-24",
     "title": "Öğrenci paketleri ve profil düzeni",

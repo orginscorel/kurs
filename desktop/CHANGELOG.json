@@ -1,5 +1,20 @@
 [
   {
+    "version": "1.23.2",
+    "date": "2026-09-24",
+    "title": "Yönetim Paneli ve liste/yoklama çıktısı",
+    "items": [
+      {
+        "type": "yeni",
+        "text": "Yönetim Paneli (görünür, kategorili komut merkezi) + Sınıf/Paket ekle kısayolları"
+      },
+      {
+        "type": "iyilestirme",
+        "text": "Öğrenci liste/yoklama çıktısı sade grid tasarıma çevrildi (İşaret/Mazeret alanı; Türkçe büyük harf)"
+      }
+    ]
+  },
+  {
     "version": "1.23.1",
     "date": "2026-09-24",
     "title": "Öğrenci paketleri ve profil düzeni",

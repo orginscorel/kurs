@@ -58,6 +58,7 @@ export default {
     { id: 'class-structure', label: 'Sınıf yapısı', to: '/program-botu/sinif-yapisi', icon: LayoutGrid, permission: 'academic.view', hint: 'Seviye, şube, alan, müfredat', keywords: ['şube', 'alan', 'sayısal', 'eşit ağırlık', 'müfredat', 'sınıf aç'] },
     { id: 'substitute', label: 'Yedek öğretmen', to: '/program-botu/yedek', icon: UserRoundCheck, permission: 'schedule.view', keywords: ['yedek', 'izin', 'vekil', 'telafi'] },
     { id: 'class-groups', label: 'Sınıflar', to: '/siniflar', icon: LayoutGrid, permission: 'academic.view', keywords: ['sınıf', 'şube'] },
+    { id: 'class-group-new', label: 'Sınıf / şube ekle', to: '/siniflar?yeni=1', icon: LayoutGrid, permission: 'academic.manage', hint: 'Yeni sınıf', keywords: ['sınıf', 'şube', 'ekle', 'yeni', 'aç', 'oluştur'] },
     { id: 'academic', label: 'Programlar ve dersler', to: '/akademik', icon: BookOpen, permission: 'academic.view', keywords: ['program', 'ders', 'derslik', 'konu', 'kazanım'] },
   ],
 } satisfies ModuleDef

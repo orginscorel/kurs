@@ -49,7 +49,8 @@ export default function CoachDashboard() {
         <div className="lg:col-span-2">
           <Panel title="Öğrencilerim">
             {isLoading ? <Skeleton className="h-40" /> : (data?.students.length ?? 0) === 0 ? (
-              <EmptyState compact icon={<Users />} title="Henüz öğrenciniz yok" description="Koçluk öğrencileri sayfasından öğrencilere koç atanır." />
+              <EmptyState compact icon={<Users />} title="Henüz öğrenciniz yok" description="Koçluk öğrencileri sayfasından öğrencilere koç atanır."
+                action={can('coaching.manage') ? <ButtonLink to="/kocluk/ogrenciler" variant="primary" icon={<Users className="size-4" />}>Öğrenciye koç ata</ButtonLink> : undefined} />
             ) : (
               <div className="overflow-x-auto scroll-thin">
                 <table className="w-full text-[13px]">
