@@ -56,6 +56,12 @@ jobs:
           path: out/php-x86_64-pc-windows-msvc.exe
           key: static-php-win-x64-spc${{ env.SPC_VERSION }}-php${{ env.PHP_VERSION }}-${{ hashFiles(format('{0}/scripts/build-static-php-win.ps1', steps.dirs.outputs.d)) }}
 
+      - name: MSVC ortamı (x64) — SPC, Windows'ta Visual Studio/cl.exe/nmake ortamını gerektirir
+        if: steps.cache.outputs.cache-hit != 'true'
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
       - name: static-php-cli ile derle
         if: steps.cache.outputs.cache-hit != 'true'
         shell: pwsh
