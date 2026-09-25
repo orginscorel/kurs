@@ -190,7 +190,8 @@ jobs:
         shell: bash
         working-directory: ${{ env.DESKTOP_DIR }}
         run: |
-          W="$GITHUB_WORKSPACE"
+          # D:\a\... → /d/a/... : GNU tar (Git bash) 'D:' ön ekini uzak-host sanıp "Cannot connect to D:" verir.
+          W="$(cygpath -u "$GITHUB_WORKSPACE")"
           # Laravel bundle
           rm -rf build/laravel && mkdir -p build/laravel
           tar -xzf "$W/_bundle/laravel.tar.gz" -C build/laravel
