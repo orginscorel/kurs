@@ -215,23 +215,24 @@ jobs:
           & $php -n -c $ini -v
           if ($LASTEXITCODE -ne 0) { throw 'php -v basarisiz' }
           # NOT: `php -r "..."` tek satırını PowerShell → php.exe argüman aktarımı Windows'ta bozuyor (tırnak/&&/?: →
-          # "unexpected end of file"). Bu yüzden duman testini bir .php DOSYASINA yazıp çalıştırıyoruz (tırnak cehennemi yok).
+          # "unexpected end of file"). Duman testini bir .php DOSYASINA yazıp çalıştırıyoruz. Satırlar YAML blok
+          # skalarına uysun diye tek-tırnaklı PS dizisi (girintili) kullanılır — here-string (@'...'@) YAML'ı bozuyordu.
           $smoke = Join-Path $env:RUNNER_TEMP "smoke.php"
-          $php_code = @'
-<?php
-$req = ['intl','sodium','pdo_sqlite','gd','curl','mbstring','openssl','sqlite3','zip','fileinfo','exif'];
-$eksik = array_values(array_filter($req, fn($e) => !extension_loaded($e)));
-if ($eksik) { fwrite(STDERR, "EKSIK: ".implode(', ', $eksik).PHP_EOL); exit(1); }
-$p = new PDO('sqlite::memory:');
-echo "sqlite ".$p->query('select sqlite_version()')->fetchColumn().PHP_EOL;
-$c = new Collator('tr_TR');
-if (!($c instanceof Collator)) { fwrite(STDERR, "intl/Collator basarisiz".PHP_EOL); exit(1); }
-if (!sodium_crypto_box_keypair()) { fwrite(STDERR, "sodium basarisiz".PHP_EOL); exit(1); }
-echo "TUM UZANTILAR OK".PHP_EOL;
-'@
-          Set-Content -Path $smoke -Value $php_code -Encoding UTF8
+          $code = @(
+            '<?php'
+            '$req = ["intl","sodium","pdo_sqlite","gd","curl","mbstring","openssl","sqlite3","zip","fileinfo","exif"];'
+            '$eksik = array_values(array_filter($req, fn($e) => !extension_loaded($e)));'
+            'if ($eksik) { fwrite(STDERR, "EKSIK: ".implode(", ", $eksik).PHP_EOL); exit(1); }'
+            '$p = new PDO("sqlite::memory:");'
+            'echo "sqlite ".$p->query("select sqlite_version()")->fetchColumn().PHP_EOL;'
+            '$c = new Collator("tr_TR");'
+            'if (!($c instanceof Collator)) { fwrite(STDERR, "intl/Collator basarisiz".PHP_EOL); exit(1); }'
+            'if (!sodium_crypto_box_keypair()) { fwrite(STDERR, "sodium basarisiz".PHP_EOL); exit(1); }'
+            'echo "TUM UZANTILAR OK".PHP_EOL;'
+          )
+          Set-Content -Path $smoke -Value $code -Encoding UTF8
           & $php -n -c $ini $smoke
-          if ($LASTEXITCODE -ne 0) { throw 'gerekli uzantı eksik veya duman testi basarisiz' }
+          if ($LASTEXITCODE -ne 0) { throw 'gerekli uzanti eksik veya duman testi basarisiz' }
 
       - name: Bağımlılıklar + Tauri derleme (NSIS + MSI)
         shell: bash
