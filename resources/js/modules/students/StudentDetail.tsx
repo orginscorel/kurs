@@ -44,7 +44,8 @@ export default function StudentDetail() {
   const [messageOpen, setMessageOpen] = useState(false)
   const photoInput = useRef<HTMLInputElement>(null)
 
-  const { data, isLoading, error } = useQuery({ queryKey: ['student', id], queryFn: () => api.get<StudentDetailData>(`/students/${id}`) })
+  // Profil her açılışta taze çekilir: veli/paket/sınıf gibi başka ekrandan eklenen kayıtlar bayat önbellekten dolayı "yok" görünmesin.
+  const { data, isLoading, error } = useQuery({ queryKey: ['student', id], queryFn: () => api.get<StudentDetailData>(`/students/${id}`), refetchOnMount: 'always', staleTime: 0 })
   const options = useQuery({ queryKey: ['students', 'options'], queryFn: () => api.get<StudentOptions>('/students/options'), staleTime: 5 * 60_000, enabled: can('students.update') })
 
   const invalidate = () => {

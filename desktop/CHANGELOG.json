@@ -1,5 +1,16 @@
 [
   {
+    "version": "1.23.5",
+    "date": "2026-09-25",
+    "title": "Öğrenci profili taze veri",
+    "items": [
+      {
+        "type": "duzeltme",
+        "text": "Öğrenci profili her açılışta taze veri çeker (veli/paket bayat görünmez)"
+      }
+    ]
+  },
+  {
     "version": "1.23.4",
     "date": "2026-09-25",
     "title": "Menü düzeni ve masaüstü yayın düzeltmeleri",
