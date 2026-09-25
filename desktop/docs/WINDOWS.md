@@ -1,7 +1,14 @@
 # Windows masaüstü sürümü
 
-macOS akışının (bkz. `DESKTOP.md`) Windows kardeşi. Aynı mimari: uygulama, gömülü **statik `php.exe`** ile
+macOS akışının (bkz. `DESKTOP.md`) Windows kardeşi. Aynı mimari: uygulama, gömülü **PHP** ile
 **tüm Laravel'i cihazda yerel** çalıştırır (çevrimdışı yerel kurulum, web ile eşitlenir). CI: `.github/workflows/desktop-windows.yml`.
+
+**PHP kaynağı (Windows'a özel):** macOS statik-PHP (SPC) kullanır; SPC Windows'ta `php-src` çıkarma adımında
+kararsız olduğundan Windows tarafı **windows.php.net resmi PHP (NTS x64)** binary'sini kullanır. Bu tek statik dosya
+değildir: `php.exe` + `php8.dll` + ICU DLL'leri + `ext\php_*.dll` bir **klasör** olarak (`php-dist`) uygulama
+kaynaklarına (`resources/php-dist`) paketlenir. Uzantılar `conf.d\ext.ini` içinden `PHP_INI_SCAN_DIR` ile yüklenir
+(`extension_dir = ${KURS_PHP_EXT_DIR}` çalışma zamanında `src/php.rs` tarafından verilir). Paylaşılan `runtime/php.ini`
+(PHPRC) her iki platformda aynıdır. Hazırlama betiği: `scripts/build-static-php-win.ps1` (`PHP_MINOR`, vars. 8.4).
 
 ## Nasıl derlenir / yayınlanır
 

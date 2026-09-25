@@ -70,6 +70,15 @@ pub fn build_env(paths: &Paths, secrets: &LocalSecrets, extra: &[(&str, String)]
             env.insert(key.into(), v);
         }
     }
+    #[cfg(windows)]
+    {
+        // Windows: php.exe DLL'lerini kendi klasöründen yükler; PATH'e php klasörü + sistem dizinleri.
+        let phpdir = paths.php().parent().map(|p| p.to_string_lossy().to_string()).unwrap_or_default();
+        let win = std::env::var("SystemRoot").unwrap_or_else(|_| "C:\\Windows".into());
+        let sys = std::env::var("PATH").unwrap_or_default();
+        env.insert("PATH".into(), format!("{};{}\\System32;{};{}", phpdir, win, win, sys));
+    }
+    #[cfg(unix)]
     env.insert("PATH".into(), "/usr/bin:/bin:/usr/sbin:/sbin".into());
     env.entry("LANG".into()).or_insert_with(|| "tr_TR.UTF-8".into());
 
@@ -78,10 +87,18 @@ pub fn build_env(paths: &Paths, secrets: &LocalSecrets, extra: &[(&str, String)]
 
     let s = |p: &Path| p.to_string_lossy().to_string();
     let cache = paths.cache_dir();
+    // Windows resmi PHP: uzantılar conf.d/ext.ini'den taranır (extension_dir = ${KURS_PHP_EXT_DIR});
+    // macOS/Linux statik php'de uzantılar gömülü → tarama kapalı (boş).
+    let (ini_scan_dir, php_ext_dir_val) = if cfg!(windows) {
+        (s(&paths.php_conf_d()), s(&paths.php_ext_dir()))
+    } else {
+        (String::new(), String::new())
+    };
     let fixed = [
         // php.ini ve içindeki ${…} değişkenleri
         ("PHPRC", s(&paths.runtime_dir())),
-        ("PHP_INI_SCAN_DIR", String::new()),
+        ("PHP_INI_SCAN_DIR", ini_scan_dir),
+        ("KURS_PHP_EXT_DIR", php_ext_dir_val),
         ("KURS_PREPEND", s(&paths.prepend())),
         ("KURS_CACERT", s(&paths.cacert())),
         ("KURS_PHP_ERROR_LOG", s(&paths.php_error_log())),

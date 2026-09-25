@@ -497,7 +497,7 @@ jobs:
       - name: Deneme çıktısı (taslak Release)
         if: ${{ !(env.UNSIGNED != 'true' && (startsWith(github.ref, 'refs/tags/desktop-v') || inputs.publish)) }}
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
         run: |
           TAG="desktop-deneme-${GITHUB_RUN_NUMBER}"
           D="${{ steps.out.outputs.dir }}"
@@ -510,7 +510,9 @@ jobs:
       - name: GitHub Release
         if: env.UNSIGNED != 'true' && (startsWith(github.ref, 'refs/tags/desktop-v') || inputs.publish)
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Repo'nun varsayılan GITHUB_TOKEN'ı salt-okunur olduğu için Release oluşturma 403 veriyordu;
+          # contents:write yetkili PAT (RELEASE_TOKEN secret'ı) kullanılıyor.
+          GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
         run: |
           TAG="desktop-v$VERSION"
           D="${{ steps.out.outputs.dir }}"

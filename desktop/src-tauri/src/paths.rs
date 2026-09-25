@@ -86,10 +86,24 @@ impl Paths {
         self.runtime_dir().join("env.template")
     }
 
-    /// Gömülü PHP (tauri externalBin: Contents/MacOS/php).
+    /// Gömülü PHP. macOS/Linux: tauri externalBin sidecar (exe yanında, statik php).
+    /// Windows: resmi PHP klasörü (resources/php-dist/php.exe + DLL'ler + ext).
     pub fn php(&self) -> PathBuf {
-        let name = if cfg!(windows) { "php.exe" } else { "php" };
-        self.exe_dir.join(name)
+        if cfg!(windows) {
+            self.resources.join("php-dist").join("php.exe")
+        } else {
+            self.exe_dir.join("php")
+        }
+    }
+
+    /// (Windows) Resmi PHP uzantı DLL klasörü — conf.d/ext.ini içindeki ${KURS_PHP_EXT_DIR}.
+    pub fn php_ext_dir(&self) -> PathBuf {
+        self.resources.join("php-dist").join("ext")
+    }
+
+    /// (Windows) Ek ini tarama klasörü — PHP_INI_SCAN_DIR (ext.ini uzantıları yükler).
+    pub fn php_conf_d(&self) -> PathBuf {
+        self.resources.join("php-dist").join("conf.d")
     }
 
     pub fn php_server_log(&self) -> PathBuf {

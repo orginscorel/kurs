@@ -31,7 +31,6 @@ permissions:
   contents: read
 
 env:
-  SPC_VERSION: '2.8.5'
   PHP_VERSION: '8.4'
   NODE_VERSION: '22'
   KURS_APP_SOURCE: ${{ vars.KURS_APP_SOURCE || 'repo' }}
@@ -53,28 +52,15 @@ jobs:
       - id: cache
         uses: actions/cache@v4
         with:
-          path: out/php-x86_64-pc-windows-msvc.exe
-          key: static-php-win-x64-spc${{ env.SPC_VERSION }}-php${{ env.PHP_VERSION }}-${{ hashFiles(format('{0}/scripts/build-static-php-win.ps1', steps.dirs.outputs.d)) }}
+          path: out/php-win
+          key: official-php-win-x64-${{ env.PHP_VERSION }}-${{ hashFiles(format('{0}/scripts/build-static-php-win.ps1', steps.dirs.outputs.d)) }}
 
-      - name: MSVC ortamı (x64) — SPC, Windows'ta Visual Studio/cl.exe/nmake ortamını gerektirir
-        if: steps.cache.outputs.cache-hit != 'true'
-        uses: ilammy/msvc-dev-cmd@v1
-        with:
-          arch: x64
-
-      - name: static-php-cli ile derle
+      - name: Resmi PHP indir + hazırla (php.exe + DLL + ext + conf.d)
         if: steps.cache.outputs.cache-hit != 'true'
         shell: pwsh
         env:
-          GITHUB_TOKEN: ${{ github.token }}
-          SPC_WORK_DIR: ${{ runner.temp }}\spc
-        run: pwsh "${{ steps.dirs.outputs.d }}/scripts/build-static-php-win.ps1" "out/php-x86_64-pc-windows-msvc.exe"
-
-      - name: Doğrula
-        shell: pwsh
-        run: |
-          & "out/php-x86_64-pc-windows-msvc.exe" -v
-          & "out/php-x86_64-pc-windows-msvc.exe" -r "exit(extension_loaded('intl') && extension_loaded('pdo_sqlite') && extension_loaded('sodium') ? 0 : 1);"
+          PHP_MINOR: ${{ env.PHP_VERSION }}
+        run: pwsh "${{ steps.dirs.outputs.d }}/scripts/build-static-php-win.ps1" "out/php-win"
 
   # ------------------------------------------------------------------ 2) Laravel paketi (vendor --no-dev + derlenmiş ön yüz) — platformdan bağımsız
   laravel:
@@ -196,8 +182,8 @@ jobs:
 
       - uses: actions/cache/restore@v4
         with:
-          path: out/php-x86_64-pc-windows-msvc.exe
-          key: static-php-win-x64-spc${{ env.SPC_VERSION }}-php${{ env.PHP_VERSION }}-${{ hashFiles(format('{0}/scripts/build-static-php-win.ps1', env.DESKTOP_DIR)) }}
+          path: out/php-win
+          key: official-php-win-x64-${{ env.PHP_VERSION }}-${{ hashFiles(format('{0}/scripts/build-static-php-win.ps1', env.DESKTOP_DIR)) }}
           fail-on-cache-miss: true
 
       - name: Paket içeriğini yerleştir
@@ -208,20 +194,27 @@ jobs:
           # Laravel bundle
           rm -rf build/laravel && mkdir -p build/laravel
           tar -xzf "$W/_bundle/laravel.tar.gz" -C build/laravel
-          # Statik PHP (Tauri sidecar: hedef üçlü + .exe)
-          mkdir -p src-tauri/binaries
-          cp "$W/out/php-x86_64-pc-windows-msvc.exe" src-tauri/binaries/php-x86_64-pc-windows-msvc.exe
-          # Mozilla CA listesi (statik PHP sistem deposunu görmez)
+          # Resmi PHP klasörü (php.exe + DLL + ext + conf.d) → Tauri resources (php-dist)
+          rm -rf src-tauri/php-dist && mkdir -p src-tauri/php-dist
+          cp -r "$W/out/php-win/." src-tauri/php-dist/
+          # Mozilla CA listesi (paketle gelen; sistem deposu yerine)
           curl -fsSL --retry 3 -o runtime/cacert.pem https://curl.se/ca/cacert.pem
 
       - name: Paketlenmiş PHP duman testi
         shell: pwsh
         working-directory: ${{ env.DESKTOP_DIR }}
         run: |
-          $php = "src-tauri/binaries/php-x86_64-pc-windows-msvc.exe"
-          & $php -v
-          & $php -r "exit(extension_loaded('intl') && extension_loaded('sodium') && extension_loaded('pdo_sqlite') && extension_loaded('gd') ? 0 : 1);"
-          & $php -r "`$p=new PDO('sqlite::memory:'); echo 'sqlite '.`$p->query('select sqlite_version()')->fetchColumn().PHP_EOL;"
+          $dir = (Resolve-Path "src-tauri/php-dist").Path
+          $php = Join-Path $dir "php.exe"
+          if (-not (Test-Path $php)) { throw "php.exe yok: $php" }
+          $ini = Join-Path $env:RUNNER_TEMP "smoke.ini"
+          $exts = @('openssl','mbstring','curl','exif','fileinfo','gd','intl','pdo_sqlite','sqlite3','sodium','zip')
+          $lines = @("extension_dir = `"$dir\ext`"", 'zend_extension = opcache') + ($exts | ForEach-Object { "extension = $_" })
+          Set-Content -Path $ini -Value $lines -Encoding ASCII
+          & $php -n -c $ini -v
+          & $php -n -c $ini -r "exit(extension_loaded('intl') && extension_loaded('sodium') && extension_loaded('pdo_sqlite') && extension_loaded('gd') && extension_loaded('curl') ? 0 : 1)"
+          if ($LASTEXITCODE -ne 0) { throw 'gerekli uzantı eksik' }
+          & $php -n -c $ini -r "`$p=new PDO('sqlite::memory:'); echo 'sqlite '.`$p->query('select sqlite_version()')->fetchColumn().PHP_EOL;"
 
       - name: Bağımlılıklar + Tauri derleme (NSIS + MSI)
         shell: bash
@@ -256,7 +249,8 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/desktop-win-v') || (github.event_name == 'workflow_dispatch' && inputs.publish)
         shell: bash
         env:
-          GH_TOKEN: ${{ github.token }}
+          # Repo varsayılan token'ı salt-okunur → Release oluşturma 403. contents:write PAT (RELEASE_TOKEN).
+          GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
         run: |
           TAG="desktop-win-v$VERSION"
           NOTES=$'Erbaa Kurs — Windows '"$VERSION"$'\n\nİmzasız kurulum: Windows SmartScreen uyarısı çıkarsa "Daha fazla bilgi" › "Yine de çalıştır".'

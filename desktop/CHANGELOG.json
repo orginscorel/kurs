@@ -1,5 +1,16 @@
 [
   {
+    "version": "1.23.4",
+    "date": "2026-09-25",
+    "title": "Menü düzeni ve masaüstü yayın düzeltmeleri",
+    "items": [
+      {
+        "type": "iyilestirme",
+        "text": "Paketler ve Programlar Finans altına alındı; masaüstü yayın/derleme düzeltmeleri"
+      }
+    ]
+  },
+  {
     "version": "1.23.3",
     "date": "2026-09-24",
     "title": "Sınıf ve Bilgiler panellerine hızlı işlemler",

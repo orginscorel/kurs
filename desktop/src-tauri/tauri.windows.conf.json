@@ -2,6 +2,12 @@
   "$schema": "https://schema.tauri.app/config/2",
   "bundle": {
     "targets": ["nsis", "msi"],
-    "createUpdaterArtifacts": false
+    "createUpdaterArtifacts": false,
+    "externalBin": [],
+    "resources": {
+      "../build/laravel/": "laravel/",
+      "../runtime/": "runtime/",
+      "php-dist/": "php-dist/"
+    }
   }
 }

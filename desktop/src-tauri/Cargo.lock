@@ -1087,7 +1087,7 @@ dependencies = [
 
 [[package]]
 name = "erbaa-kurs"
-version = "1.23.3"
+version = "1.23.4"
 dependencies = [
  "base64 0.22.1",
  "getrandom 0.3.4",
