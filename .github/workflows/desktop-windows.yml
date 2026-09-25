@@ -213,9 +213,25 @@ jobs:
           $lines = @("extension_dir = `"$dir\ext`"", 'zend_extension = opcache') + ($exts | ForEach-Object { "extension = $_" })
           Set-Content -Path $ini -Value $lines -Encoding ASCII
           & $php -n -c $ini -v
-          & $php -n -c $ini -r "exit(extension_loaded('intl') && extension_loaded('sodium') && extension_loaded('pdo_sqlite') && extension_loaded('gd') && extension_loaded('curl') ? 0 : 1)"
-          if ($LASTEXITCODE -ne 0) { throw 'gerekli uzantı eksik' }
-          & $php -n -c $ini -r "`$p=new PDO('sqlite::memory:'); echo 'sqlite '.`$p->query('select sqlite_version()')->fetchColumn().PHP_EOL;"
+          if ($LASTEXITCODE -ne 0) { throw 'php -v basarisiz' }
+          # NOT: `php -r "..."` tek satırını PowerShell → php.exe argüman aktarımı Windows'ta bozuyor (tırnak/&&/?: →
+          # "unexpected end of file"). Bu yüzden duman testini bir .php DOSYASINA yazıp çalıştırıyoruz (tırnak cehennemi yok).
+          $smoke = Join-Path $env:RUNNER_TEMP "smoke.php"
+          $php_code = @'
+<?php
+$req = ['intl','sodium','pdo_sqlite','gd','curl','mbstring','openssl','sqlite3','zip','fileinfo','exif'];
+$eksik = array_values(array_filter($req, fn($e) => !extension_loaded($e)));
+if ($eksik) { fwrite(STDERR, "EKSIK: ".implode(', ', $eksik).PHP_EOL); exit(1); }
+$p = new PDO('sqlite::memory:');
+echo "sqlite ".$p->query('select sqlite_version()')->fetchColumn().PHP_EOL;
+$c = new Collator('tr_TR');
+if (!($c instanceof Collator)) { fwrite(STDERR, "intl/Collator basarisiz".PHP_EOL); exit(1); }
+if (!sodium_crypto_box_keypair()) { fwrite(STDERR, "sodium basarisiz".PHP_EOL); exit(1); }
+echo "TUM UZANTILAR OK".PHP_EOL;
+'@
+          Set-Content -Path $smoke -Value $php_code -Encoding UTF8
+          & $php -n -c $ini $smoke
+          if ($LASTEXITCODE -ne 0) { throw 'gerekli uzantı eksik veya duman testi basarisiz' }
 
       - name: Bağımlılıklar + Tauri derleme (NSIS + MSI)
         shell: bash

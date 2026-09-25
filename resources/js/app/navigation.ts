@@ -77,7 +77,7 @@ const MOVE_TO: Record<string, SectionKey> = {
   '/ogretmenler': 'teachers',
   '/personel': 'teachers',
   '/yoklama/cihazlar': 'settings',
-  '/akademik': 'finance',
+  // Programlar ve dersler Akademik altında kalır (kendi section:'academic'); ayrıca ALSO_IN ile Finans'ta da görünür.
   '/finans/paketler': 'finance',
   '/finans/ayarlar': 'settings',
   '/iletisim/sablonlar': 'settings',
@@ -85,6 +85,14 @@ const MOVE_TO: Record<string, SectionKey> = {
   '/yerlestirme': 'academic',
   // Çıktılar tek yerde: Raporlar ve çıktılar
   '/ogrenciler/liste-ciktisi': 'reports',
+}
+
+/**
+ * Bir sayfayı birden çok ana alanda göster (kendi/MOVE_TO alanına EK olarak). Örn. "Programlar ve dersler"
+ * hem Akademik'te (kendi alanı) hem Finans'ta listelenir — kullanıcı iki taraftan da erişebilsin.
+ */
+const ALSO_IN: Record<string, SectionKey[]> = {
+  '/akademik': ['finance'],
 }
 
 /** Başka yerden zaten erişilen sayfalar menüde tekrarlanmaz (bildirimler üst çubukta). */
@@ -162,7 +170,7 @@ const allItems = modules.flatMap((m) => m.nav ?? [])
 export const navigation: NavGroup[] = GROUPS.map((g) => ({
   ...g,
   items: allItems
-    .filter((i) => !HIDDEN.has(i.to) && (MOVE_TO[i.to] ?? i.section) === g.key)
+    .filter((i) => !HIDDEN.has(i.to) && ((MOVE_TO[i.to] ?? i.section) === g.key || (ALSO_IN[i.to]?.includes(g.key) ?? false)))
     .sort((a, b) => (g.key === 'settings' ? settingsRank(a.to) - settingsRank(b.to) : orderRank(a.to) - orderRank(b.to)) || (a.order ?? 50) - (b.order ?? 50))
     .map(({ section: _section, ...rest }) => ({
       ...rest,

@@ -17,6 +17,8 @@ type LocalStatus = {
   node: 'local' | 'server'
   phase?: 'idle' | 'syncing' | 'offline' | 'error' | 'revoked' | 'unpaired' | 'stale'
   paired?: boolean
+  /** Sunucu imleci: arttıysa yerel düğüme YENİ veri indi (aşağıda izlenir, ekran canlı tazelenir). */
+  cursor?: number
   last_success_at?: string | null
   last_error?: string | null
   pending?: number
@@ -49,9 +51,24 @@ function SyncStatusInner() {
   const { data } = useQuery({
     queryKey: ['sync', 'local-status'],
     queryFn: () => api.get<LocalStatus>('/sync/local-status'),
-    refetchInterval: 10_000,
+    // Kısa aralık: arka plan turu (30→15 sn) yeni veri indirir indirmez imleç değişimini yakala, ekranı canlı tazele.
+    refetchInterval: 5_000,
     refetchIntervalInBackground: false,
   })
+
+  // ANLIK SENKRON: imleç arttıysa sunucudan yeni veri indi → tüm veri sorgularını geçersiz kıl (eşitleme durumu hariç,
+  // döngüye girmesin). Böylece web'de yapılan değişiklik uygulamada yeniden başlatmadan canlı görünür.
+  const lastCursor = useRef<number | null>(null)
+  useEffect(() => {
+    const cur = data?.cursor
+    if (typeof cur !== 'number') return
+    if (lastCursor.current !== null && cur > lastCursor.current) {
+      qc.invalidateQueries({
+        predicate: (q) => !(Array.isArray(q.queryKey) && q.queryKey[0] === 'sync'),
+      })
+    }
+    lastCursor.current = cur
+  }, [data?.cursor, qc])
   const [result, setResult] = useState<{ tone: 'ok' | 'warn'; text: string } | null>(null)
   const syncNow = useMutation({
     mutationFn: async (): Promise<DesktopSyncOutcome | null> => {

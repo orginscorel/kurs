@@ -74,7 +74,7 @@ class LocalState
     /**
      * Gösterge özeti.
      *
-     * @return array{phase: string, paired: bool, last_success_at: ?string, last_error: ?string, pending: int, rejected: int, open_conflicts: ?int, server_url: ?string, device_code: ?string, next_attempt_at: ?string}
+     * @return array{phase: string, paired: bool, cursor: int, last_success_at: ?string, last_error: ?string, pending: int, rejected: int, open_conflicts: ?int, server_url: ?string, device_code: ?string, next_attempt_at: ?string}
      */
     public function summary(): array
     {
@@ -102,6 +102,8 @@ class LocalState
         return [
             'phase' => $paired ? $phase : 'unpaired',
             'paired' => $paired,
+            // İstemci bunu izler: arttıysa sunucudan YENİ veri indi → ekranı canlı tazele (yeniden başlatma gerekmez).
+            'cursor' => $this->serverCursor(),
             'last_success_at' => $last,
             'last_error' => $file['last_error'] ?? null,
             'last_error_detail' => $file['last_error_detail'] ?? null,

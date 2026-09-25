@@ -1,5 +1,20 @@
 [
   {
+    "version": "1.23.6",
+    "date": "2026-09-25",
+    "title": "Anlık senkron",
+    "items": [
+      {
+        "type": "duzeltme",
+        "text": "Web'de yapılan değişiklik masaüstü uygulamada yeniden başlatmadan canlı görünür (anlık eşitleme)"
+      },
+      {
+        "type": "yeni",
+        "text": "Programlar ve dersler menüsü hem Akademik hem Finans altında"
+      }
+    ]
+  },
+  {
     "version": "1.23.5",
     "date": "2026-09-25",
     "title": "Öğrenci profili taze veri",

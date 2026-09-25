@@ -24,8 +24,8 @@ const SERVER_WORKERS: &str = "4";
 const HEALTH_TIMEOUT: Duration = Duration::from_secs(40);
 const MAX_RESTARTS: usize = 5;
 const RESTART_WINDOW: Duration = Duration::from_secs(300);
-/// Eşitleme turu aralığı (zamanlayıcıdan bağımsız, bu uygulamanın kendi görevi)
-const SYNC_INTERVAL: Duration = Duration::from_secs(30);
+/// Eşitleme turu aralığı (zamanlayıcıdan bağımsız, bu uygulamanın kendi görevi). Anlık senkron hissi için 15 sn.
+const SYNC_INTERVAL: Duration = Duration::from_secs(15);
 /// Tek tur üst sınırı: aşılırsa süreç grubu öldürülür (ölü TCP bağlantısında asılı kalma)
 const SYNC_TIMEOUT: Duration = Duration::from_secs(150);
 /// Duvar saati tekdüze saatten bu kadar ileri kaydıysa makine uyumuştur (macOS'ta Instant uykuda ilerlemez)
