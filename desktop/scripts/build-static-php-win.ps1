@@ -25,9 +25,8 @@ Set-Location $Work
 
 if (-not (Test-Path './spc.exe')) {
   Write-Host "static-php-cli $SpcVersion (windows-x64) indiriliyor"
-  curl.exe -fSL --retry 3 -o spc.zip "https://github.com/crazywhalecc/static-php-cli/releases/download/$SpcVersion/spc-windows-x64.zip"
-  Expand-Archive -Force -Path spc.zip -DestinationPath .
-  Remove-Item spc.zip -Force
+  # SPC yayınında Windows binary'si doğrudan .exe'dir (zip DEĞİL) → doğrudan spc.exe olarak indir.
+  curl.exe -fSL --retry 3 -o spc.exe "https://github.com/crazywhalecc/static-php-cli/releases/download/$SpcVersion/spc-windows-x64.exe"
 }
 & ./spc.exe --version
 
