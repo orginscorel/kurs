@@ -316,7 +316,18 @@ class StudentController extends ApiController
             ->where('a.student_id', $student->id)
             ->when($request->query('status'), fn ($q, $st) => $q->where('a.status', $st))
             ->orderByDesc('ls.starts_at')
-            ->paginate($this->perPage($request, 30), ['a.id', 'a.date', 'a.status', 'a.late_minutes', 'a.method', 'a.note', 'ls.starts_at', 'ls.ends_at', 's.name as subject', DB::raw("CONCAT(t.first_name,' ',t.last_name) AS teacher")]);
+            ->paginate($this->perPage($request, 30), ['a.id', 'a.date', 'a.status', 'a.late_minutes', 'a.method', 'a.note', 'a.lesson_session_id', 'ls.starts_at', 'ls.ends_at', 'ls.topic_note', 's.name as subject', DB::raw("CONCAT(t.first_name,' ',t.last_name) AS teacher")]);
+
+        // İşlenen konular (gelmediyse kaçırdığı konular) — toplu getir
+        $sessionIds = $rows->getCollection()->pluck('lesson_session_id')->filter()->unique()->values();
+        $topicMap = $sessionIds->isEmpty() ? [] : DB::table('lesson_session_topic as lst')
+            ->join('topics as tp', 'tp.id', '=', 'lst.topic_id')
+            ->whereIn('lst.lesson_session_id', $sessionIds)
+            ->orderBy('lst.sort')->orderBy('tp.name')
+            ->get(['lst.lesson_session_id as sid', 'tp.id', 'tp.name', 'tp.outcome_code'])
+            ->groupBy('sid')
+            ->map(fn ($g) => $g->map(fn ($r) => ['id' => (int) $r->id, 'name' => $r->name, 'outcome_code' => $r->outcome_code])->values()->all())
+            ->all();
 
         $presences = DB::table('daily_presences')->where('student_id', $student->id)->orderByDesc('date')->limit(31)
             ->get(['date', 'first_entry_at', 'last_exit_at', 'minutes_inside', 'is_inside']);
@@ -324,7 +335,7 @@ class StudentController extends ApiController
         $summary = DB::table('attendances')->where('student_id', $student->id)
             ->selectRaw("SUM(status='present') AS present, SUM(status='late') AS late, SUM(status='absent') AS absent, SUM(status='excused') AS excused, SUM(status='medical') AS medical, COUNT(*) AS total")->first();
 
-        return $this->paginated($rows, null, ['presences' => $presences, 'summary' => $summary]);
+        return $this->paginated($rows, fn ($r) => [...(array) $r, 'topics' => $topicMap[$r->lesson_session_id] ?? []], ['presences' => $presences, 'summary' => $summary]);
     }
 
     public function payments(Request $request, Student $student): JsonResponse

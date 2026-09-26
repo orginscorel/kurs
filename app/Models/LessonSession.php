@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Models\Concerns\BelongsToBranch;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class LessonSession extends Model
@@ -52,5 +53,20 @@ class LessonSession extends Model
     public function attendances(): HasMany
     {
         return $this->hasMany(Attendance::class);
+    }
+
+    /** Tekil/legacy konu (geriye dönük uyumluluk; yeni akış topics() pivotunu kullanır). */
+    public function topic(): BelongsTo
+    {
+        return $this->belongsTo(Topic::class);
+    }
+
+    /** Bu derste işlenen konular (çoklu). */
+    public function topics(): BelongsToMany
+    {
+        return $this->belongsToMany(Topic::class, 'lesson_session_topic')
+            ->withPivot('sort')
+            ->orderBy('lesson_session_topic.sort')
+            ->orderBy('topics.name');
     }
 }

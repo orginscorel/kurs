@@ -193,7 +193,10 @@ class PortalController extends ApiController
             ->where('a.student_id', $student->id)
             ->when(in_array($request->query('status'), array_keys(self::ATTENDANCE_LABELS), true), fn ($q) => $q->where('a.status', $request->query('status')))
             ->orderByDesc('ls.starts_at')
-            ->paginate($this->perPage($request, 30), ['a.id', 'a.date', 'a.status', 'a.late_minutes', 'ls.starts_at', 'ls.ends_at', 's.name as subject']);
+            ->paginate($this->perPage($request, 30), ['a.id', 'a.date', 'a.status', 'a.late_minutes', 'a.lesson_session_id', 'ls.starts_at', 'ls.ends_at', 'ls.topic_note', 's.name as subject']);
+
+        // O derste işlenen konular (gelmediyse = kaçırdığı konular)
+        $topicMap = $this->topicsForSessions($rows->getCollection()->pluck('lesson_session_id'));
 
         $summary = DB::table('attendances')->where('student_id', $student->id)
             ->selectRaw("COUNT(*) AS total, SUM(status='present') AS present, SUM(status='late') AS late, SUM(status='absent') AS absent, SUM(status='excused') AS excused, SUM(status='medical') AS medical")->first();
@@ -208,7 +211,7 @@ class PortalController extends ApiController
         $presences = DB::table('daily_presences')->where('student_id', $student->id)->orderByDesc('date')->limit(14)
             ->get(['date', 'first_entry_at', 'last_exit_at', 'minutes_inside', 'is_inside']);
 
-        return $this->json($this->paginated($rows, fn ($r) => [...(array) $r, 'status_label' => self::ATTENDANCE_LABELS[$r->status] ?? $r->status], [
+        return $this->json($this->paginated($rows, fn ($r) => [...(array) $r, 'status_label' => self::ATTENDANCE_LABELS[$r->status] ?? $r->status, 'topics' => $topicMap[$r->lesson_session_id] ?? []], [
             'summary' => array_map('intval', (array) $summary),
             'by_subject' => $bySubject,
             'presences' => $presences,
@@ -489,7 +492,7 @@ class PortalController extends ApiController
             return collect();
         }
 
-        return DB::table('lesson_sessions as ls')
+        $rows = DB::table('lesson_sessions as ls')
             ->join('subjects as s', 's.id', '=', 'ls.subject_id')
             ->leftJoin('classrooms as c', 'c.id', '=', 'ls.classroom_id')
             ->leftJoin('teachers as t', 't.id', '=', 'ls.teacher_id')
@@ -499,12 +502,40 @@ class PortalController extends ApiController
             ->whereBetween('ls.date', [$from->toDateString(), $to->toDateString()])
             ->orderBy('ls.starts_at')
             ->get(['ls.id', 'ls.date', 'ls.starts_at', 'ls.ends_at', 'ls.status', 'ls.cancel_reason', 'ls.topic_note', 's.name as subject', 's.color as subject_color',
-                'c.name as classroom', 'g.name as class_group', DB::raw("CONCAT(t.first_name,' ',t.last_name) AS teacher"), 'a.status as attendance'])
-            ->map(function ($r) {
-                $r->attendance_label = $r->attendance ? (self::ATTENDANCE_LABELS[$r->attendance] ?? $r->attendance) : null;
+                'c.name as classroom', 'g.name as class_group', DB::raw("CONCAT(t.first_name,' ',t.last_name) AS teacher"), 'a.status as attendance']);
 
-                return $r;
-            });
+        $topicMap = $this->topicsForSessions($rows->pluck('id'));
+
+        return $rows->map(function ($r) use ($topicMap) {
+            $r->attendance_label = $r->attendance ? (self::ATTENDANCE_LABELS[$r->attendance] ?? $r->attendance) : null;
+            // İşlenen konular; öğrenci gelmediyse (absent) bunlar kaçırdığı konulardır.
+            $r->topics = $topicMap[$r->id] ?? [];
+
+            return $r;
+        });
+    }
+
+    /**
+     * Oturum kimliklerine göre işlenen konuları toplu getirir (öğrenci/veli görünümü).
+     *
+     * @param  \Illuminate\Support\Collection<int,int>  $sessionIds
+     * @return array<int,array<int,array{id:int,name:string,outcome_code:?string}>>
+     */
+    private function topicsForSessions(Collection $sessionIds): array
+    {
+        $ids = $sessionIds->filter()->unique()->values();
+        if ($ids->isEmpty()) {
+            return [];
+        }
+
+        return DB::table('lesson_session_topic as lst')
+            ->join('topics as t', 't.id', '=', 'lst.topic_id')
+            ->whereIn('lst.lesson_session_id', $ids)
+            ->orderBy('lst.sort')->orderBy('t.name')
+            ->get(['lst.lesson_session_id as sid', 't.id', 't.name', 't.outcome_code'])
+            ->groupBy('sid')
+            ->map(fn ($g) => $g->map(fn ($r) => ['id' => (int) $r->id, 'name' => $r->name, 'outcome_code' => $r->outcome_code])->values()->all())
+            ->all();
     }
 
     private function examRows(Student $student, int $limit = 30): Collection

@@ -9,7 +9,7 @@ import type { ListMeta } from '@/lib/api'
 import { attendanceTone, usePortal, useVoice } from '../api'
 import { ListCard, MiniStat, PortalTitle } from '../ui'
 
-type Row = { id: number; date: string; status: string; status_label: string; late_minutes: number | null; starts_at: string; ends_at: string; subject: string }
+type Row = { id: number; date: string; status: string; status_label: string; late_minutes: number | null; starts_at: string; ends_at: string; subject: string; topics?: { id: number; name: string; outcome_code: string | null }[] }
 type Data = {
   data: Row[]
   meta: ListMeta & {
@@ -49,15 +49,34 @@ export default function PortalAttendance() {
           ) : (
             <>
               <ListCard>
-                {data.data.map((r) => (
-                  <li key={r.id} className="flex items-center gap-3 px-4 py-2.5">
-                    <div className="min-w-0 flex-1">
-                      <p className="break-words text-[14.5px] font-medium">{r.subject}</p>
-                      <p className="text-[12.5px] text-ink-3 tabular">{date(r.date, 'day')} · {time(r.starts_at)}</p>
-                    </div>
-                    <Badge tone={attendanceTone[r.status] ?? 'neutral'} dot>{r.status_label}{r.late_minutes ? ` · ${r.late_minutes} dk` : ''}</Badge>
-                  </li>
-                ))}
+                {data.data.map((r) => {
+                  const missed = ['absent', 'excused', 'medical'].includes(r.status)
+                  return (
+                    <li key={r.id} className="flex flex-col gap-1.5 px-4 py-2.5">
+                      <div className="flex items-center gap-3">
+                        <div className="min-w-0 flex-1">
+                          <p className="break-words text-[14.5px] font-medium">{r.subject}</p>
+                          <p className="text-[12.5px] text-ink-3 tabular">{date(r.date, 'day')} · {time(r.starts_at)}</p>
+                        </div>
+                        <Badge tone={attendanceTone[r.status] ?? 'neutral'} dot>{r.status_label}{r.late_minutes ? ` · ${r.late_minutes} dk` : ''}</Badge>
+                      </div>
+                      {r.topics && r.topics.length > 0 && (
+                        <div className="rounded-[var(--radius-sm)] bg-surface-2 px-2.5 py-1.5">
+                          <p className={`mb-1 text-[11.5px] font-medium ${missed ? 'text-warning' : 'text-ink-3'}`}>
+                            {missed ? 'Kaçırdığı konular' : 'İşlenen konular'}
+                          </p>
+                          <div className="flex flex-wrap gap-1">
+                            {r.topics.map((t) => (
+                              <span key={t.id} className="rounded bg-surface px-1.5 py-0.5 text-[11.5px] text-ink-2 ring-1 ring-line">
+                                {t.outcome_code ? `${t.outcome_code} · ` : ''}{t.name}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </li>
+                  )
+                })}
               </ListCard>
               {data.meta.last_page > 1 && (
                 <div className="flex items-center justify-between text-[12.5px] text-ink-3">

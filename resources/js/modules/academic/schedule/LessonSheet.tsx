@@ -19,7 +19,7 @@ import { MoveForm, SubstituteList } from '../timetable/SessionActions'
 /** Ders kartı: şablon bilgisi + seçili haftanın oturumu için tek seferlik işlemler. */
 export type SheetTarget = {
   scheduleId: number | null
-  session: { id: number; date: string; status: string; cancel_reason: string | null; topic_note: string | null; topic_id: number | null; attendance_taken: boolean; classroom_override?: { id: number; name: string } | null; teacher_override?: { id: number; name: string } | null } | null
+  session: { id: number; date: string; status: string; cancel_reason: string | null; topic_note: string | null; topic_id: number | null; topics?: { id: number; name: string; outcome_code: string | null }[]; attendance_taken: boolean; classroom_override?: { id: number; name: string } | null; teacher_override?: { id: number; name: string } | null } | null
   weekday: number; starts_at: string; ends_at: string
   subject: { id: number; name: string; color: string }; teacher: { id: number; name: string }; classroom: { id: number; name: string }; class_group: { id: number; name: string }
   valid_from?: string; valid_until?: string | null
@@ -42,7 +42,7 @@ export function LessonSheet({ target, onClose, onChanged, onEdit, options }: Pro
   const [reason, setReason] = useState('')
   const [room, setRoom] = useState('')
   const [teacher, setTeacher] = useState('')
-  const [topicId, setTopicId] = useState('')
+  const [topicIds, setTopicIds] = useState<number[]>([])
   const [note, setNote] = useState('')
   const [conflicts, setConflicts] = useState<Conflict[]>([])
 
@@ -52,7 +52,7 @@ export function LessonSheet({ target, onClose, onChanged, onEdit, options }: Pro
     setRoom('')
     setTeacher('')
     setConflicts([])
-    setTopicId(target?.session?.topic_id ? String(target.session.topic_id) : '')
+    setTopicIds(target?.session?.topics?.length ? target.session.topics.map((t) => t.id) : (target?.session?.topic_id ? [target.session.topic_id] : []))
     setNote(target?.session?.topic_note ?? '')
   }, [target])
 
@@ -73,7 +73,7 @@ export function LessonSheet({ target, onClose, onChanged, onEdit, options }: Pro
   const cancelM = useMutation({ mutationFn: () => api.post<{ message: string }>(`/schedule/sessions/${s!.id}/cancel`, { reason }), onSuccess: (r) => done(r.message), onError: fail })
   const restoreM = useMutation({ mutationFn: () => api.post<{ message: string }>(`/schedule/sessions/${s!.id}/restore`), onSuccess: (r) => done(r.message), onError: fail })
   const reassignM = useMutation({ mutationFn: () => api.post<{ message: string }>(`/schedule/sessions/${s!.id}/reassign`, { classroom_id: room ? Number(room) : undefined, teacher_id: teacher ? Number(teacher) : undefined }), onSuccess: (r) => done(r.message), onError: fail })
-  const topicM = useMutation({ mutationFn: () => api.post<{ message: string }>(`/schedule/sessions/${s!.id}/topic`, { topic_id: topicId ? Number(topicId) : null, topic_note: note || null }), onSuccess: (r) => done(r.message), onError: fail })
+  const topicM = useMutation({ mutationFn: () => api.post<{ message: string }>(`/schedule/sessions/${s!.id}/topic`, { topic_ids: topicIds, topic_note: note || null }), onSuccess: (r) => done(r.message), onError: fail })
   const deleteM = useMutation({ mutationFn: () => api.delete<{ message: string }>(`/schedule/${target!.scheduleId}`), onSuccess: (r) => done(r.message), onError: fail })
   const lockM = useMutation({ mutationFn: () => api.put<{ message: string }>(`/schedule/${target!.scheduleId}/lock`, { locked: !target!.is_locked }), onSuccess: (r) => done(r.message), onError: fail })
   const actionDone = () => {
@@ -139,7 +139,16 @@ export function LessonSheet({ target, onClose, onChanged, onEdit, options }: Pro
               ]}
             />
             {cancelled && s?.cancel_reason && <Alert tone="neutral" title="İptal gerekçesi">{s.cancel_reason}</Alert>}
-            {s?.topic_note && <Alert tone="neutral" title="İşlenen konu">{s.topic_note}</Alert>}
+            {(s?.topics?.length || s?.topic_note) && (
+              <Alert tone="neutral" title="İşlenen konular">
+                {s?.topics && s.topics.length > 0 && (
+                  <div className="mb-1.5 flex flex-wrap gap-1.5">
+                    {s.topics.map((t) => <Badge key={t.id} tone="info">{t.outcome_code ? `${t.outcome_code} · ` : ''}{t.name}</Badge>)}
+                  </div>
+                )}
+                {s?.topic_note && <span>{s.topic_note}</span>}
+              </Alert>
+            )}
 
             {s && (
               <div>
@@ -183,21 +192,44 @@ export function LessonSheet({ target, onClose, onChanged, onEdit, options }: Pro
           </div>
         )}
 
-        {mode === 'topic' && (
-          <div className="flex flex-col gap-3">
-            <Field label="İşlenen konu (müfredattan)" optional>
-              <Select value={topicId} onChange={(e) => setTopicId(e.target.value)} placeholder="Seçin" options={(topics.data?.topics ?? []).map((t) => ({ value: t.id, label: `${t.parent_id ? '— ' : ''}${t.outcome_code ? `${t.outcome_code} · ` : ''}${t.name}` }))} />
-              {target && (
-                <div className="mt-1.5">
-                  <TopicQuickAdd subjectId={target.subject.id} onCreated={(t) => { qc.invalidateQueries({ queryKey: ['subject', target.subject.id, 'topics'] }); setTopicId(String(t.id)) }} />
-                </div>
-              )}
-            </Field>
-            <Field label="Not" optional>
-              <Textarea value={note} onChange={(e) => setNote(e.target.value)} placeholder="İşlenen konu, verilen ödev, notlar" />
-            </Field>
-          </div>
-        )}
+        {mode === 'topic' && (() => {
+          const allTopics = topics.data?.topics ?? []
+          const label = (id: number) => {
+            const t = allTopics.find((x) => x.id === id) ?? target?.session?.topics?.find((x) => x.id === id)
+            return t ? `${t.outcome_code ? `${t.outcome_code} · ` : ''}${t.name}` : `#${id}`
+          }
+          const addable = allTopics.filter((t) => !topicIds.includes(t.id))
+          return (
+            <div className="flex flex-col gap-3">
+              <Field label="İşlenen konular (müfredattan — birden fazla seçebilirsiniz)" optional>
+                {topicIds.length > 0 && (
+                  <div className="mb-2 flex flex-wrap gap-1.5">
+                    {topicIds.map((id) => (
+                      <span key={id} className="inline-flex items-center gap-1 rounded-[var(--radius-sm)] bg-info-soft px-2 py-0.5 text-[12.5px] text-info ring-1 ring-info/25">
+                        {label(id)}
+                        <button type="button" className="text-info/70 hover:text-info" onClick={() => setTopicIds((prev) => prev.filter((x) => x !== id))} aria-label="Kaldır">×</button>
+                      </span>
+                    ))}
+                  </div>
+                )}
+                <Select
+                  value=""
+                  onChange={(e) => { const v = Number(e.target.value); if (v) setTopicIds((prev) => prev.includes(v) ? prev : [...prev, v]) }}
+                  placeholder={addable.length ? 'Konu ekle…' : 'Tüm konular eklendi'}
+                  options={addable.map((t) => ({ value: t.id, label: `${t.parent_id ? '— ' : ''}${t.outcome_code ? `${t.outcome_code} · ` : ''}${t.name}` }))}
+                />
+                {target && (
+                  <div className="mt-1.5">
+                    <TopicQuickAdd subjectId={target.subject.id} onCreated={(t) => { qc.invalidateQueries({ queryKey: ['subject', target.subject.id, 'topics'] }); setTopicIds((prev) => prev.includes(t.id) ? prev : [...prev, t.id]) }} />
+                  </div>
+                )}
+              </Field>
+              <Field label="Not" optional>
+                <Textarea value={note} onChange={(e) => setNote(e.target.value)} placeholder="Ek açıklama, verilen ödev, notlar" />
+              </Field>
+            </div>
+          )
+        })()}
       </Modal>
 
       <ConfirmDialog

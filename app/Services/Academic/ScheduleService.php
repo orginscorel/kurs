@@ -174,9 +174,21 @@ class ScheduleService
         return $schedule;
     }
 
-    public function setTopic(LessonSession $session, ?int $topicId, ?string $note): LessonSession
+    /**
+     * Bir derste işlenen konuları belirler (ÇOKLU). Legacy tekil `topic_id` ilk konuya set edilir
+     * (eski görünümler bozulmasın); pivot `lesson_session_topic` senkronlanır.
+     *
+     * @param  array<int>  $topicIds
+     */
+    public function setTopic(LessonSession $session, array $topicIds, ?string $note): LessonSession
     {
-        $session->forceFill(['topic_id' => $topicId, 'topic_note' => $note])->save();
+        $topicIds = array_values(array_unique(array_filter(array_map('intval', $topicIds))));
+        $sync = [];
+        foreach ($topicIds as $i => $tid) {
+            $sync[$tid] = ['sort' => $i];
+        }
+        $session->topics()->sync($sync);
+        $session->forceFill(['topic_id' => $topicIds[0] ?? null, 'topic_note' => $note])->save();
 
         return $session;
     }

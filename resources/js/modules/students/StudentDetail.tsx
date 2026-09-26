@@ -531,19 +531,32 @@ function AttendanceTab({ studentId }: { studentId: number }) {
             <EmptyState compact icon={<CheckCircle2 />} title="Kayıt yok" />
           ) : (
             <ul>
-              {data.data.map((a: any) => (
-                <li key={a.id} className="flex items-center gap-3 border-t border-line px-4 py-2.5 text-[13px]">
-                  <div className="w-20 shrink-0">
-                    <p className="tabular">{date(a.starts_at).slice(0, 5)}</p>
-                    <p className="text-[12px] text-ink-3 tabular">{time(a.starts_at)}</p>
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate font-medium">{a.subject}</p>
-                    <p className="truncate text-[12px] text-ink-3">Öğretmen: {a.teacher ?? '—'} · Yöntem: {methodLabel[a.method] ?? a.method}</p>
-                  </div>
-                  <Badge tone={attTone[a.status] ?? 'neutral'}>{attLabel[a.status] ?? a.status}{a.late_minutes ? ` · ${a.late_minutes} dk` : ''}</Badge>
-                </li>
-              ))}
+              {data.data.map((a: any) => {
+                const missed = ['absent', 'excused', 'medical'].includes(a.status)
+                return (
+                  <li key={a.id} className="flex flex-col gap-1.5 border-t border-line px-4 py-2.5 text-[13px]">
+                    <div className="flex items-center gap-3">
+                      <div className="w-20 shrink-0">
+                        <p className="tabular">{date(a.starts_at).slice(0, 5)}</p>
+                        <p className="text-[12px] text-ink-3 tabular">{time(a.starts_at)}</p>
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate font-medium">{a.subject}</p>
+                        <p className="truncate text-[12px] text-ink-3">Öğretmen: {a.teacher ?? '—'} · Yöntem: {methodLabel[a.method] ?? a.method}</p>
+                      </div>
+                      <Badge tone={attTone[a.status] ?? 'neutral'}>{attLabel[a.status] ?? a.status}{a.late_minutes ? ` · ${a.late_minutes} dk` : ''}</Badge>
+                    </div>
+                    {a.topics && a.topics.length > 0 && (
+                      <div className="ml-[92px] flex flex-wrap items-center gap-1">
+                        <span className={cn('text-[11.5px] font-medium', missed ? 'text-warning' : 'text-ink-3')}>{missed ? 'Kaçırdığı konular:' : 'İşlenen:'}</span>
+                        {a.topics.map((t: any) => (
+                          <span key={t.id} className="rounded bg-surface-2 px-1.5 py-0.5 text-[11.5px] text-ink-2 ring-1 ring-line">{t.outcome_code ? `${t.outcome_code} · ` : ''}{t.name}</span>
+                        ))}
+                      </div>
+                    )}
+                  </li>
+                )
+              })}
             </ul>
           )}
           {data.meta.last_page > 1 && (

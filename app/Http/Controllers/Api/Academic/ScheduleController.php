@@ -53,6 +53,7 @@ class ScheduleController extends ApiController
         // Tek seferlik değişikliği (farklı derslik/öğretmen) ızgarada göstermek için
         $overrideRooms = DB::table('classrooms')->whereIn('id', $sessions->pluck('classroom_id')->unique())->pluck('name', 'id');
         $overrideTeachers = DB::table('teachers')->whereIn('id', $sessions->pluck('teacher_id')->unique())->get(['id', 'first_name', 'last_name'])->keyBy('id');
+        $sessionTopics = $this->topicsForSessions($sessions->pluck('id'));
 
         $studies = collect();
         if ($view !== 'class_group') {
@@ -70,7 +71,7 @@ class ScheduleController extends ApiController
                 ]);
         }
 
-        $items = $templates->map(function (LessonSchedule $t) use ($sessions, $start, $overrideRooms, $overrideTeachers) {
+        $items = $templates->map(function (LessonSchedule $t) use ($sessions, $start, $overrideRooms, $overrideTeachers, $sessionTopics) {
             $s = $sessions[$t->id] ?? null;
             $date = $start->addDays($t->weekday - 1);
             $inRange = $date->gte($t->valid_from) && (! $t->valid_until || $date->lte($t->valid_until));
@@ -84,6 +85,7 @@ class ScheduleController extends ApiController
                 'class_group' => ['id' => $t->classGroup->id, 'name' => $t->classGroup->name],
                 'session' => $s ? [
                     'id' => $s->id, 'date' => $s->date->toDateString(), 'status' => $s->status, 'cancel_reason' => $s->cancel_reason, 'topic_note' => $s->topic_note, 'topic_id' => $s->topic_id,
+                    'topics' => $sessionTopics[$s->id] ?? [],
                     'attendance_taken' => (bool) $s->attendance_taken_at,
                     'classroom_override' => $s->classroom_id !== $t->classroom_id ? ['id' => $s->classroom_id, 'name' => $overrideRooms[$s->classroom_id] ?? null] : null,
                     'teacher_override' => $s->teacher_id !== $t->teacher_id ? ['id' => $s->teacher_id, 'name' => isset($overrideTeachers[$s->teacher_id]) ? $overrideTeachers[$s->teacher_id]->first_name.' '.$overrideTeachers[$s->teacher_id]->last_name : null] : null,
@@ -112,7 +114,7 @@ class ScheduleController extends ApiController
         $groupIds = $view === 'student' ? $this->studentGroupIds($id) : null;
 
         $rows = LessonSession::query()
-            ->with(['subject:id,name,short_name,color', 'teacher:id,first_name,last_name,color', 'classroom:id,name', 'classGroup:id,name'])
+            ->with(['subject:id,name,short_name,color', 'teacher:id,first_name,last_name,color', 'classroom:id,name', 'classGroup:id,name', 'topics:id,name,outcome_code'])
             ->withCount(['attendances as present_count' => fn ($q) => $q->whereIn('status', ['present', 'late']), 'attendances as absent_count' => fn ($q) => $q->where('status', 'absent')])
             ->whereBetween('date', [$from->toDateString(), $to->toDateString()])
             ->when($view === 'class_group', fn ($q) => $q->where('class_group_id', $id))
@@ -126,6 +128,7 @@ class ScheduleController extends ApiController
         return response()->json(['data' => $rows->map(fn (LessonSession $s) => [
             'id' => $s->id, 'schedule_id' => $s->lesson_schedule_id, 'date' => $s->date->toDateString(), 'starts_at' => $s->starts_at->format('H:i'), 'ends_at' => $s->ends_at->format('H:i'),
             'status' => $s->status, 'cancel_reason' => $s->cancel_reason, 'topic_note' => $s->topic_note, 'topic_id' => $s->topic_id, 'attendance_taken' => (bool) $s->attendance_taken_at,
+            'topics' => $s->topics->map(fn ($t) => ['id' => $t->id, 'name' => $t->name, 'outcome_code' => $t->outcome_code])->values(),
             'present_count' => (int) $s->present_count, 'absent_count' => (int) $s->absent_count, 'makeup_of_id' => $s->makeup_of_id, 'holiday_id' => $s->holiday_id,
             'phase' => $s->status === 'cancelled' ? 'cancelled' : ($now->lt($s->starts_at) ? 'upcoming' : ($now->lt($s->ends_at) ? 'in_progress' : 'done')),
             'subject' => ['id' => $s->subject->id, 'name' => $s->subject->name, 'short_name' => $s->subject->short_name, 'color' => $s->subject->color],
@@ -213,10 +216,40 @@ class ScheduleController extends ApiController
 
     public function topicSession(Request $request, LessonSession $session): JsonResponse
     {
-        $data = $request->validate(['topic_id' => ['nullable', 'integer', Rule::exists('topics', 'id')->where('subject_id', $session->subject_id)], 'topic_note' => ['nullable', 'string', 'max:500']]);
-        $this->schedules->setTopic($session, $data['topic_id'] ?? null, $data['topic_note'] ?? null);
+        $data = $request->validate([
+            // Çoklu konu (yeni akış); tekil topic_id geriye dönük uyumluluk için kabul edilir.
+            'topic_ids' => ['nullable', 'array'],
+            'topic_ids.*' => ['integer', Rule::exists('topics', 'id')->where('subject_id', $session->subject_id)],
+            'topic_id' => ['nullable', 'integer', Rule::exists('topics', 'id')->where('subject_id', $session->subject_id)],
+            'topic_note' => ['nullable', 'string', 'max:500'],
+        ]);
+        $ids = $data['topic_ids'] ?? (! empty($data['topic_id']) ? [$data['topic_id']] : []);
+        $this->schedules->setTopic($session, $ids, $data['topic_note'] ?? null);
 
         return $this->ok('İşlenen konu kaydedildi.');
+    }
+
+    /**
+     * Oturum kimliklerine göre işlenen konuları toplu getirir (N+1'siz).
+     *
+     * @param  \Illuminate\Support\Collection<int,int>  $sessionIds
+     * @return array<int,array<int,array{id:int,name:string,outcome_code:?string}>>
+     */
+    private function topicsForSessions($sessionIds): array
+    {
+        $sessionIds = collect($sessionIds)->filter()->unique()->values();
+        if ($sessionIds->isEmpty()) {
+            return [];
+        }
+
+        return DB::table('lesson_session_topic as lst')
+            ->join('topics as t', 't.id', '=', 'lst.topic_id')
+            ->whereIn('lst.lesson_session_id', $sessionIds)
+            ->orderBy('lst.sort')->orderBy('t.name')
+            ->get(['lst.lesson_session_id as sid', 't.id', 't.name', 't.outcome_code'])
+            ->groupBy('sid')
+            ->map(fn ($g) => $g->map(fn ($r) => ['id' => (int) $r->id, 'name' => $r->name, 'outcome_code' => $r->outcome_code])->values()->all())
+            ->all();
     }
 
     // ------------------------------------------------------------------ yardımcılar
