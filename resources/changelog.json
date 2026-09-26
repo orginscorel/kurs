@@ -1,5 +1,16 @@
 [
   {
+    "version": "1.32.0",
+    "date": "2026-09-26",
+    "title": "Şube yönetimi",
+    "items": [
+      {
+        "type": "yeni",
+        "text": "Kurulumda 'Şubeler' sekmesi (Program → Şube → Sınıf sırası); şubeler (A, B…) tanımlanır, sınıf açarken şube ayrı seçilir ve ada eklenir (12-EA + A → 12-EA-A)"
+      }
+    ]
+  },
+  {
     "version": "1.31.0",
     "date": "2026-09-26",
     "title": "Öğrenci no + şube yerleştirme düzeltmeleri",

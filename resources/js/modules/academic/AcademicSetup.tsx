@@ -1,7 +1,7 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { CalendarRange, GraduationCap, LayoutGrid, Pencil, Plus, Star, Trash2 } from 'lucide-react'
+import { CalendarRange, GraduationCap, LayoutGrid, Pencil, Plus, Rows3, Star, Trash2, X } from 'lucide-react'
 import { api, ApiError } from '@/lib/api'
 import { todayISO } from '@/lib/format'
 import { useCan } from '@/app/auth'
@@ -18,8 +18,8 @@ import { Field, Input, Select } from '@/components/ui/form'
 type Prog = { id: number; code?: string; name: string; kind: string; is_active: boolean }
 type Term = { id: number; name: string; is_current: boolean; starts_on?: string | null; ends_on?: string | null }
 type Group = { id: number; name: string; program_id: number | null; academic_term_id?: number | null; capacity: number; is_active: boolean }
-type Opt = { programs: Prog[]; terms: Term[]; class_groups: Group[] }
-type Tab = 'programs' | 'classes' | 'terms'
+type Opt = { programs: Prog[]; terms: Term[]; class_groups: Group[]; sections?: string[] }
+type Tab = 'programs' | 'sections' | 'classes' | 'terms'
 const KIND_LABEL: Record<string, string> = { group: 'Grup dersi', private: 'Birebir', study: 'Etüt' }
 
 function toCode(name: string): string {
@@ -40,6 +40,7 @@ export default function AcademicSetup() {
 
   const programs = data?.programs.filter((p) => p.is_active) ?? []
   const groups = data?.class_groups.filter((c) => c.is_active) ?? []
+  const sections = data?.sections ?? ['A', 'B']
 
   return (
     <div className="animate-fade-in">
@@ -49,9 +50,10 @@ export default function AcademicSetup() {
         description="Sınıf açmak için gerekenler tek yerde. Önce program, sonra sınıf (şube). Eklediklerinizi düzenleyip silebilirsiniz."
       />
 
-      <div className="mb-4 grid grid-cols-1 sm:grid-cols-2 gap-2">
+      <div className="mb-4 grid grid-cols-1 sm:grid-cols-3 gap-2">
         <StepCard n={1} label="Program" done={programs.length} icon={<GraduationCap className="size-4" />} active={tab === 'programs'} onClick={() => setTab('programs')} />
-        <StepCard n={2} label="Sınıf (şube)" done={groups.length} icon={<LayoutGrid className="size-4" />} active={tab === 'classes'} onClick={() => setTab('classes')} />
+        <StepCard n={2} label="Şube" done={sections.length} icon={<Rows3 className="size-4" />} active={tab === 'sections'} onClick={() => setTab('sections')} />
+        <StepCard n={3} label="Sınıf" done={groups.length} icon={<LayoutGrid className="size-4" />} active={tab === 'classes'} onClick={() => setTab('classes')} />
       </div>
 
       <Tabs
@@ -60,7 +62,8 @@ export default function AcademicSetup() {
         className="mb-4"
         tabs={[
           { value: 'programs', label: 'Programlar', count: programs.length },
-          { value: 'classes', label: 'Sınıflar (şubeler)', count: groups.length },
+          { value: 'sections', label: 'Şubeler', count: sections.length },
+          { value: 'classes', label: 'Sınıflar', count: groups.length },
           { value: 'terms', label: 'Dönemler', count: data?.terms.length ?? 0 },
         ]}
       />
@@ -68,7 +71,8 @@ export default function AcademicSetup() {
       {isLoading ? <Skeleton className="h-72" /> : (
         <>
           {tab === 'programs' && <ProgramsTab items={programs} manage={manage} onDone={refresh} fail={fail} />}
-          {tab === 'classes' && <ClassesTab data={data} programs={programs} manage={manage} onDone={refresh} fail={fail} goProgram={() => setTab('programs')} />}
+          {tab === 'sections' && <SectionsTab items={sections} manage={manage} onDone={refresh} fail={fail} />}
+          {tab === 'classes' && <ClassesTab data={data} programs={programs} sections={sections} manage={manage} onDone={refresh} fail={fail} goProgram={() => setTab('programs')} />}
           {tab === 'terms' && <TermsTab items={data?.terms ?? []} manage={manage} onDone={refresh} fail={fail} />}
         </>
       )}
@@ -145,15 +149,54 @@ function ProgramsTab({ items, manage, onDone, fail }: { items: Prog[]; manage: b
   )
 }
 
-function ClassesTab({ data, programs, manage, onDone, fail, goProgram }: { data?: Opt; programs: Prog[]; manage: boolean; onDone: () => void; fail: (e: unknown) => void; goProgram: () => void }) {
+function SectionsTab({ items, manage, onDone, fail }: { items: string[]; manage: boolean; onDone: () => void; fail: (e: unknown) => void }) {
+  const [list, setList] = useState<string[]>(items)
+  const [val, setVal] = useState('')
+  useEffect(() => { setList(items) }, [items])
+  const save = useMutation({
+    mutationFn: (next: string[]) => api.put('/class-sections', { sections: next }),
+    onSuccess: () => { toast.success('Şubeler kaydedildi.'); onDone() },
+    onError: fail,
+  })
+  const add = () => {
+    const v = val.trim().toLocaleUpperCase('tr')
+    if (!v || list.includes(v)) { setVal(''); return }
+    const next = [...list, v]; setList(next); setVal(''); save.mutate(next)
+  }
+  const remove = (s: string) => { const next = list.filter((x) => x !== s); setList(next); save.mutate(next) }
+  return (
+    <Panel title="Şubeler" description="Şube listesi (A, B, …). Önce şubeleri tanımlayın; sınıf açarken buradan seçilir." flush>
+      {manage && (
+        <div className="flex flex-wrap items-end gap-2 border-b border-line p-3">
+          <Field label="Yeni şube" className="w-40"><Input value={val} onChange={(e) => setVal(e.target.value)} maxLength={8} placeholder="Ör. C" onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); add() } }} /></Field>
+          <Button variant="primary" icon={<Plus className="size-4" />} loading={save.isPending} disabled={!val.trim()} onClick={add}>Ekle</Button>
+        </div>
+      )}
+      {list.length === 0 ? <EmptyState compact icon={<Rows3 />} title="Şube yok" description="A ve B ekleyin." /> : (
+        <div className="flex flex-wrap gap-2 p-3">
+          {list.map((s) => (
+            <span key={s} className="inline-flex items-center gap-1.5 rounded-[8px] bg-surface-2 px-3 py-1.5 text-[13px] font-medium ring-1 ring-line">
+              {s} şubesi
+              {manage && <button type="button" className="text-ink-3 hover:text-danger" onClick={() => remove(s)} aria-label="Kaldır"><X className="size-3.5" /></button>}
+            </span>
+          ))}
+        </div>
+      )}
+    </Panel>
+  )
+}
+
+function ClassesTab({ data, programs, sections, manage, onDone, fail, goProgram }: { data?: Opt; programs: Prog[]; sections: string[]; manage: boolean; onDone: () => void; fail: (e: unknown) => void; goProgram: () => void }) {
   const current = data?.terms.find((t) => t.is_current) ?? data?.terms[0]
-  const [f, setF] = useState({ name: '', program_id: '', academic_term_id: '', capacity: '24' })
+  const [f, setF] = useState({ name: '', section: sections[0] ?? 'A', program_id: '', academic_term_id: '', capacity: '24' })
   const [edit, setEdit] = useState<Group | null>(null)
   const [del, setDel] = useState<Group | null>(null)
   const termId = f.academic_term_id || (current ? String(current.id) : '')
+  // Sınıf adı = taban ad + şube (12-EA + A → 12-EA-A). Şube ayrı alandan gelir.
+  const fullName = (base: string, section: string) => { const b = base.trim().replace(new RegExp(`-${section}$`, 'i'), '').trim(); return section ? `${b}-${section}` : b }
   const add = useMutation({
-    mutationFn: () => api.post('/class-groups', { name: f.name.trim(), program_id: Number(f.program_id), academic_term_id: Number(termId), capacity: Number(f.capacity) || 24, is_active: true }),
-    onSuccess: () => { toast.success('Sınıf (şube) oluşturuldu.'); setF({ name: '', program_id: '', academic_term_id: '', capacity: '24' }); onDone() },
+    mutationFn: () => api.post('/class-groups', { name: fullName(f.name, f.section), section: f.section, program_id: Number(f.program_id), academic_term_id: Number(termId), capacity: Number(f.capacity) || 24, is_active: true }),
+    onSuccess: () => { toast.success('Sınıf oluşturuldu.'); setF({ name: '', section: sections[0] ?? 'A', program_id: '', academic_term_id: '', capacity: '24' }); onDone() },
     onError: fail,
   })
   const save = useMutation({
@@ -170,16 +213,17 @@ function ClassesTab({ data, programs, manage, onDone, fail, goProgram }: { data?
   const progName = (id: number | null) => programs.find((p) => p.id === id)?.name ?? '—'
 
   return (
-    <Panel title="Sınıflar (şubeler)" description="Öğrencilerin yerleştiği şube. Bir programa ve döneme bağlıdır. Örn. 12-SAY-A." flush>
+    <Panel title="Sınıflar" description="Sınıf adı (ör. 12-EA) + program + şube. Örn. 12-EA + şube A → 12-EA-A." flush>
       {manage && programs.length === 0 ? (
         <div className="p-3"><EmptyState compact icon={<GraduationCap />} title="Önce program gerekir" description="Sınıf bir programa bağlıdır." action={<Button size="sm" onClick={goProgram}>Programlar sekmesine git</Button>} /></div>
       ) : manage && (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 border-b border-line p-3">
-          <Field label="Sınıf / şube adı" required hint="Örn. 12-SAY-A, 8-LGS-B"><Input value={f.name} onChange={(e) => setF((s) => ({ ...s, name: e.target.value }))} /></Field>
+          <Field label="Sınıf adı" required hint="Ör. 12-EA, 12-SAY, 9-Genel (şubesiz)"><Input value={f.name} onChange={(e) => setF((s) => ({ ...s, name: e.target.value }))} /></Field>
+          <Field label="Şube" required hint="Şubeler sekmesinden yönetilir"><Select value={f.section} onChange={(e) => setF((s) => ({ ...s, section: e.target.value }))} options={sections.map((x) => ({ value: x, label: `${x} şubesi` }))} /></Field>
           <Field label="Program" required><Select value={f.program_id} onChange={(e) => setF((s) => ({ ...s, program_id: e.target.value }))} placeholder="Program seçin" options={programs.map((p) => ({ value: p.id, label: p.name }))} /></Field>
           <Field label="Dönem" required><Select value={termId} onChange={(e) => setF((s) => ({ ...s, academic_term_id: e.target.value }))} options={(data?.terms ?? []).map((t) => ({ value: t.id, label: `${t.name}${t.is_current ? ' (güncel)' : ''}` }))} /></Field>
           <Field label="Kontenjan" required><Input type="number" min={1} max={500} value={f.capacity} onChange={(e) => setF((s) => ({ ...s, capacity: e.target.value }))} /></Field>
-          <div className="sm:col-span-2"><Button variant="primary" icon={<Plus className="size-4" />} loading={add.isPending} disabled={f.name.trim().length < 1 || !f.program_id || !termId} onClick={() => add.mutate()}>Sınıfı oluştur</Button></div>
+          <div className="flex items-end"><Button variant="primary" className="w-full sm:w-auto" icon={<Plus className="size-4" />} loading={add.isPending} disabled={f.name.trim().length < 1 || !f.program_id || !termId} onClick={() => add.mutate()}>Sınıfı oluştur{f.name.trim() ? ` (${fullName(f.name, f.section)})` : ''}</Button></div>
         </div>
       )}
       {groups.length === 0 ? <EmptyState compact icon={<LayoutGrid />} title="Henüz sınıf yok" description="Program hazırsa yukarıdan sınıf (şube) oluşturun." /> : (

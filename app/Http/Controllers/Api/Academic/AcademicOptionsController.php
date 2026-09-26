@@ -34,6 +34,7 @@ class AcademicOptionsController extends ApiController
             'terms' => AcademicTerm::query()->orderByDesc('starts_on')->get(['id', 'name', 'starts_on', 'ends_on', 'is_current']),
             'class_groups' => ClassGroup::query()->with('program:id,name,color')->orderBy('name')->get(['id', 'name', 'program_id', 'academic_term_id', 'capacity', 'homeroom_classroom_id', 'is_active'])
                 ->map(fn ($g) => ['id' => $g->id, 'name' => $g->name, 'program_id' => $g->program_id, 'program' => $g->program?->name, 'color' => $g->program?->color, 'academic_term_id' => $g->academic_term_id, 'capacity' => $g->capacity, 'homeroom_classroom_id' => $g->homeroom_classroom_id, 'is_active' => $g->is_active]),
+            'sections' => \App\Support\Settings::get('academic.sections', ['A', 'B']),
             'weekdays' => TimeSlots::WEEKDAYS,
             'classroom_kinds' => Classroom::KINDS,
             'my_teacher_id' => $myTeacher,

@@ -49,6 +49,7 @@ Route::middleware(['permission:academic.manage', 'throttle:writes'])->group(func
     Route::put('classrooms/{classroom}', [ClassroomController::class, 'update']);
     Route::delete('classrooms/{classroom}', [ClassroomController::class, 'destroy']);
 
+    Route::put('class-sections', [ClassGroupController::class, 'saveSections']);
     Route::post('class-groups', [ClassGroupController::class, 'store']);
     Route::put('class-groups/{group}', [ClassGroupController::class, 'update']);
     Route::delete('class-groups/{group}', [ClassGroupController::class, 'destroy']);

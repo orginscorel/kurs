@@ -153,6 +153,19 @@ class ClassGroupController extends ApiController
         ];
     }
 
+    /** Şube listesini (A, B, …) kaydeder — kurulumda tanımlanır, sınıf açarken seçilir. */
+    public function saveSections(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'sections' => ['required', 'array', 'min:1', 'max:26'],
+            'sections.*' => ['required', 'string', 'max:8'],
+        ], [], ['sections' => 'Şubeler']);
+        $clean = array_values(array_unique(array_filter(array_map(fn ($s) => trim((string) $s), $data['sections']))));
+        \App\Support\Settings::put('academic', ['sections' => $clean]);
+
+        return $this->ok('Şubeler kaydedildi.');
+    }
+
     private function validated(Request $request, ?ClassGroup $group = null): array
     {
         $data = $request->validate([
