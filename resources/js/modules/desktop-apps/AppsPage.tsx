@@ -10,12 +10,17 @@ import { useCan } from '@/app/auth'
 import { cn } from '@/lib/cn'
 import { date } from '@/lib/format'
 
+type Installer = { version: string; name: string; url: string; size: number; sha256: string; pub_date: string | null }
+
 type ReleaseInfo = {
   version: string
   pub_date: string | null
   min_os: string | null
   arch: string
   dmg: { name: string; url: string; size: number; sha256: string } | null
+  windows: Installer | null
+  android: Installer | null
+  ios: { url: string } | null
   notes: ChangelogEntry[] | null
 }
 
@@ -33,6 +38,33 @@ async function fetchRelease(): Promise<ReleaseInfo | null> {
 }
 
 const mb = (bytes: number) => `${(bytes / 1024 / 1024).toLocaleString('tr-TR', { maximumFractionDigits: 0 })} MB`
+
+/** Diğer platform kartı: sürüm yayınlanmışsa indirme bağlantısı, yoksa "Hazırlanıyor". */
+function PlatformCard({ icon, name, href, label, meta, hint, download, external, loading }: {
+  icon: ReactNode; name: string; href?: string | null; label: string
+  meta?: string; hint?: string; download?: boolean; external?: boolean; loading?: boolean
+}) {
+  return (
+    <div className="flex flex-col gap-2 rounded-[var(--radius-sm)] px-3 py-2.5 ring-1 ring-line">
+      <div className="flex items-center justify-between gap-2">
+        <span className="inline-flex items-center gap-2 text-[13.5px] font-medium text-ink">{icon}{name}</span>
+        {loading ? <Skeleton className="h-5 w-16" /> : href ? null : <Badge tone="neutral">Hazırlanıyor</Badge>}
+      </div>
+      {href && (
+        <a
+          href={href}
+          {...(download ? { download: true } : {})}
+          {...(external ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
+          className="inline-flex h-9 items-center justify-center gap-2 rounded-[var(--radius-sm)] bg-primary px-3 text-[13.5px] font-medium text-white hover:bg-primary-hover"
+        >
+          <Download className="size-4" /> {label}
+        </a>
+      )}
+      {href && meta && <span className="text-[12px] text-ink-3">{meta}</span>}
+      {href && hint && <span className="text-[12px] text-ink-3">{hint}</span>}
+    </div>
+  )
+}
 
 function Requirement({ icon, label, value }: { icon: ReactNode; label: string; value: string }) {
   return (
@@ -142,16 +174,24 @@ export default function AppsPage({ standalone = false }: { standalone?: boolean 
 
       <Panel className="mt-4" title="Diğer platformlar">
         <div className="grid gap-3 sm:grid-cols-3">
-          {[
-            { icon: <MonitorDown className="size-4" />, name: 'Windows' },
-            { icon: <Smartphone className="size-4" />, name: 'iPhone ve iPad' },
-            { icon: <Smartphone className="size-4" />, name: 'Android' },
-          ].map((p) => (
-            <div key={p.name} className="flex items-center justify-between gap-2 rounded-[var(--radius-sm)] px-3 py-2.5 ring-1 ring-line">
-              <span className="inline-flex items-center gap-2 text-[13.5px] text-ink">{p.icon}{p.name}</span>
-              <Badge tone="neutral">Hazırlanıyor</Badge>
-            </div>
-          ))}
+          <PlatformCard
+            icon={<MonitorDown className="size-4" />} name="Windows"
+            href={data?.windows?.url} label="Windows için indir"
+            meta={data?.windows ? `${mb(data.windows.size)}${data.windows.pub_date ? ` · ${date(data.windows.pub_date, 'long')}` : ''}` : undefined}
+            loading={isLoading}
+          />
+          <PlatformCard
+            icon={<Smartphone className="size-4" />} name="Android"
+            href={data?.android?.url} label="Android APK indir" download
+            meta={data?.android ? `${mb(data.android.size)}${data.android.pub_date ? ` · ${date(data.android.pub_date, 'long')}` : ''}` : undefined}
+            hint={data?.android ? 'Kurulumda "bilinmeyen kaynak" iznini verin.' : undefined}
+            loading={isLoading}
+          />
+          <PlatformCard
+            icon={<Smartphone className="size-4" />} name="iPhone ve iPad"
+            href={data?.ios?.url} label="App Store / TestFlight" external
+            loading={isLoading}
+          />
         </div>
       </Panel>
 

@@ -189,6 +189,13 @@ class DesktopReleaseSync extends Command
             rename($tmp, $dir);
             // İzin satırı bildirimden ÖNCE: yeni arşiv adları latest.json yayına girdiğinde 403 almasın
             self::ensureHtaccess($base);
+
+            // Diğer platformlar (ayrı etiketler, aynı özel depo → aynı sunucudan servis edilir):
+            // Windows NSIS kurulum (.exe) ve Android APK. Biri yoksa/sürüm eksikse null döner (macOS'u bozmaz).
+            $summary['windows'] = $this->syncInstaller($gh, $repo, $origin, $base, 'desktop-win-v', '/-setup\.exe$/i', 'win');
+            $summary['android'] = $this->syncInstaller($gh, $repo, $origin, $base, 'mobile-android-v', '/\.apk$/i', 'android');
+            $iosUrl = (string) config('desktop.ios_url', '');
+            $summary['ios'] = $iosUrl !== '' ? ['url' => $iosUrl] : null;
             $this->writeAtomic("$base/latest.json", json_encode($manifest, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
             $this->writeAtomic("$base/release.json", json_encode($summary, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
             if (is_array($changelog)) {
@@ -206,6 +213,77 @@ class DesktopReleaseSync extends Command
         $this->info("Masaüstü v{$version} yayında: {$origin}/".trim((string) config('desktop.public_dir', 'desktop'), '/').'/latest.json');
 
         return self::SUCCESS;
+    }
+
+    /**
+     * Ayrı bir etiket ailesinden (ör. desktop-win-v*, mobile-android-v*) tek kurulum dosyasını çeker
+     * ve public/desktop/<subdir>/<sürüm>/ altına koyar. Özel depo olduğundan bu sunucudan servis edilir.
+     * Hata/eksiklik durumunda null döner — macOS akışını bozmaz.
+     *
+     * @return array{version:string,name:string,url:string,size:int,sha256:string,pub_date:?string}|null
+     */
+    private function syncInstaller(callable $gh, string $repo, string $origin, string $base, string $prefix, string $assetRe, string $subdir): ?array
+    {
+        try {
+            $release = collect($gh()->get("https://api.github.com/repos/{$repo}/releases", ['per_page' => 30])->throw()->json())
+                ->filter(fn ($r) => ! ($r['draft'] ?? false) && ! ($r['prerelease'] ?? false) && str_starts_with((string) ($r['tag_name'] ?? ''), $prefix))
+                ->sortByDesc(fn ($r) => $this->versionKey(substr((string) $r['tag_name'], strlen($prefix))))
+                ->first();
+            if (! $release) {
+                return null;
+            }
+            $version = substr((string) $release['tag_name'], strlen($prefix));
+            if (! preg_match('/^\d+\.\d+\.\d+/', $version)) {
+                return null;
+            }
+            $asset = collect($release['assets'] ?? [])
+                ->first(fn ($a) => preg_match($assetRe, (string) ($a['name'] ?? '')) && preg_match('/^[A-Za-z0-9._ -]+$/', (string) $a['name']));
+            if (! $asset) {
+                return null;
+            }
+            $name = (string) $asset['name'];
+            $dir = "$base/$subdir/$version";
+            $target = "$dir/$name";
+            if (! (is_file($target) && (int) filesize($target) === (int) ($asset['size'] ?? -1))) {
+                $tmp = "$base/.tmp-$subdir-".bin2hex(random_bytes(4));
+                File::ensureDirectoryExists($tmp);
+                $t = "$tmp/$name";
+                $res = $gh()->timeout(1800)->replaceHeaders(['Accept' => 'application/octet-stream'])
+                    ->sink($t)->get("https://api.github.com/repos/{$repo}/releases/assets/{$asset['id']}")->throw();
+                $res->toPsrResponse()->getBody()->close();
+                clearstatcache(true, $t);
+                if (isset($asset['size']) && filesize($t) !== (int) $asset['size']) {
+                    File::deleteDirectory($tmp);
+                    throw new \RuntimeException("$name boyutu tutmuyor.");
+                }
+                File::ensureDirectoryExists("$base/$subdir");
+                if (is_dir($dir)) {
+                    File::deleteDirectory($dir);
+                }
+                rename($tmp, $dir);
+                // Eski sürüm klasörlerini temizle (yalnız en yeniyi tut)
+                foreach (File::directories("$base/$subdir") as $d) {
+                    if (basename($d) !== $version && preg_match('/^\d+\.\d+\.\d+/', basename($d))) {
+                        File::deleteDirectory($d);
+                    }
+                }
+            }
+            self::ensureHtaccess($base);
+            $url = $origin.'/'.trim((string) config('desktop.public_dir', 'desktop'), '/')."/$subdir/$version/".rawurlencode($name);
+
+            return [
+                'version' => $version,
+                'name' => $name,
+                'url' => $url,
+                'size' => (int) filesize($target),
+                'sha256' => hash_file('sha256', $target),
+                'pub_date' => $release['published_at'] ?? null,
+            ];
+        } catch (\Throwable $e) {
+            Log::warning("Masaüstü/mobil ek platform çekilemedi ($subdir)", ['error' => $e->getMessage()]);
+
+            return null;
+        }
     }
 
     private function versionKey(string $v): string
@@ -253,6 +331,12 @@ Options -Indexes
 <FilesMatch "\.(tar\.gz|sig)$">
     Header set Cache-Control "public, max-age=86400"
 </FilesMatch>
+# Windows kurulum (.exe) ve Android APK (.apk) — indirme olarak sunulur (KURS-INSTALLERS)
+<FilesMatch "\.(exe|apk)$">
+    Header set Content-Disposition "attachment"
+    Header set Cache-Control "public, max-age=86400"
+    Require all granted
+</FilesMatch>
 # Kök .htaccess arşiv uzantılarını kapatıyor; güncelleyicinin indirdiği paketler burada açık olmalı
 # (universal + işlemciye özel aarch64 / x86_64 arşivleri ve imzaları)
 $allow
@@ -264,6 +348,15 @@ HT);
             return;
         }
         $content = (string) file_get_contents($file);
+        // Windows/Android kurulum izinleri (setup.exe/.apk) — bir kez eklenir
+        if (! str_contains($content, 'KURS-INSTALLERS')) {
+            $content = rtrim($content)."\n# Windows kurulum (.exe) ve Android APK (.apk) — indirme (KURS-INSTALLERS)\n<FilesMatch \"\\.(exe|apk)\$\">\n    Header set Content-Disposition \"attachment\"\n    Require all granted\n</FilesMatch>\n";
+            $tmp = $file.'.tmp-'.bin2hex(random_bytes(3));
+            file_put_contents($tmp, $content);
+            @chmod($tmp, 0644);
+            rename($tmp, $file);
+            $content = (string) file_get_contents($file);
+        }
         if (str_contains($content, $allow)) {
             return;
         }

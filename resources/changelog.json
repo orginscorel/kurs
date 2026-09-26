@@ -1,5 +1,16 @@
 [
   {
+    "version": "1.23.7",
+    "date": "2026-09-26",
+    "title": "Uygulama indirmeleri",
+    "items": [
+      {
+        "type": "yeni",
+        "text": "Uygulamalar sayfasında Windows, Android ve macOS indirme bağlantıları otomatik görünür ('Hazırlanıyor' kaldırıldı)"
+      }
+    ]
+  },
+  {
     "version": "1.23.6",
     "date": "2026-09-25",
     "title": "Anlık senkron",
