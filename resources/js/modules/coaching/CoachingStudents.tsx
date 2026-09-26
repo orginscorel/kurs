@@ -32,7 +32,7 @@ export default function CoachingStudents() {
 
   const options = useQuery({ queryKey: ['coaching', 'options'], queryFn: () => api.get<CoachingOptions>('/coaching/assignments/options'), staleTime: 5 * 60_000 })
 
-  const query = { q: list.q, coach_id: list.filters.coach_id, unassigned: list.filters.unassigned, page: list.page }
+  const query = { q: list.q, coach_id: list.filters.coach_id, unassigned: list.filters.unassigned, include_all: list.filters.include_all, page: list.page }
   const { data, isLoading, isFetching, refetch } = useQuery({
     queryKey: ['coaching', 'assignments', 'list', query],
     queryFn: () => api.get<Paginated<AssignmentRow>>('/coaching/assignments', query),
@@ -48,6 +48,14 @@ export default function CoachingStudents() {
     { key: 'student', header: 'Öğrenci', cell: (r) => <div className="min-w-0"><p className="truncate font-medium text-ink" title={r.full_name}>{r.full_name}</p><p className="text-[12px] text-ink-3 tabular">Öğrenci no: {r.student_no}</p></div> },
     { key: 'grade', header: 'Sınıf / alan', hideable: true, cell: (r) => <span className="text-ink-2">{[r.school_grade, r.field].filter(Boolean).join(' · ') || '—'}</span> },
     { key: 'coach', header: 'Koç', cell: (r) => r.coach ? <Badge tone="primary">{r.coach.name}</Badge> : <Badge tone="warning">Atanmadı</Badge> },
+    {
+      key: 'coaching', header: 'Koçluk kapsamı', hideable: true, cell: (r) => r.coaching_source ? (
+        <div className="min-w-0">
+          <Badge tone={r.coaching_source === 'package' ? 'success' : 'info'}>{r.coaching_source === 'package' ? (r.coaching_package ?? 'Paket koçluğu') : 'Ek koçluk'}</Badge>
+          <p className="mt-0.5 text-[12px] text-ink-3 tabular">{r.coaching_start ? date(r.coaching_start) : '—'} – {r.coaching_end ? date(r.coaching_end) : 'sürüyor'}</p>
+        </div>
+      ) : <span className="text-ink-3">—</span>,
+    },
     { key: 'last', header: 'Son görüşme', hideable: true, cell: (r) => r.last_session_at ? <span className="text-ink-2">{date(r.last_session_at)} · {relative(r.last_session_at)}</span> : <span className="text-ink-3">—</span> },
     {
       key: 'action', header: '', align: 'right', cell: (r) => can('coaching.manage') && (
@@ -61,7 +69,7 @@ export default function CoachingStudents() {
 
   return (
     <div className="animate-fade-in">
-      <PageHeader title="Koçluk Öğrencileri" description="Öğrencilere koç atayın ve koçluk görüşmesi kaydedin"
+      <PageHeader title="Koçluk Öğrencileri" description="Koçluk paketi olan ya da ek koçluk alan öğrenciler. Koç atayın ve görüşme kaydedin."
         actions={can('coaching.manage') && <Button variant="primary" icon={<Plus className="size-4" />} onClick={() => setSession({})}>Yeni görüşme</Button>}
       />
 
@@ -81,9 +89,11 @@ export default function CoachingStudents() {
               className="w-full sm:w-[240px]" />
             <Select value={list.filters.coach_id ?? ''} onChange={(e) => list.update({ filters: { coach_id: e.target.value } })} placeholder="Tüm koçlar" aria-label="Koç"
               options={(options.data?.coaches ?? []).map((c) => ({ value: c.id, label: c.name }))} className="w-full sm:w-[220px]" />
-            <div className="sm:ml-auto">
+            <div className="flex items-center gap-4 sm:ml-auto">
               <Switch checked={list.filters.unassigned === '1'} onChange={(v) => list.update({ filters: { unassigned: v ? '1' : null } })}
                 label={<span className="inline-flex items-center gap-1.5"><UserPlus className="size-3.5" /> Koçu olmayanlar</span>} />
+              <Switch checked={list.filters.include_all === '1'} onChange={(v) => list.update({ filters: { include_all: v ? '1' : null } })}
+                label="Kapsam dışını da göster" />
             </div>
           </div>
         }

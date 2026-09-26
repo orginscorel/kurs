@@ -14,6 +14,10 @@ export type AssignmentRow = {
   field: string | null
   coach: Coach | null
   assigned_at: string | null
+  coaching_source: 'package' | 'extra' | null
+  coaching_package: string | null
+  coaching_start: string | null
+  coaching_end: string | null
   last_session_at: string | null
 }
 

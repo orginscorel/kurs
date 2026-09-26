@@ -1,5 +1,20 @@
 [
   {
+    "version": "1.27.0",
+    "date": "2026-09-26",
+    "title": "Koçluk paketi ve öğrencileri",
+    "items": [
+      {
+        "type": "yeni",
+        "text": "Pakete 'Koçluk hizmeti dahil' seçeneği; bu paketi alan öğrenci otomatik Koçluk öğrencileri listesine girer"
+      },
+      {
+        "type": "yeni",
+        "text": "Koçluk öğrencileri yalnız koçluk paketi olan ya da ek koçluk alan öğrencileri listeler; koçluk başlangıç ve bitiş tarihleri görünür"
+      }
+    ]
+  },
+  {
     "version": "1.26.1",
     "date": "2026-09-26",
     "title": "İlişki senkronu düzeltmesi",

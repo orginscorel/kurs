@@ -40,6 +40,7 @@ class CatalogController extends FinanceController
             'id' => $p->id, 'name' => $p->name, 'type' => $p->type ?? 'course', 'program_id' => $p->program_id, 'program' => $p->program?->name,
             'academic_term_id' => $p->academic_term_id, 'term' => $terms[$p->academic_term_id] ?? null,
             'list_price' => (string) $p->list_price, 'default_installments' => (int) $p->default_installments, 'includes' => $p->includes,
+            'has_coaching' => (bool) $p->has_coaching,
             'is_active' => $p->is_active, 'enrollment_count' => (int) ($counts[$p->id] ?? 0),
             'monthly' => $p->default_installments > 0 ? bcdiv((string) $p->list_price, (string) $p->default_installments, 2) : null,
         ])]);
@@ -89,6 +90,7 @@ class CatalogController extends FinanceController
             'list_price' => ['required', 'string', self::MONEY],
             'default_installments' => ['required', 'integer', 'min:1', 'max:36'],
             'includes' => ['nullable', 'string', 'max:2000'],
+            'has_coaching' => ['boolean'],
             'is_active' => ['boolean'],
         ], ['list_price.regex' => 'Fiyatı 45000 ya da 45000,50 biçiminde girin.']);
         $data['type'] = $data['type'] ?? 'course';
