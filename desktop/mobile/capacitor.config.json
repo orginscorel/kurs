@@ -1,0 +1,22 @@
+{
+  "appId": "com.bogahostdeveloper.kurs",
+  "appName": "Erbaa Kurs",
+  "webDir": "www",
+  "server": {
+    "url": "https://kurs.bogahostdeveloper.com.tr",
+    "androidScheme": "https",
+    "iosScheme": "https",
+    "cleartext": false,
+    "allowNavigation": [
+      "kurs.bogahostdeveloper.com.tr",
+      "*.bogahostdeveloper.com.tr"
+    ]
+  },
+  "android": {
+    "allowMixedContent": false
+  },
+  "ios": {
+    "contentInset": "always",
+    "limitsNavigationsToAppBoundDomains": false
+  }
+}

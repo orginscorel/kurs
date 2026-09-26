@@ -1,0 +1,124 @@
+# Erbaa Kurs — Android (Capacitor çevrimiçi kabuk → canlı web uygulaması)
+# Tetik:
+#   - etiket:  mobile-android-v<sürüm>  veya  mobile-v<sürüm>   → imzalı APK derle + GitHub Release
+#   - elle:    Actions › mobile-android › Run workflow
+#
+# İmza: KURS_ANDROID_KEYSTORE_B64 (base64 PKCS12), KURS_ANDROID_KEYSTORE_PASS, KURS_ANDROID_KEY_ALIAS secret'ları.
+name: mobile-android
+
+on:
+  push:
+    tags: ['mobile-android-v*', 'mobile-v*']
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: 'GitHub Release olarak yayımla'
+        type: boolean
+        default: true
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Sürüm belirle
+        id: ver
+        shell: bash
+        run: |
+          V="$(node -p "require('./desktop/mobile/package.json').version")"
+          if [ -n "${GITHUB_REF_NAME:-}" ] && printf '%s' "$GITHUB_REF_NAME" | grep -qE '^mobile(-android)?-v'; then
+            V="$(printf '%s' "$GITHUB_REF_NAME" | sed -E 's/^mobile(-android)?-v//')"
+          fi
+          [ -n "$V" ] || { echo "::error::Sürüm okunamadı"; exit 1; }
+          IFS=. read -r a b c <<<"$V"; a=${a:-0}; b=${b:-0}; c=${c:-0}
+          CODE=$(( a*10000 + b*100 + c ))
+          echo "version=$V" >> "$GITHUB_OUTPUT"
+          echo "code=$CODE" >> "$GITHUB_OUTPUT"
+          echo "Sürüm $V (versionCode $CODE)"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - uses: android-actions/setup-android@v3
+
+      - name: Capacitor projesi + Android platformu
+        working-directory: desktop/mobile
+        run: |
+          npm install --no-audit --no-fund
+          npx cap add android
+          npx cap sync android
+
+      - name: Uygulama ikonları (Tauri seti)
+        shell: bash
+        run: |
+          RES="desktop/mobile/android/app/src/main/res"
+          cp -r desktop/src-tauri/icons/android/* "$RES/"
+          echo "İkonlar kopyalandı:"; ls "$RES" | tr '\n' ' '; echo
+
+      - name: Sürüm adı/kodu enjekte et
+        shell: bash
+        run: |
+          GRADLE="desktop/mobile/android/app/build.gradle"
+          sed -i -E "s/versionCode [0-9]+/versionCode ${{ steps.ver.outputs.code }}/" "$GRADLE"
+          sed -i -E "s/versionName \"[^\"]*\"/versionName \"${{ steps.ver.outputs.version }}\"/" "$GRADLE"
+          grep -E "versionCode|versionName" "$GRADLE"
+
+      - name: Release APK derle (imzasız)
+        working-directory: desktop/mobile/android
+        run: |
+          chmod +x gradlew
+          ./gradlew --no-daemon assembleRelease
+
+      - name: APK imzala
+        id: sign
+        shell: bash
+        env:
+          KS_B64: ${{ secrets.KURS_ANDROID_KEYSTORE_B64 }}
+          KS_PASS: ${{ secrets.KURS_ANDROID_KEYSTORE_PASS }}
+          KS_ALIAS: ${{ secrets.KURS_ANDROID_KEY_ALIAS }}
+        run: |
+          set -euo pipefail
+          [ -n "$KS_B64" ] || { echo "::error::KURS_ANDROID_KEYSTORE_B64 secret'ı tanımlı değil"; exit 1; }
+          BT="$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)"
+          echo "build-tools: $BT"
+          IN="desktop/mobile/android/app/build/outputs/apk/release/app-release-unsigned.apk"
+          [ -f "$IN" ] || { echo "::error::imzasız APK bulunamadı: $IN"; ls -R desktop/mobile/android/app/build/outputs || true; exit 1; }
+          echo "$KS_B64" | base64 -d > "$RUNNER_TEMP/ks.p12"
+          mkdir -p dist-apk
+          OUT="dist-apk/ErbaaKurs-${{ steps.ver.outputs.version }}.apk"
+          "$BT/zipalign" -v -p 4 "$IN" "$RUNNER_TEMP/aligned.apk" >/dev/null
+          "$BT/apksigner" sign \
+            --ks "$RUNNER_TEMP/ks.p12" --ks-type PKCS12 \
+            --ks-pass "pass:$KS_PASS" --ks-key-alias "$KS_ALIAS" \
+            --out "$OUT" "$RUNNER_TEMP/aligned.apk"
+          "$BT/apksigner" verify --verbose "$OUT" | head -5
+          echo "apk=$OUT" >> "$GITHUB_OUTPUT"
+          ls -la "$OUT"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ErbaaKurs-android-${{ steps.ver.outputs.version }}
+          path: ${{ steps.sign.outputs.apk }}
+
+      - name: GitHub Release'e yükle
+        if: startsWith(github.ref, 'refs/tags/') || inputs.publish
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+          VERSION: ${{ steps.ver.outputs.version }}
+        shell: bash
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          case "$TAG" in mobile*-v*) ;; *) TAG="mobile-android-v$VERSION" ;; esac
+          NOTES="Erbaa Kurs Android $VERSION — telefona indirilebilir APK. Kurulumda 'bilinmeyen kaynak' iznini verin."
+          gh release view "$TAG" >/dev/null 2>&1 || gh release create "$TAG" --title "Erbaa Kurs Android $VERSION" --notes "$NOTES" --target "$GITHUB_SHA"
+          gh release upload "$TAG" "${{ steps.sign.outputs.apk }}" --clobber

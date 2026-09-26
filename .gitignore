@@ -111,3 +111,9 @@ Thumbs.db
 /desktop/src-tauri/gen/schemas/
 /desktop/src-tauri/binaries/php-*
 /desktop/runtime/cacert.pem
+
+# --- Mobil (Capacitor: android/ios platformları CI'da üretilir, commitlenmez)
+/desktop/mobile/android/
+/desktop/mobile/ios/
+/desktop/mobile/node_modules/
+/desktop/mobile/dist-apk/

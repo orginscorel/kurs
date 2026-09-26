@@ -60,10 +60,10 @@ rsync -a --delete \
 mkdir -p "$TARGET/desktop/src-tauri/binaries"
 [ -f "$TARGET/desktop/src-tauri/binaries/.gitkeep" ] || : > "$TARGET/desktop/src-tauri/binaries/.gitkeep"
 
-echo "▶ İş akışı ve kök .gitignore"
+echo "▶ İş akışları ve kök .gitignore"
 mkdir -p "$TARGET/.github/workflows"
-cp "$DESKTOP_DIR/.github/workflows/desktop-macos.yml" "$TARGET/.github/workflows/desktop-macos.yml"
-cp "$DESKTOP_DIR/.github/workflows/desktop-windows.yml" "$TARGET/.github/workflows/desktop-windows.yml"
+# Tüm workflow'ları kopyala (desktop-macos, desktop-windows, mobile-android, mobile-ios, …)
+cp "$DESKTOP_DIR/.github/workflows/"*.yml "$TARGET/.github/workflows/"
 cp "$DESKTOP_DIR/repo-gitignore" "$TARGET/.gitignore"
 
 echo "▶ Sır taraması"
