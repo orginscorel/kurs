@@ -1,5 +1,16 @@
 [
   {
+    "version": "1.26.0",
+    "date": "2026-09-26",
+    "title": "Akademik kurulum sayfası",
+    "items": [
+      {
+        "type": "yeni",
+        "text": "Akademik → Kurulum: program, derslik, sınıf (şube) ve dönem tek sayfada sekmelerle, adım adım (1-Program 2-Derslik 3-Sınıf) eklenir; neyi nereden ekleyeceğin tek yerde"
+      }
+    ]
+  },
+  {
     "version": "1.25.2",
     "date": "2026-09-26",
     "title": "Program açıklaması + hızlı ekleme",

@@ -49,7 +49,7 @@ const ORDER: string[] = [
   // Yoklama
   '/pdks', '/yoklama', '/yoklama/canli', '/yoklama/devamsizlik',
   // Akademik
-  '/ders-programi', '/takvim', '/siniflar', '/derslik-tasarimi', '/yerlestirme', '/odevler', '/etut', '/program-botu',
+  '/akademik/kurulum', '/ders-programi', '/takvim', '/siniflar', '/derslik-tasarimi', '/yerlestirme', '/odevler', '/etut', '/program-botu',
   // Sınavlar
   '/sinavlar', '/optik-okuma', '/sinav-sonuclari', '/sinav-analizleri', '/kazanim-analizi',
   // Rehberlik

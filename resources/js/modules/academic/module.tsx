@@ -4,6 +4,7 @@ import { page } from '@/app/page'
 import type { ModuleDef } from '@/app/modules'
 
 const SchedulePage = lazyPage(() => import('./SchedulePage'))
+const AcademicSetup = lazyPage(() => import('./AcademicSetup'))
 const ClassGroupList = lazyPage(() => import('./ClassGroupList'))
 const ClassGroupDetail = lazyPage(() => import('./ClassGroupDetail'))
 const AcademicStructure = lazyPage(() => import('./AcademicStructure'))
@@ -24,6 +25,7 @@ export default {
   id: 'academic',
   routes: [
     { path: 'ders-programi', element: page(<SchedulePage />) },
+    { path: 'akademik/kurulum', element: page(<AcademicSetup />) },
     { path: 'siniflar', element: page(<ClassGroupList />) },
     { path: 'siniflar/:id', element: page(<ClassGroupDetail />) },
     { path: 'akademik', element: page(<AcademicStructure />) },
@@ -41,6 +43,7 @@ export default {
     { path: 'program-botu/:id', element: page(<RunDetailPage />) },
   ],
   nav: [
+    { section: 'academic', label: 'Kurulum', to: '/akademik/kurulum', icon: ClipboardPlus, permission: 'academic.manage', order: 0.5 },
     { section: 'academic', label: 'Ders programı', to: '/ders-programi', icon: CalendarDays, permission: 'schedule.view', order: 1 },
     { section: 'academic', label: 'Program botu', to: '/program-botu', icon: Bot, permission: 'schedule.view', order: 1.7 },
     { section: 'academic', label: 'Sınıflar', to: '/siniflar', icon: LayoutGrid, permission: 'academic.view', order: 2 },
