@@ -1,5 +1,20 @@
 [
   {
+    "version": "1.31.0",
+    "date": "2026-09-26",
+    "title": "Öğrenci no + şube yerleştirme düzeltmeleri",
+    "items": [
+      {
+        "type": "iyilestirme",
+        "text": "Öğrenci numarası artık kayıt yılı + sıra biçiminde (2026001, 2026002…), yıl bazında sıfırlanır; mevcut öğrenciler yeniden numaralandı"
+      },
+      {
+        "type": "duzeltme",
+        "text": "Sınıfların seviye/şube/branş bilgisi adından otomatik doldurulur; öğrenciyi şubeye yerleştirirken (okul sınıfı seçilince) şubeler artık görünür"
+      }
+    ]
+  },
+  {
     "version": "1.30.0",
     "date": "2026-09-26",
     "title": "Sınıf tasarımı sınıflardan otomatik",

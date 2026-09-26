@@ -155,17 +155,43 @@ class ClassGroupController extends ApiController
 
     private function validated(Request $request, ?ClassGroup $group = null): array
     {
-        return $request->validate([
+        $data = $request->validate([
             'name' => ['required', 'string', 'max:80'],
             'academic_term_id' => ['required', 'integer', Rule::exists('academic_terms', 'id')],
             'program_id' => ['required', 'integer', Rule::exists('programs', 'id')],
             'homeroom_classroom_id' => ['nullable', 'integer', Rule::exists('classrooms', 'id')],
             'advisor_teacher_id' => ['nullable', 'integer', Rule::exists('teachers', 'id')],
             'capacity' => ['required', 'integer', 'min:1', 'max:500'],
+            'section' => ['nullable', 'string', 'max:8'],
             'is_active' => ['boolean'],
         ], [], [
             'name' => 'Sınıf adı', 'academic_term_id' => 'Eğitim dönemi', 'program_id' => 'Program', 'homeroom_classroom_id' => 'Ana derslik',
-            'advisor_teacher_id' => 'Danışman öğretmen', 'capacity' => 'Kontenjan', 'is_active' => 'Aktiflik',
+            'advisor_teacher_id' => 'Danışman öğretmen', 'capacity' => 'Kontenjan', 'section' => 'Şube', 'is_active' => 'Aktiflik',
         ]);
+
+        // Ad'dan seviye / şube / branş türet (placement bunlara göre eşler). Elle verilen şube önceliklidir.
+        [$data['grade_level'], $section, $data['track']] = self::parseClassName($data['name']);
+        $data['section'] = ! empty($data['section']) ? $data['section'] : $section;
+
+        return $data;
+    }
+
+    /**
+     * "12-SAY-A" → [12, "A", "SAY"] · "10-Genel" → [10, "A", "Genel"] · "12-TYT-YDT" → [12, "A", "TYT-YDT"].
+     *
+     * @return array{0:?int,1:string,2:?string}
+     */
+    public static function parseClassName(string $name): array
+    {
+        $grade = preg_match('/^(\d{1,2})\b/', $name, $m) ? (int) $m[1] : null;
+        $section = preg_match('/-([A-ZÇĞİÖŞÜ])$/u', $name, $m) ? $m[1] : 'A';
+        $track = $name;
+        if ($grade !== null) {
+            $track = preg_replace('/^'.$grade.'-?/', '', $track);
+        }
+        $track = preg_replace('/-([A-ZÇĞİÖŞÜ])$/u', '', $track);
+        $track = trim((string) $track, '- ') ?: null;
+
+        return [$grade, $section, $track];
     }
 }

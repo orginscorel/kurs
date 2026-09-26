@@ -27,6 +27,19 @@ class StudentService
     /**
      * @param array $data  öğrenci alanları + national_id + guardians: [{id?|first_name,last_name,phone,…, relationship, is_primary}]
      */
+    /** Öğrenci no üretir: <kayıt yılı><sıra>, yıl bazında 001'den (2026001, 2026002…). 999'dan sonra 4 haneye taşar. */
+    public static function nextStudentNo(int $year): string
+    {
+        $prefix = (string) $year;
+        $max = Student::withTrashed()
+            ->whereRaw("student_no REGEXP '^{$prefix}[0-9]+$'")
+            ->orderByRaw('CAST(student_no AS UNSIGNED) DESC')
+            ->value('student_no');
+        $seq = $max ? ((int) substr((string) $max, strlen($prefix))) + 1 : 1;
+
+        return $prefix.str_pad((string) $seq, 3, '0', STR_PAD_LEFT);
+    }
+
     public function create(array $data): Student
     {
         return DB::transaction(function () use ($data) {
@@ -34,11 +47,12 @@ class StudentService
 
             $student = new Student(Arr::only($data, self::FIELDS));
             $student->forceFill(Sensitive::nationalIdColumns($data['national_id'] ?? null));
-            // Sayaç ilk kez oluşurken mevcut en yüksek numaradan devam eder (içe aktarılmış/demo kayıtlarla çakışmasın)
-            $maxExisting = (int) Student::query()->withTrashed()->whereRaw("student_no REGEXP '^[0-9]+$'")->max(DB::raw('CAST(student_no AS UNSIGNED)'));
-            $student->student_no = $data['student_no'] ?? (string) Sequence::nextNumber('student_no', max((int) (now()->year.'001'), $maxExisting + 1));
             $student->status ??= 'active';
             $student->registered_on ??= now()->toDateString();
+            // Öğrenci no = KAYIT YILI + sıra (yıl bazında 001'den başlar): 2026001, 2026002…
+            $student->student_no = ! empty($data['student_no'])
+                ? $data['student_no']
+                : self::nextStudentNo((int) substr((string) $student->registered_on, 0, 4));
             $student->save();
 
             $this->syncGuardians($student, $data['guardians'] ?? []);
