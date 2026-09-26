@@ -1,5 +1,16 @@
 [
   {
+    "version": "1.24.1",
+    "date": "2026-09-26",
+    "title": "Paket türü",
+    "items": [
+      {
+        "type": "yeni",
+        "text": "Paketlere tür eklendi — Ders / Kütüphane / Etüt; kütüphane ve etüt paketleri program/sınıf gerektirmez, mezun öğrenciye de atanabilir"
+      }
+    ]
+  },
+  {
     "version": "1.24.0",
     "date": "2026-09-26",
     "title": "Ders konuları",

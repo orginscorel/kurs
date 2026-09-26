@@ -15,8 +15,10 @@ import { ConfirmDialog, Menu, Modal } from '@/components/ui/overlay'
 import { MoneyInput } from './components'
 import { fromCents, toCents } from './shared'
 
-type Pkg = { id: number; name: string; program_id: number | null; program: string | null; academic_term_id: number | null; term: string | null; list_price: string; default_installments: number; includes: string | null; is_active: boolean; enrollment_count: number; monthly: string | null }
+type Pkg = { id: number; name: string; type: string; program_id: number | null; program: string | null; academic_term_id: number | null; term: string | null; list_price: string; default_installments: number; includes: string | null; is_active: boolean; enrollment_count: number; monthly: string | null }
 type Options = { programs: { id: number; name: string }[]; terms: { id: number; name: string; is_current: boolean }[] }
+
+const PKG_TYPES: Record<string, string> = { course: 'Ders paketi', library: 'Kütüphane', study: 'Etüt' }
 
 export default function Packages() {
   const can = useCan()
@@ -70,8 +72,9 @@ export default function Packages() {
               <div className="flex items-start gap-2">
                 <div className="min-w-0 flex-1">
                   <p className="font-semibold text-ink">{p.name}</p>
-                  <p className="text-[12px] text-ink-3">{p.program ?? 'Programsız'} · {p.term ?? 'Tüm dönemler'}</p>
+                  <p className="text-[12px] text-ink-3">{p.type && p.type !== 'course' ? PKG_TYPES[p.type] : (p.program ?? 'Programsız')} · {p.term ?? 'Tüm dönemler'}</p>
                 </div>
+                {p.type && p.type !== 'course' && <Badge tone="info">{PKG_TYPES[p.type]}</Badge>}
                 {!p.is_active && <Badge>Pasif</Badge>}
                 {manage && (
                   <Menu
@@ -109,13 +112,13 @@ export default function Packages() {
 
 function PackageForm({ target, options, onClose }: { target: Pkg | 'new' | null; options?: Options; onClose: () => void }) {
   const qc = useQueryClient()
-  const [form, setForm] = useState({ name: '', program_id: '', academic_term_id: '', list_price: '', default_installments: '8', includes: '', is_active: true })
+  const [form, setForm] = useState({ name: '', type: 'course', program_id: '', academic_term_id: '', list_price: '', default_installments: '8', includes: '', is_active: true })
   const [errors, setErrors] = useState<Record<string, string[]>>({})
   useEffect(() => {
     if (!target) return
     setErrors({})
-    if (target === 'new') setForm({ name: '', program_id: '', academic_term_id: String(options?.terms.find((t) => t.is_current)?.id ?? ''), list_price: '', default_installments: '8', includes: '', is_active: true })
-    else setForm({ name: target.name, program_id: String(target.program_id ?? ''), academic_term_id: String(target.academic_term_id ?? ''), list_price: target.list_price.replace('.', ','), default_installments: String(target.default_installments), includes: target.includes ?? '', is_active: target.is_active })
+    if (target === 'new') setForm({ name: '', type: 'course', program_id: '', academic_term_id: String(options?.terms.find((t) => t.is_current)?.id ?? ''), list_price: '', default_installments: '8', includes: '', is_active: true })
+    else setForm({ name: target.name, type: target.type ?? 'course', program_id: String(target.program_id ?? ''), academic_term_id: String(target.academic_term_id ?? ''), list_price: target.list_price.replace('.', ','), default_installments: String(target.default_installments), includes: target.includes ?? '', is_active: target.is_active })
   }, [target, options])
   const set = (k: keyof typeof form, v: string | boolean) => setForm((f) => ({ ...f, [k]: v }))
   const cents = toCents(form.list_price)
@@ -138,8 +141,11 @@ function PackageForm({ target, options, onClose }: { target: Pkg | 'new' | null;
       footer={<><Button variant="ghost" onClick={onClose}>Vazgeç</Button><Button variant="primary" loading={save.isPending} disabled={form.name.trim().length < 2 || !cents || cents <= 0} onClick={() => save.mutate()}>Kaydet</Button></>}
     >
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <Field label="Paket adı" required className="sm:col-span-2" error={errors.name?.[0]}><Input value={form.name} onChange={(e) => set('name', e.target.value)} maxLength={160} placeholder="Örn. TYT Hazırlık 2026-2027" /></Field>
-        <Field label="Program" optional><Select value={form.program_id} onChange={(e) => set('program_id', e.target.value)} placeholder="Programsız" options={(options?.programs ?? []).map((p) => ({ value: p.id, label: p.name }))} /></Field>
+        <Field label="Paket türü" required className="sm:col-span-2" hint={form.type === 'course' ? 'Ders paketi sınıfa yerleştirme gerektirir.' : 'Kütüphane/etüt paketi programsız olabilir; mezun öğrenciye de atanabilir.'}>
+          <Select value={form.type} onChange={(e) => set('type', e.target.value)} options={Object.entries(PKG_TYPES).map(([value, label]) => ({ value, label }))} />
+        </Field>
+        <Field label="Paket adı" required className="sm:col-span-2" error={errors.name?.[0]}><Input value={form.name} onChange={(e) => set('name', e.target.value)} maxLength={160} placeholder={form.type === 'library' ? 'Örn. Kütüphane Üyeliği 2026-2027' : form.type === 'study' ? 'Örn. Akşam Etüdü' : 'Örn. TYT Hazırlık 2026-2027'} /></Field>
+        <Field label="Program" optional={form.type !== 'course'}><Select value={form.program_id} onChange={(e) => set('program_id', e.target.value)} placeholder={form.type === 'course' ? 'Programsız' : 'Gerekmez'} options={(options?.programs ?? []).map((p) => ({ value: p.id, label: p.name }))} /></Field>
         <Field label="Dönem" optional><Select value={form.academic_term_id} onChange={(e) => set('academic_term_id', e.target.value)} placeholder="Tüm dönemler" options={(options?.terms ?? []).map((t) => ({ value: t.id, label: t.name }))} /></Field>
         <Field label="Liste fiyatı" required error={errors.list_price?.[0]}><MoneyInput value={form.list_price} onChange={(v) => set('list_price', v)} /></Field>
         <Field label="Varsayılan taksit sayısı" required hint={monthly ? `Aylık yaklaşık ${money(monthly, { short: true })}` : undefined} error={errors.default_installments?.[0]}><Input type="number" min={1} max={36} value={form.default_installments} onChange={(e) => set('default_installments', e.target.value)} /></Field>

@@ -37,7 +37,7 @@ class CatalogController extends FinanceController
         $terms = AcademicTerm::query()->pluck('name', 'id');
 
         return response()->json(['data' => $rows->map(fn (EducationPackage $p) => [
-            'id' => $p->id, 'name' => $p->name, 'program_id' => $p->program_id, 'program' => $p->program?->name,
+            'id' => $p->id, 'name' => $p->name, 'type' => $p->type ?? 'course', 'program_id' => $p->program_id, 'program' => $p->program?->name,
             'academic_term_id' => $p->academic_term_id, 'term' => $terms[$p->academic_term_id] ?? null,
             'list_price' => (string) $p->list_price, 'default_installments' => (int) $p->default_installments, 'includes' => $p->includes,
             'is_active' => $p->is_active, 'enrollment_count' => (int) ($counts[$p->id] ?? 0),
@@ -83,6 +83,7 @@ class CatalogController extends FinanceController
     {
         $data = $this->validateTr($request, [
             'name' => ['required', 'string', 'min:2', 'max:160'],
+            'type' => ['nullable', \Illuminate\Validation\Rule::in(array_keys(EducationPackage::TYPES))],
             'program_id' => ['nullable', 'integer'],
             'academic_term_id' => ['nullable', 'integer'],
             'list_price' => ['required', 'string', self::MONEY],
@@ -90,6 +91,7 @@ class CatalogController extends FinanceController
             'includes' => ['nullable', 'string', 'max:2000'],
             'is_active' => ['boolean'],
         ], ['list_price.regex' => 'Fiyatı 45000 ya da 45000,50 biçiminde girin.']);
+        $data['type'] = $data['type'] ?? 'course';
 
         if (! empty($data['program_id'])) {
             \App\Models\Program::query()->findOrFail($data['program_id']);

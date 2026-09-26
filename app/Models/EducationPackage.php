@@ -11,9 +11,22 @@ class EducationPackage extends Model
 {
     use BelongsToBranch, SoftDeletes;
 
-    protected $fillable = ['branch_id', 'program_id', 'academic_term_id', 'name', 'list_price', 'default_installments', 'includes', 'has_coaching', 'is_active'];
+    /** Paket türleri: ders (sınıf/program gerektirir) · kütüphane · etüt (ikisi de sınıf gerektirmez). */
+    public const TYPES = [
+        'course' => 'Ders paketi',
+        'library' => 'Kütüphane',
+        'study' => 'Etüt',
+    ];
+
+    protected $fillable = ['branch_id', 'program_id', 'academic_term_id', 'type', 'name', 'list_price', 'default_installments', 'includes', 'has_coaching', 'is_active'];
 
     protected $casts = ['list_price' => 'decimal:2', 'has_coaching' => 'boolean', 'is_active' => 'boolean'];
+
+    /** Ders paketi sınıfa yerleştirme gerektirir; kütüphane/etüt gerektirmez (mezun da alabilir). */
+    public function requiresClass(): bool
+    {
+        return ($this->type ?? 'course') === 'course';
+    }
 
     public function program(): BelongsTo
     {
