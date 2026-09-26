@@ -72,7 +72,6 @@ export default function ClassGroupDetail() {
           <div className="mt-1.5 flex flex-wrap items-center gap-2 text-[13px] text-ink-2">
             {g.program && <ColorChip>{g.program}</ColorChip>}
             {g.term && <span>Dönem: {g.term}</span>}
-            {g.homeroom && <span>· Ana derslik: {g.homeroom}</span>}
             {g.advisor && <span>· Danışman öğretmen: {g.advisor}</span>}
           </div>
         </div>

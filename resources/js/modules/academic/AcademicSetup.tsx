@@ -1,29 +1,27 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { Building2, CalendarRange, GraduationCap, LayoutGrid, Plus } from 'lucide-react'
+import { CalendarRange, GraduationCap, LayoutGrid, Pencil, Plus, Star, Trash2 } from 'lucide-react'
 import { api, ApiError } from '@/lib/api'
 import { todayISO } from '@/lib/format'
 import { useCan } from '@/app/auth'
 import { PageHeader, Panel, Tabs } from '@/components/ui/layout'
-import { Alert, Badge, EmptyState, Skeleton } from '@/components/ui/feedback'
+import { Badge, EmptyState, Skeleton } from '@/components/ui/feedback'
 import { Button } from '@/components/ui/Button'
+import { ConfirmDialog, Modal } from '@/components/ui/overlay'
 import { Field, Input, Select } from '@/components/ui/form'
 
 /**
  * Akademik kurulum: sınıf açmak için gereken her şey TEK yerde, sekmeli ve basit.
- * Sıra: 1) Program (kurs türü) → 2) Derslik → 3) Sınıf (şube). Dönem çoğunlukla hazırdır.
+ * Program → Sınıf (şube). Her öğe eklenebilir, DÜZENLENEBİLİR ve (onaylı) SİLİNEBİLİR.
  */
-type Opt = {
-  programs: { id: number; name: string; kind: string; is_active: boolean }[]
-  classrooms: { id: number; name: string; capacity: number; is_active: boolean }[]
-  terms: { id: number; name: string; is_current: boolean }[]
-  class_groups: { id: number; name: string; program_id: number | null; capacity: number; is_active: boolean }[]
-}
-type Tab = 'programs' | 'classrooms' | 'classes' | 'terms'
+type Prog = { id: number; code?: string; name: string; kind: string; is_active: boolean }
+type Term = { id: number; name: string; is_current: boolean; starts_on?: string | null; ends_on?: string | null }
+type Group = { id: number; name: string; program_id: number | null; academic_term_id?: number | null; capacity: number; is_active: boolean }
+type Opt = { programs: Prog[]; terms: Term[]; class_groups: Group[] }
+type Tab = 'programs' | 'classes' | 'terms'
 const KIND_LABEL: Record<string, string> = { group: 'Grup dersi', private: 'Birebir', study: 'Etüt' }
 
-/** Türkçe adı A-Z0-9 program koduna çevirir (backend: büyük harf + [A-Z0-9_-]). */
 function toCode(name: string): string {
   const tr: Record<string, string> = { ç: 'C', Ç: 'C', ğ: 'G', Ğ: 'G', ı: 'I', İ: 'I', ö: 'O', Ö: 'O', ş: 'S', Ş: 'S', ü: 'U', Ü: 'U' }
   return name.replace(/[çÇğĞıİöÖşŞüÜ]/g, (c) => tr[c] ?? c).toUpperCase().replace(/[^A-Z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 20) || 'PRG'
@@ -41,20 +39,19 @@ export default function AcademicSetup() {
   if (!can('academic.view')) return <EmptyState icon={<LayoutGrid />} title="Bu sayfa için yetkiniz yok" />
 
   const programs = data?.programs.filter((p) => p.is_active) ?? []
-  const classrooms = data?.classrooms.filter((c) => c.is_active) ?? []
+  const groups = data?.class_groups.filter((c) => c.is_active) ?? []
 
   return (
     <div className="animate-fade-in">
       <PageHeader
         title="Akademik kurulum"
         breadcrumbs={[{ label: 'Akademik', to: '/akademik' }, { label: 'Kurulum' }]}
-        description="Sınıf açmak için gereken her şey tek yerde. Sırasıyla: 1) Program 2) Derslik 3) Sınıf (şube)."
+        description="Sınıf açmak için gerekenler tek yerde. Önce program, sonra sınıf (şube). Eklediklerinizi düzenleyip silebilirsiniz."
       />
 
-      <div className="mb-4 grid grid-cols-1 sm:grid-cols-3 gap-2">
+      <div className="mb-4 grid grid-cols-1 sm:grid-cols-2 gap-2">
         <StepCard n={1} label="Program" done={programs.length} icon={<GraduationCap className="size-4" />} active={tab === 'programs'} onClick={() => setTab('programs')} />
-        <StepCard n={2} label="Derslik" done={classrooms.length} icon={<Building2 className="size-4" />} active={tab === 'classrooms'} onClick={() => setTab('classrooms')} />
-        <StepCard n={3} label="Sınıf (şube)" done={data?.class_groups.filter((c) => c.is_active).length ?? 0} icon={<LayoutGrid className="size-4" />} active={tab === 'classes'} onClick={() => setTab('classes')} />
+        <StepCard n={2} label="Sınıf (şube)" done={groups.length} icon={<LayoutGrid className="size-4" />} active={tab === 'classes'} onClick={() => setTab('classes')} />
       </div>
 
       <Tabs
@@ -63,8 +60,7 @@ export default function AcademicSetup() {
         className="mb-4"
         tabs={[
           { value: 'programs', label: 'Programlar', count: programs.length },
-          { value: 'classrooms', label: 'Derslikler', count: classrooms.length },
-          { value: 'classes', label: 'Sınıflar (şubeler)', count: data?.class_groups.filter((c) => c.is_active).length ?? 0 },
+          { value: 'classes', label: 'Sınıflar (şubeler)', count: groups.length },
           { value: 'terms', label: 'Dönemler', count: data?.terms.length ?? 0 },
         ]}
       />
@@ -72,9 +68,8 @@ export default function AcademicSetup() {
       {isLoading ? <Skeleton className="h-72" /> : (
         <>
           {tab === 'programs' && <ProgramsTab items={programs} manage={manage} onDone={refresh} fail={fail} />}
-          {tab === 'classrooms' && <ClassroomsTab items={classrooms} manage={manage} onDone={refresh} fail={fail} />}
-          {tab === 'classes' && <ClassesTab data={data} programs={programs} classrooms={classrooms} manage={manage} onDone={refresh} fail={fail} goProgram={() => setTab('programs')} />}
-          {tab === 'terms' && <TermsTab items={data?.terms ?? []} onDone={refresh} fail={fail} />}
+          {tab === 'classes' && <ClassesTab data={data} programs={programs} manage={manage} onDone={refresh} fail={fail} goProgram={() => setTab('programs')} />}
+          {tab === 'terms' && <TermsTab items={data?.terms ?? []} manage={manage} onDone={refresh} fail={fail} />}
         </>
       )}
     </div>
@@ -90,21 +85,37 @@ function StepCard({ n, label, done, icon, active, onClick }: { n: number; label:
   )
 }
 
-function ListRow({ title, meta, badge }: { title: string; meta?: string; badge?: string }) {
+/** Liste satırı + (yetkiliyse) düzenle/sil kısayolları. */
+function ListRow({ title, meta, badge, onEdit, onDelete, extra }: { title: string; meta?: string; badge?: string; onEdit?: () => void; onDelete?: () => void; extra?: React.ReactNode }) {
   return (
     <li className="flex items-center gap-3 border-t border-line px-4 py-2.5 first:border-0">
       <span className="min-w-0 flex-1"><span className="block truncate font-medium text-[13.5px]">{title}</span>{meta && <span className="block text-[12px] text-ink-3">{meta}</span>}</span>
       {badge && <Badge tone="neutral">{badge}</Badge>}
+      {extra}
+      {onEdit && <Button size="icon-sm" variant="ghost" aria-label="Düzenle" title="Düzenle" onClick={onEdit}><Pencil className="size-3.5" /></Button>}
+      {onDelete && <Button size="icon-sm" variant="ghost" aria-label="Sil" title="Sil" onClick={onDelete}><Trash2 className="size-3.5 text-danger" /></Button>}
     </li>
   )
 }
 
-function ProgramsTab({ items, manage, onDone, fail }: { items: Opt['programs']; manage: boolean; onDone: () => void; fail: (e: unknown) => void }) {
+function ProgramsTab({ items, manage, onDone, fail }: { items: Prog[]; manage: boolean; onDone: () => void; fail: (e: unknown) => void }) {
   const [f, setF] = useState({ name: '', kind: 'group' })
+  const [edit, setEdit] = useState<Prog | null>(null)
+  const [del, setDel] = useState<Prog | null>(null)
   const add = useMutation({
     mutationFn: () => api.post('/programs', { name: f.name.trim(), code: toCode(f.name), kind: f.kind }),
     onSuccess: () => { toast.success('Program eklendi.'); setF({ name: '', kind: 'group' }); onDone() },
     onError: fail,
+  })
+  const save = useMutation({
+    mutationFn: (p: Prog) => api.put(`/programs/${p.id}`, { name: p.name.trim(), code: p.code || toCode(p.name), kind: p.kind }),
+    onSuccess: () => { toast.success('Program güncellendi.'); setEdit(null); onDone() },
+    onError: fail,
+  })
+  const remove = useMutation({
+    mutationFn: (p: Prog) => api.delete(`/programs/${p.id}`),
+    onSuccess: () => { toast.success('Program silindi.'); setDel(null); onDone() },
+    onError: (e) => { fail(e); setDel(null) },
   })
   return (
     <Panel title="Programlar" description="Kurs türü / eğitim programı. Sınıflar ve paketler buna bağlanır. Örn. TYT-AYT Hazırlık, LGS." flush>
@@ -115,43 +126,45 @@ function ProgramsTab({ items, manage, onDone, fail }: { items: Opt['programs']; 
           <Button variant="primary" icon={<Plus className="size-4" />} loading={add.isPending} disabled={f.name.trim().length < 2} onClick={() => add.mutate()}>Ekle</Button>
         </div>
       )}
-      {items.length === 0 ? <EmptyState compact icon={<GraduationCap />} title="Henüz program yok" description="Yukarıdan ilk programı ekleyin." /> : <ul>{items.map((p) => <ListRow key={p.id} title={p.name} badge={KIND_LABEL[p.kind] ?? p.kind} />)}</ul>}
-    </Panel>
-  )
-}
-
-function ClassroomsTab({ items, manage, onDone, fail }: { items: Opt['classrooms']; manage: boolean; onDone: () => void; fail: (e: unknown) => void }) {
-  const [f, setF] = useState({ name: '', capacity: '24' })
-  const add = useMutation({
-    mutationFn: () => api.post('/classrooms', { name: f.name.trim(), kind: 'classroom', capacity: Number(f.capacity) || 24 }),
-    onSuccess: () => { toast.success('Derslik eklendi.'); setF({ name: '', capacity: '24' }); onDone() },
-    onError: fail,
-  })
-  return (
-    <Panel title="Derslikler" description="Sınıfların fiziksel odaları. Sınıf açarken 'ana derslik' olarak seçilir." flush>
-      {manage && (
-        <div className="flex flex-wrap items-end gap-2 border-b border-line p-3">
-          <Field label="Derslik adı" className="min-w-[180px] flex-1"><Input value={f.name} onChange={(e) => setF((s) => ({ ...s, name: e.target.value }))} placeholder="Örn. A-101" /></Field>
-          <Field label="Kapasite" className="w-28"><Input type="number" min={1} max={1000} value={f.capacity} onChange={(e) => setF((s) => ({ ...s, capacity: e.target.value }))} /></Field>
-          <Button variant="primary" icon={<Plus className="size-4" />} loading={add.isPending} disabled={f.name.trim().length < 1} onClick={() => add.mutate()}>Ekle</Button>
-        </div>
+      {items.length === 0 ? <EmptyState compact icon={<GraduationCap />} title="Henüz program yok" description="Yukarıdan ilk programı ekleyin." /> : (
+        <ul>{items.map((p) => <ListRow key={p.id} title={p.name} badge={KIND_LABEL[p.kind] ?? p.kind} onEdit={manage ? () => setEdit({ ...p }) : undefined} onDelete={manage ? () => setDel(p) : undefined} />)}</ul>
       )}
-      {items.length === 0 ? <EmptyState compact icon={<Building2 />} title="Henüz derslik yok" description="Yukarıdan ilk dersliği ekleyin." /> : <ul>{items.map((c) => <ListRow key={c.id} title={c.name} badge={`${c.capacity} kişi`} />)}</ul>}
+
+      <Modal open={!!edit} onClose={() => setEdit(null)} title="Programı düzenle"
+        footer={<><Button variant="ghost" onClick={() => setEdit(null)}>Vazgeç</Button><Button variant="primary" loading={save.isPending} disabled={!edit || edit.name.trim().length < 2} onClick={() => edit && save.mutate(edit)}>Kaydet</Button></>}>
+        {edit && (
+          <div className="grid gap-3">
+            <Field label="Program adı" required><Input value={edit.name} onChange={(e) => setEdit({ ...edit, name: e.target.value })} /></Field>
+            <Field label="Tür"><Select value={edit.kind} onChange={(e) => setEdit({ ...edit, kind: e.target.value })} options={Object.entries(KIND_LABEL).map(([value, label]) => ({ value, label }))} /></Field>
+          </div>
+        )}
+      </Modal>
+      <ConfirmDialog open={!!del} onClose={() => setDel(null)} onConfirm={() => del && remove.mutate(del)} loading={remove.isPending} danger
+        title="Programı sil" confirmLabel="Sil" description={del ? `"${del.name}" programı silinecek. Bu programa bağlı sınıf varsa silinemez.` : undefined} />
     </Panel>
   )
 }
 
-function ClassesTab({ data, programs, classrooms, manage, onDone, fail, goProgram }: { data?: Opt; programs: Opt['programs']; classrooms: Opt['classrooms']; manage: boolean; onDone: () => void; fail: (e: unknown) => void; goProgram: () => void }) {
+function ClassesTab({ data, programs, manage, onDone, fail, goProgram }: { data?: Opt; programs: Prog[]; manage: boolean; onDone: () => void; fail: (e: unknown) => void; goProgram: () => void }) {
   const current = data?.terms.find((t) => t.is_current) ?? data?.terms[0]
-  const [f, setF] = useState({ name: '', program_id: '', academic_term_id: '', homeroom_classroom_id: '', capacity: '24' })
+  const [f, setF] = useState({ name: '', program_id: '', academic_term_id: '', capacity: '24' })
+  const [edit, setEdit] = useState<Group | null>(null)
+  const [del, setDel] = useState<Group | null>(null)
   const termId = f.academic_term_id || (current ? String(current.id) : '')
   const add = useMutation({
-    mutationFn: () => api.post('/class-groups', {
-      name: f.name.trim(), program_id: Number(f.program_id), academic_term_id: Number(termId),
-      homeroom_classroom_id: f.homeroom_classroom_id ? Number(f.homeroom_classroom_id) : null, capacity: Number(f.capacity) || 24, is_active: true,
-    }),
-    onSuccess: () => { toast.success('Sınıf (şube) oluşturuldu.'); setF({ name: '', program_id: '', academic_term_id: '', homeroom_classroom_id: '', capacity: '24' }); onDone() },
+    mutationFn: () => api.post('/class-groups', { name: f.name.trim(), program_id: Number(f.program_id), academic_term_id: Number(termId), capacity: Number(f.capacity) || 24, is_active: true }),
+    onSuccess: () => { toast.success('Sınıf (şube) oluşturuldu.'); setF({ name: '', program_id: '', academic_term_id: '', capacity: '24' }); onDone() },
     onError: fail,
+  })
+  const save = useMutation({
+    mutationFn: (g: Group) => api.put(`/class-groups/${g.id}`, { name: g.name.trim(), program_id: Number(g.program_id), academic_term_id: Number(g.academic_term_id), capacity: Number(g.capacity) || 24, is_active: g.is_active }),
+    onSuccess: () => { toast.success('Sınıf güncellendi.'); setEdit(null); onDone() },
+    onError: fail,
+  })
+  const remove = useMutation({
+    mutationFn: (g: Group) => api.delete(`/class-groups/${g.id}`),
+    onSuccess: (r: any) => { toast.success(r?.message ?? 'Sınıf silindi.'); setDel(null); onDone() },
+    onError: (e) => { fail(e); setDel(null) },
   })
   const groups = data?.class_groups.filter((c) => c.is_active) ?? []
   const progName = (id: number | null) => programs.find((p) => p.id === id)?.name ?? '—'
@@ -159,40 +172,85 @@ function ClassesTab({ data, programs, classrooms, manage, onDone, fail, goProgra
   return (
     <Panel title="Sınıflar (şubeler)" description="Öğrencilerin yerleştiği şube. Bir programa ve döneme bağlıdır. Örn. 12-SAY-A." flush>
       {manage && programs.length === 0 ? (
-        <div className="p-3"><Alert tone="info" title="Önce program gerekir">Sınıf bir programa bağlıdır. <button className="font-medium text-primary underline" onClick={goProgram}>Programlar sekmesinden</button> en az bir program ekleyin.</Alert></div>
+        <div className="p-3"><EmptyState compact icon={<GraduationCap />} title="Önce program gerekir" description="Sınıf bir programa bağlıdır." action={<Button size="sm" onClick={goProgram}>Programlar sekmesine git</Button>} /></div>
       ) : manage && (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 border-b border-line p-3">
           <Field label="Sınıf / şube adı" required hint="Örn. 12-SAY-A, 8-LGS-B"><Input value={f.name} onChange={(e) => setF((s) => ({ ...s, name: e.target.value }))} /></Field>
           <Field label="Program" required><Select value={f.program_id} onChange={(e) => setF((s) => ({ ...s, program_id: e.target.value }))} placeholder="Program seçin" options={programs.map((p) => ({ value: p.id, label: p.name }))} /></Field>
           <Field label="Dönem" required><Select value={termId} onChange={(e) => setF((s) => ({ ...s, academic_term_id: e.target.value }))} options={(data?.terms ?? []).map((t) => ({ value: t.id, label: `${t.name}${t.is_current ? ' (güncel)' : ''}` }))} /></Field>
-          <Field label="Ana derslik" optional hint={classrooms.length === 0 ? 'Derslik yok — Derslikler sekmesinden ekleyin' : undefined}><Select value={f.homeroom_classroom_id} onChange={(e) => setF((s) => ({ ...s, homeroom_classroom_id: e.target.value }))} placeholder="Atanmadı" options={classrooms.map((c) => ({ value: c.id, label: `${c.name} · ${c.capacity} kişi` }))} /></Field>
           <Field label="Kontenjan" required><Input type="number" min={1} max={500} value={f.capacity} onChange={(e) => setF((s) => ({ ...s, capacity: e.target.value }))} /></Field>
-          <div className="flex items-end"><Button variant="primary" className="w-full sm:w-auto" icon={<Plus className="size-4" />} loading={add.isPending} disabled={f.name.trim().length < 1 || !f.program_id || !termId} onClick={() => add.mutate()}>Sınıfı oluştur</Button></div>
+          <div className="sm:col-span-2"><Button variant="primary" icon={<Plus className="size-4" />} loading={add.isPending} disabled={f.name.trim().length < 1 || !f.program_id || !termId} onClick={() => add.mutate()}>Sınıfı oluştur</Button></div>
         </div>
       )}
-      {groups.length === 0 ? <EmptyState compact icon={<LayoutGrid />} title="Henüz sınıf yok" description="Program ve derslik hazırsa yukarıdan sınıf (şube) oluşturun." /> : <ul>{groups.map((g) => <ListRow key={g.id} title={g.name} meta={progName(g.program_id)} badge={`${g.capacity} kişi`} />)}</ul>}
+      {groups.length === 0 ? <EmptyState compact icon={<LayoutGrid />} title="Henüz sınıf yok" description="Program hazırsa yukarıdan sınıf (şube) oluşturun." /> : (
+        <ul>{groups.map((g) => <ListRow key={g.id} title={g.name} meta={progName(g.program_id)} badge={`${g.capacity} kişi`} onEdit={manage ? () => setEdit({ ...g, academic_term_id: g.academic_term_id ?? current?.id ?? null }) : undefined} onDelete={manage ? () => setDel(g) : undefined} />)}</ul>
+      )}
+
+      <Modal open={!!edit} onClose={() => setEdit(null)} title="Sınıfı düzenle"
+        footer={<><Button variant="ghost" onClick={() => setEdit(null)}>Vazgeç</Button><Button variant="primary" loading={save.isPending} disabled={!edit || edit.name.trim().length < 1 || !edit.program_id} onClick={() => edit && save.mutate(edit)}>Kaydet</Button></>}>
+        {edit && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <Field label="Sınıf / şube adı" required className="sm:col-span-2"><Input value={edit.name} onChange={(e) => setEdit({ ...edit, name: e.target.value })} /></Field>
+            <Field label="Program" required><Select value={String(edit.program_id ?? '')} onChange={(e) => setEdit({ ...edit, program_id: Number(e.target.value) })} options={programs.map((p) => ({ value: p.id, label: p.name }))} /></Field>
+            <Field label="Dönem" required><Select value={String(edit.academic_term_id ?? '')} onChange={(e) => setEdit({ ...edit, academic_term_id: Number(e.target.value) })} options={(data?.terms ?? []).map((t) => ({ value: t.id, label: t.name }))} /></Field>
+            <Field label="Kontenjan" required><Input type="number" min={1} max={500} value={String(edit.capacity)} onChange={(e) => setEdit({ ...edit, capacity: Number(e.target.value) })} /></Field>
+          </div>
+        )}
+      </Modal>
+      <ConfirmDialog open={!!del} onClose={() => setDel(null)} onConfirm={() => del && remove.mutate(del)} loading={remove.isPending} danger
+        title="Sınıfı sil" confirmLabel="Sil" description={del ? `"${del.name}" sınıfı silinecek. Kayıtlı öğrenci varsa çıkarılır (öğrenci kayıtları korunur).` : undefined} />
     </Panel>
   )
 }
 
-function TermsTab({ items, onDone, fail }: { items: Opt['terms']; onDone: () => void; fail: (e: unknown) => void }) {
+function TermsTab({ items, manage, onDone, fail }: { items: Term[]; manage: boolean; onDone: () => void; fail: (e: unknown) => void }) {
   const [f, setF] = useState({ name: '', starts_on: todayISO(), ends_on: '', is_current: false })
+  const [edit, setEdit] = useState<Term | null>(null)
   const add = useMutation({
     mutationFn: () => api.post('/academic-terms', { name: f.name.trim(), starts_on: f.starts_on, ends_on: f.ends_on, is_current: f.is_current }),
     onSuccess: () => { toast.success('Dönem eklendi.'); setF({ name: '', starts_on: todayISO(), ends_on: '', is_current: false }); onDone() },
     onError: fail,
   })
+  const save = useMutation({
+    mutationFn: (t: Term) => api.put(`/academic-terms/${t.id}`, { name: t.name.trim(), starts_on: t.starts_on, ends_on: t.ends_on }),
+    onSuccess: () => { toast.success('Dönem güncellendi.'); setEdit(null); onDone() },
+    onError: fail,
+  })
+  const setCurrent = useMutation({
+    mutationFn: (t: Term) => api.post(`/academic-terms/${t.id}/set-current`),
+    onSuccess: () => { toast.success('Güncel dönem güncellendi.'); onDone() },
+    onError: fail,
+  })
   return (
     <Panel title="Dönemler" description="Eğitim-öğretim dönemi. Sınıflar ve kayıtlar döneme bağlanır. Genelde bir kez tanımlanır." flush>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 border-b border-line p-3">
-        <Field label="Dönem adı" required hint="Örn. 2026-2027"><Input value={f.name} onChange={(e) => setF((s) => ({ ...s, name: e.target.value }))} /></Field>
-        <div />
-        <Field label="Başlangıç" required><Input type="date" value={f.starts_on} onChange={(e) => setF((s) => ({ ...s, starts_on: e.target.value }))} /></Field>
-        <Field label="Bitiş" required><Input type="date" value={f.ends_on} onChange={(e) => setF((s) => ({ ...s, ends_on: e.target.value }))} /></Field>
-        <label className="flex items-center gap-2 text-[13px]"><input type="checkbox" checked={f.is_current} onChange={(e) => setF((s) => ({ ...s, is_current: e.target.checked }))} /> Güncel dönem yap</label>
-        <div className="flex items-end sm:justify-end"><Button variant="primary" icon={<Plus className="size-4" />} loading={add.isPending} disabled={f.name.trim().length < 2 || !f.ends_on} onClick={() => add.mutate()}>Ekle</Button></div>
-      </div>
-      {items.length === 0 ? <EmptyState compact icon={<CalendarRange />} title="Henüz dönem yok" /> : <ul>{items.map((t) => <ListRow key={t.id} title={t.name} badge={t.is_current ? 'Güncel' : undefined} />)}</ul>}
+      {manage && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 border-b border-line p-3">
+          <Field label="Dönem adı" required hint="Örn. 2026-2027"><Input value={f.name} onChange={(e) => setF((s) => ({ ...s, name: e.target.value }))} /></Field>
+          <div />
+          <Field label="Başlangıç" required><Input type="date" value={f.starts_on} onChange={(e) => setF((s) => ({ ...s, starts_on: e.target.value }))} /></Field>
+          <Field label="Bitiş" required><Input type="date" value={f.ends_on} onChange={(e) => setF((s) => ({ ...s, ends_on: e.target.value }))} /></Field>
+          <label className="flex items-center gap-2 text-[13px]"><input type="checkbox" checked={f.is_current} onChange={(e) => setF((s) => ({ ...s, is_current: e.target.checked }))} /> Güncel dönem yap</label>
+          <div className="flex items-end sm:justify-end"><Button variant="primary" icon={<Plus className="size-4" />} loading={add.isPending} disabled={f.name.trim().length < 2 || !f.ends_on} onClick={() => add.mutate()}>Ekle</Button></div>
+        </div>
+      )}
+      {items.length === 0 ? <EmptyState compact icon={<CalendarRange />} title="Henüz dönem yok" /> : (
+        <ul>{items.map((t) => (
+          <ListRow key={t.id} title={t.name} badge={t.is_current ? 'Güncel' : undefined}
+            extra={manage && !t.is_current ? <Button size="xs" variant="ghost" icon={<Star className="size-3.5" />} loading={setCurrent.isPending} onClick={() => setCurrent.mutate(t)}>Güncel yap</Button> : undefined}
+            onEdit={manage ? () => setEdit({ ...t, starts_on: t.starts_on ?? todayISO(), ends_on: t.ends_on ?? '' }) : undefined} />
+        ))}</ul>
+      )}
+
+      <Modal open={!!edit} onClose={() => setEdit(null)} title="Dönemi düzenle"
+        footer={<><Button variant="ghost" onClick={() => setEdit(null)}>Vazgeç</Button><Button variant="primary" loading={save.isPending} disabled={!edit || edit.name.trim().length < 2 || !edit.ends_on} onClick={() => edit && save.mutate(edit)}>Kaydet</Button></>}>
+        {edit && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <Field label="Dönem adı" required className="sm:col-span-2"><Input value={edit.name} onChange={(e) => setEdit({ ...edit, name: e.target.value })} /></Field>
+            <Field label="Başlangıç" required><Input type="date" value={edit.starts_on ?? ''} onChange={(e) => setEdit({ ...edit, starts_on: e.target.value })} /></Field>
+            <Field label="Bitiş" required><Input type="date" value={edit.ends_on ?? ''} onChange={(e) => setEdit({ ...edit, ends_on: e.target.value })} /></Field>
+          </div>
+        )}
+      </Modal>
     </Panel>
   )
 }

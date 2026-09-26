@@ -19,9 +19,9 @@ export default {
     { path: 'derslik-tasarimi/yeni', element: page(<LayoutWizardPage />) },
     { path: 'derslik-tasarimi/:id', element: page(<LayoutEditorPage />) },
   ],
-  nav: [{ section: 'academic', label: 'Derslik tasarımı', to: '/derslik-tasarimi', icon: Armchair, permission: 'academic.view', order: 2.5 }],
+  nav: [{ section: 'academic', label: 'Sınıf tasarımı', to: '/derslik-tasarimi', icon: Armchair, permission: 'academic.view', order: 2.5 }],
   commands: [
-    { id: 'classroom-design', label: 'Derslik tasarımı (3D)', to: '/derslik-tasarimi', icon: Box, permission: 'academic.view', hint: 'Oturma düzeni', keywords: ['derslik', '3d', 'oturma', 'masa', 'sıra', 'yerleşim', 'plan', 'oda'] },
-    { id: 'classroom-design-new', label: 'Yeni derslik tasarımı', to: '/derslik-tasarimi/yeni', icon: Plus, permission: 'classroom_layouts.manage', hint: 'Oda planı çiz', keywords: ['derslik', 'oda', 'çiz', 'yeni', '3d'] },
+    { id: 'classroom-design', label: 'Sınıf tasarımı (3D)', to: '/derslik-tasarimi', icon: Box, permission: 'academic.view', hint: 'Oturma düzeni', keywords: ['sınıf', 'derslik', '3d', 'oturma', 'masa', 'sıra', 'yerleşim', 'plan'] },
+    { id: 'classroom-design-new', label: 'Yeni sınıf tasarımı', to: '/derslik-tasarimi/yeni', icon: Plus, permission: 'classroom_layouts.manage', hint: 'Oturma planı çiz', keywords: ['sınıf', 'derslik', 'çiz', 'yeni', '3d'] },
   ],
 } satisfies ModuleDef

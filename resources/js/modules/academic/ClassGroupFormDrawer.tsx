@@ -15,19 +15,7 @@ export function ClassGroupFormDrawer({ open, onClose, onSaved, options, group }:
   const qc = useQueryClient()
   const [form, setForm] = useState<Record<string, any>>({})
   const [errors, setErrors] = useState<Record<string, string[]>>({})
-  // Boş listede oracıkta derslik ekleme (veriler sıfırlanınca "Ana derslik" seçilemiyordu)
-  const [newRoom, setNewRoom] = useState<{ open: boolean; name: string; capacity: string }>({ open: false, name: '', capacity: '24' })
-  const createRoom = useMutation({
-    mutationFn: () => api.post<{ id: number }>('/classrooms', { name: newRoom.name.trim(), kind: 'classroom', capacity: Number(newRoom.capacity) || 24 }),
-    onSuccess: async (r) => {
-      await qc.invalidateQueries({ queryKey: ['academic', 'options'] })
-      setForm((f) => ({ ...f, homeroom_classroom_id: String(r.id) }))
-      setNewRoom({ open: false, name: '', capacity: '24' })
-      toast.success('Derslik eklendi ve ana derslik olarak seçildi.')
-    },
-    onError: (e) => toast.error(e instanceof ApiError ? e.firstError() : 'Derslik eklenemedi.'),
-  })
-  // Program da boş olabilir (sıfırlama sonrası). Oracıkta program tanımlama kısayolu.
+  // Program boş olabilir (sıfırlama sonrası). Oracıkta program tanımlama kısayolu.
   const [newProg, setNewProg] = useState<{ open: boolean; name: string; kind: string }>({ open: false, name: '', kind: 'group' })
   const progCode = (name: string) => {
     const tr: Record<string, string> = { ç: 'C', Ç: 'C', ğ: 'G', Ğ: 'G', ı: 'I', İ: 'I', ö: 'O', Ö: 'O', ş: 'S', Ş: 'S', ü: 'U', Ü: 'U' }
@@ -79,8 +67,6 @@ export function ClassGroupFormDrawer({ open, onClose, onSaved, options, group }:
     },
   })
 
-  const room = options?.classrooms.find((c) => c.id === Number(form.homeroom_classroom_id))
-
   return (
     <Drawer
       open={open}
@@ -111,19 +97,6 @@ export function ClassGroupFormDrawer({ open, onClose, onSaved, options, group }:
               <Input className="min-w-[160px] flex-1" placeholder="Program adı (örn. TYT-AYT Hazırlık)" value={newProg.name} onChange={(e) => setNewProg((n) => ({ ...n, name: e.target.value }))} />
               <Select className="w-32" value={newProg.kind} onChange={(e) => setNewProg((n) => ({ ...n, kind: e.target.value }))} options={[{ value: 'group', label: 'Grup dersi' }, { value: 'private', label: 'Birebir' }, { value: 'study', label: 'Etüt' }]} />
               <Button type="button" size="sm" variant="primary" loading={createProg.isPending} disabled={newProg.name.trim().length < 2} onClick={() => createProg.mutate()}>Ekle</Button>
-            </div>
-          )}
-        </Field>
-        <Field label="Ana derslik" optional error={err('homeroom_classroom_id')} hint={room ? `Derslik kapasitesi ${room.capacity}` : ((options?.classrooms ?? []).filter((c) => c.is_active).length === 0 ? 'Henüz derslik yok — "Yeni derslik" ile ekleyin' : undefined)}>
-          <div className="flex items-center gap-2">
-            <Select className="flex-1" value={form.homeroom_classroom_id ?? ''} onChange={(e) => { const r = options?.classrooms.find((c) => c.id === Number(e.target.value)); setForm((f) => ({ ...f, homeroom_classroom_id: e.target.value, capacity: r && !editing ? Math.min(Number(f.capacity) || 24, r.capacity) : f.capacity })) }} placeholder="Atanmadı" options={(options?.classrooms ?? []).filter((c) => c.is_active).map((c) => ({ value: c.id, label: `${c.name} · ${c.capacity} kişi` }))} />
-            <Button type="button" size="sm" variant="ghost" icon={<Plus className="size-3.5" />} onClick={() => setNewRoom((n) => ({ ...n, open: !n.open }))}>Yeni</Button>
-          </div>
-          {newRoom.open && (
-            <div className="mt-2 flex flex-wrap items-end gap-2 rounded-[var(--radius-sm)] bg-surface-2 p-2">
-              <Input className="min-w-[140px] flex-1" placeholder="Derslik adı (örn. A-101)" value={newRoom.name} onChange={(e) => setNewRoom((n) => ({ ...n, name: e.target.value }))} />
-              <Input type="number" min={1} max={1000} className="w-24" placeholder="Kapasite" value={newRoom.capacity} onChange={(e) => setNewRoom((n) => ({ ...n, capacity: e.target.value }))} />
-              <Button type="button" size="sm" variant="primary" loading={createRoom.isPending} disabled={newRoom.name.trim().length < 1} onClick={() => createRoom.mutate()}>Ekle</Button>
             </div>
           )}
         </Field>
