@@ -1,5 +1,20 @@
 [
   {
+    "version": "1.29.0",
+    "date": "2026-09-26",
+    "title": "Derslik kaldırıldı + kurulum düzenle/sil",
+    "items": [
+      {
+        "type": "iyilestirme",
+        "text": "'Derslik' kavramı arayüzden kaldırıldı; tek kavram Sınıf. Kurulumdan Derslikler sekmesi ve sınıf formundan 'Ana derslik' çıkarıldı; 'Derslik tasarımı' → 'Sınıf tasarımı'"
+      },
+      {
+        "type": "yeni",
+        "text": "Akademik kurulumda program, sınıf ve dönem düzenlenebilir ve onay isteyerek silinebilir (kazara silinmez)"
+      }
+    ]
+  },
+  {
     "version": "1.28.0",
     "date": "2026-09-26",
     "title": "Deneme sistemi paketi ve öğrencileri",
