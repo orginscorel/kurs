@@ -7,7 +7,8 @@ export type AcademicOptions = {
   classrooms: { id: number; name: string; kind: string; capacity: number; floor: string | null; is_active: boolean }[]
   teachers: { id: number; name: string; first_name: string; last_name: string; color: string; title: string | null; is_active: boolean; subject_ids: number[] }[]
   terms: { id: number; name: string; starts_on: string; ends_on: string; is_current: boolean }[]
-  class_groups: { id: number; name: string; program_id: number; program: string | null; color: string | null; academic_term_id: number; capacity: number; homeroom_classroom_id: number | null; is_active: boolean }[]
+  sections?: string[]
+  class_groups: { id: number; name: string; program_id: number; program: string | null; color: string | null; academic_term_id: number; capacity: number; homeroom_classroom_id: number | null; section?: string | null; is_active: boolean }[]
   weekdays: Record<string, string>
   classroom_kinds: Record<string, string>
   my_teacher_id: number | null
@@ -47,7 +48,7 @@ export type ClassroomDetailData = {
 }
 
 export type ClassGroupRow = {
-  id: number; name: string; capacity: number; is_active: boolean; program_id: number; academic_term_id: number; homeroom_classroom_id: number | null; advisor_teacher_id: number | null
+  id: number; name: string; section?: string | null; capacity: number; is_active: boolean; program_id: number; academic_term_id: number; homeroom_classroom_id: number | null; advisor_teacher_id: number | null
   program: string | null; program_color: string | null; program_kind: string | null; term: string | null; homeroom: string | null; advisor: string | null
   students_count: number; lessons_count: number; fill_rate: number
   /** Son 30 gün devam yüzdesi ve bugünkü ders sayısı; yalnız liste ucunda hesaplanır */

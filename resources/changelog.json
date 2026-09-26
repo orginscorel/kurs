@@ -1,5 +1,16 @@
 [
   {
+    "version": "1.32.1",
+    "date": "2026-09-26",
+    "title": "Sınıf düzenlemede şube seçimi",
+    "items": [
+      {
+        "type": "duzeltme",
+        "text": "Sınıfı düzenlerken de 'Şube' seçilebiliyor (hem Kurulum hem sınıf düzenleme ekranı); şube değişince ad otomatik güncellenir (12-EA-A → 12-EA-B)"
+      }
+    ]
+  },
+  {
     "version": "1.32.0",
     "date": "2026-09-26",
     "title": "Şube yönetimi",

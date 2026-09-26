@@ -17,7 +17,7 @@ import { Field, Input, Select } from '@/components/ui/form'
  */
 type Prog = { id: number; code?: string; name: string; kind: string; is_active: boolean }
 type Term = { id: number; name: string; is_current: boolean; starts_on?: string | null; ends_on?: string | null }
-type Group = { id: number; name: string; program_id: number | null; academic_term_id?: number | null; capacity: number; is_active: boolean }
+type Group = { id: number; name: string; section?: string | null; program_id: number | null; academic_term_id?: number | null; capacity: number; is_active: boolean }
 type Opt = { programs: Prog[]; terms: Term[]; class_groups: Group[]; sections?: string[] }
 type Tab = 'programs' | 'sections' | 'classes' | 'terms'
 const KIND_LABEL: Record<string, string> = { group: 'Grup dersi', private: 'Birebir', study: 'Etüt' }
@@ -192,15 +192,17 @@ function ClassesTab({ data, programs, sections, manage, onDone, fail, goProgram 
   const [edit, setEdit] = useState<Group | null>(null)
   const [del, setDel] = useState<Group | null>(null)
   const termId = f.academic_term_id || (current ? String(current.id) : '')
-  // Sınıf adı = taban ad + şube (12-EA + A → 12-EA-A). Şube ayrı alandan gelir.
-  const fullName = (base: string, section: string) => { const b = base.trim().replace(new RegExp(`-${section}$`, 'i'), '').trim(); return section ? `${b}-${section}` : b }
+  // Sınıf adı = taban ad + şube. Ad'daki mevcut son "-<harf>" şubesi ayıklanır, seçilen şube eklenir
+  // (12-EA + A → 12-EA-A; şube A→B değişince 12-EA-A → 12-EA-B). Şube boşsa yalnız taban ad.
+  const baseName = (n: string) => n.trim().replace(/-[A-Za-zÇĞİÖŞÜçğıöşü]$/u, '').trim()
+  const fullName = (base: string, section: string) => (section ? `${baseName(base)}-${section}` : baseName(base))
   const add = useMutation({
     mutationFn: () => api.post('/class-groups', { name: fullName(f.name, f.section), section: f.section, program_id: Number(f.program_id), academic_term_id: Number(termId), capacity: Number(f.capacity) || 24, is_active: true }),
     onSuccess: () => { toast.success('Sınıf oluşturuldu.'); setF({ name: '', section: sections[0] ?? 'A', program_id: '', academic_term_id: '', capacity: '24' }); onDone() },
     onError: fail,
   })
   const save = useMutation({
-    mutationFn: (g: Group) => api.put(`/class-groups/${g.id}`, { name: g.name.trim(), program_id: Number(g.program_id), academic_term_id: Number(g.academic_term_id), capacity: Number(g.capacity) || 24, is_active: g.is_active }),
+    mutationFn: (g: Group) => api.put(`/class-groups/${g.id}`, { name: fullName(g.name, g.section ?? ''), section: g.section ?? null, program_id: Number(g.program_id), academic_term_id: Number(g.academic_term_id), capacity: Number(g.capacity) || 24, is_active: g.is_active }),
     onSuccess: () => { toast.success('Sınıf güncellendi.'); setEdit(null); onDone() },
     onError: fail,
   })
@@ -227,14 +229,15 @@ function ClassesTab({ data, programs, sections, manage, onDone, fail, goProgram 
         </div>
       )}
       {groups.length === 0 ? <EmptyState compact icon={<LayoutGrid />} title="Henüz sınıf yok" description="Program hazırsa yukarıdan sınıf (şube) oluşturun." /> : (
-        <ul>{groups.map((g) => <ListRow key={g.id} title={g.name} meta={progName(g.program_id)} badge={`${g.capacity} kişi`} onEdit={manage ? () => setEdit({ ...g, academic_term_id: g.academic_term_id ?? current?.id ?? null }) : undefined} onDelete={manage ? () => setDel(g) : undefined} />)}</ul>
+        <ul>{groups.map((g) => <ListRow key={g.id} title={g.name} meta={`${progName(g.program_id)}${g.section ? ` · ${g.section} şubesi` : ''}`} badge={`${g.capacity} kişi`} onEdit={manage ? () => setEdit({ ...g, section: g.section ?? (g.name.trim().match(/-([A-Za-zÇĞİÖŞÜçğıöşü])$/u)?.[1] ?? ''), academic_term_id: g.academic_term_id ?? current?.id ?? null }) : undefined} onDelete={manage ? () => setDel(g) : undefined} />)}</ul>
       )}
 
       <Modal open={!!edit} onClose={() => setEdit(null)} title="Sınıfı düzenle"
         footer={<><Button variant="ghost" onClick={() => setEdit(null)}>Vazgeç</Button><Button variant="primary" loading={save.isPending} disabled={!edit || edit.name.trim().length < 1 || !edit.program_id} onClick={() => edit && save.mutate(edit)}>Kaydet</Button></>}>
         {edit && (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <Field label="Sınıf / şube adı" required className="sm:col-span-2"><Input value={edit.name} onChange={(e) => setEdit({ ...edit, name: e.target.value })} /></Field>
+            <Field label="Sınıf adı" required hint={`Kayıt: ${fullName(edit.name, edit.section ?? '')}`}><Input value={edit.name} onChange={(e) => setEdit({ ...edit, name: e.target.value })} /></Field>
+            <Field label="Şube" hint="Şubeler sekmesinden yönetilir"><Select value={edit.section ?? ''} onChange={(e) => setEdit({ ...edit, section: e.target.value })} placeholder="Şubesiz" options={sections.map((x) => ({ value: x, label: `${x} şubesi` }))} /></Field>
             <Field label="Program" required><Select value={String(edit.program_id ?? '')} onChange={(e) => setEdit({ ...edit, program_id: Number(e.target.value) })} options={programs.map((p) => ({ value: p.id, label: p.name }))} /></Field>
             <Field label="Dönem" required><Select value={String(edit.academic_term_id ?? '')} onChange={(e) => setEdit({ ...edit, academic_term_id: Number(e.target.value) })} options={(data?.terms ?? []).map((t) => ({ value: t.id, label: t.name }))} /></Field>
             <Field label="Kontenjan" required><Input type="number" min={1} max={500} value={String(edit.capacity)} onChange={(e) => setEdit({ ...edit, capacity: Number(e.target.value) })} /></Field>

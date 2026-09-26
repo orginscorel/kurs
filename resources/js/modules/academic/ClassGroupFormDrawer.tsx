@@ -38,10 +38,11 @@ export function ClassGroupFormDrawer({ open, onClose, onSaved, options, group }:
     if (!open) return
     setErrors({})
     if (group) {
-      setForm({ name: group.name, academic_term_id: group.academic_term_id, program_id: group.program_id, homeroom_classroom_id: group.homeroom_classroom_id ?? '', advisor_teacher_id: group.advisor_teacher_id ?? '', capacity: group.capacity, is_active: group.is_active })
+      const sec = group.section ?? (group.name.trim().match(/-([A-Za-zÇĞİÖŞÜçğıöşü])$/u)?.[1] ?? '')
+      setForm({ name: group.name, section: sec, academic_term_id: group.academic_term_id, program_id: group.program_id, advisor_teacher_id: group.advisor_teacher_id ?? '', capacity: group.capacity, is_active: group.is_active })
     } else {
       const o = optionsRef.current
-      setForm({ name: '', academic_term_id: o?.terms.find((t) => t.is_current)?.id ?? o?.terms[0]?.id ?? '', program_id: '', homeroom_classroom_id: '', advisor_teacher_id: '', capacity: 24, is_active: true })
+      setForm({ name: '', section: (o?.sections ?? ['A'])[0] ?? 'A', academic_term_id: o?.terms.find((t) => t.is_current)?.id ?? o?.terms[0]?.id ?? '', program_id: '', advisor_teacher_id: '', capacity: 24, is_active: true })
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, group])
@@ -49,9 +50,13 @@ export function ClassGroupFormDrawer({ open, onClose, onSaved, options, group }:
   const set = (k: string, v: unknown) => setForm((f) => ({ ...f, [k]: v }))
   const err = (k: string) => errors[k]?.[0]
 
+    // Şube ayrı alandan gelir; ad = taban + "-" + şube (12-EA + A → 12-EA-A).
+  const baseName = (n: string) => String(n ?? '').trim().replace(/-[A-Za-zÇĞİÖŞÜçğıöşü]$/u, '').trim()
   const save = useMutation({
     mutationFn: () => {
-      const payload = { ...form, homeroom_classroom_id: form.homeroom_classroom_id || null, advisor_teacher_id: form.advisor_teacher_id || null, capacity: Number(form.capacity) }
+      const section = (form.section || '').trim()
+      const name = section ? `${baseName(form.name)}-${section}` : baseName(form.name)
+      const payload = { ...form, name, section: section || null, advisor_teacher_id: form.advisor_teacher_id || null, capacity: Number(form.capacity) }
       return editing ? api.put<{ message: string }>(`/class-groups/${group!.id}`, payload).then((r) => ({ ...r, id: group!.id })) : api.post<{ message: string; id: number }>('/class-groups', payload)
     },
     onSuccess: (r) => {
@@ -81,8 +86,11 @@ export function ClassGroupFormDrawer({ open, onClose, onSaved, options, group }:
       }
     >
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <Field label="Sınıf adı" required error={err('name')} className="sm:col-span-2" hint="Örn. 12-SAY-A, 8-LGS-B, MEZUN-EA">
+        <Field label="Sınıf adı" required error={err('name')} hint="Ör. 12-EA, 12-SAY (şube ayrı seçilir)">
           <Input value={form.name ?? ''} onChange={(e) => set('name', e.target.value)} autoFocus />
+        </Field>
+        <Field label="Şube" error={err('section')} hint="Şubeler kurulumdan yönetilir">
+          <Select value={form.section ?? ''} onChange={(e) => set('section', e.target.value)} placeholder="Şubesiz" options={(options?.sections ?? ['A', 'B']).map((x) => ({ value: x, label: `${x} şubesi` }))} />
         </Field>
         <Field label="Eğitim dönemi" required error={err('academic_term_id')}>
           <Select placeholder="Dönem seçin" value={form.academic_term_id ?? ''} onChange={(e) => set('academic_term_id', e.target.value)} options={(options?.terms ?? []).map((t) => ({ value: t.id, label: t.name }))} />
