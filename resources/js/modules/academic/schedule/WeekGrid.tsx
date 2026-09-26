@@ -143,6 +143,15 @@ export function WeekGrid({ data, canManage, compact, onMove, onSelect, onStudySe
                 nowTop={d.is_today && nowMin >= rangeStart && nowMin <= rangeEnd ? ((nowMin - rangeStart) / 60) * HOUR_PX : null}
                 onEmptyClick={canManage && onEmptyClick ? (y) => { if (!recentlyDragged()) onEmptyClick(d.weekday, rangeStart + Math.floor(((y / HOUR_PX) * 60) / 30) * 30) } : undefined}
               >
+                {(data.breaks ?? []).filter((b) => b.weekday === d.weekday).map((b, i) => {
+                  const s = toMinutes(b.start); const e = toMinutes(b.end)
+                  return (
+                    <div key={`brk-${i}`} className="pointer-events-none absolute inset-x-0 z-0 flex items-center justify-center overflow-hidden bg-surface-2/70 ring-1 ring-inset ring-line/60"
+                      style={{ top: ((s - rangeStart) / 60) * HOUR_PX, height: Math.max(12, ((e - s) / 60) * HOUR_PX) }}>
+                      <span className="truncate px-1 text-[9.5px] font-medium uppercase tracking-wide text-ink-3">{b.label}</span>
+                    </div>
+                  )
+                })}
                 {blocks
                   .filter((b) => b.weekday === d.weekday)
                   .map((b) => {

@@ -80,6 +80,7 @@ export type WeekData = {
   view: ScheduleView; id: number; week_start: string; week_end: string
   days: { date: string; weekday: number; label: string; is_today: boolean }[]
   items: WeekItem[]; studies: WeekStudy[]; range: { start: number; end: number }
+  breaks?: { weekday: number; start: string; end: string; label: string; minutes: number }[]
 }
 export type SessionRow = {
   id: number; schedule_id: number | null; date: string; starts_at: string; ends_at: string; status: string; cancel_reason: string | null; topic_note: string | null; topic_id: number | null

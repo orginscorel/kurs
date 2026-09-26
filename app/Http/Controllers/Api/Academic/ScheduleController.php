@@ -98,8 +98,42 @@ class ScheduleController extends ApiController
             'days' => collect(range(0, 6))->map(fn ($i) => ['date' => $start->addDays($i)->toDateString(), 'weekday' => $i + 1, 'label' => TimeSlots::WEEKDAYS[$i + 1], 'is_today' => $start->addDays($i)->isToday()]),
             'items' => $items->values(),
             'studies' => $studies->values(),
+            'breaks' => $this->breaksFor($view, $id),
             'range' => $this->hourRange($items->pluck('starts_at')->concat($studies->pluck('starts_at')), $items->pluck('ends_at')->concat($studies->pluck('ends_at'))),
         ]);
+    }
+
+    /**
+     * Sınıfın zaman şablonundaki ders saatleri arasındaki boşluklar = teneffüs/öğle molaları.
+     * Ders programı ızgarasında görsel blok olarak gösterilir (yalnız sınıf görünümünde).
+     *
+     * @return list<array{weekday:int,start:string,end:string,label:string,minutes:int}>
+     */
+    private function breaksFor(string $view, ?int $id): array
+    {
+        if ($view !== 'class_group' || ! $id) {
+            return [];
+        }
+        $byDay = [];
+        foreach ((\App\Models\ClassGroup::query()->find($id)?->timeTemplates ?? collect()) as $t) {
+            foreach ($t->periods() as $p) {
+                $byDay[$p['weekday']][] = [$p['start'], $p['end']];
+            }
+        }
+        $breaks = [];
+        foreach ($byDay as $wd => $slots) {
+            usort($slots, fn ($a, $b) => $a[0] <=> $b[0]);
+            for ($i = 1; $i < count($slots); $i++) {
+                $gapStart = $slots[$i - 1][1];
+                $gapEnd = $slots[$i][0];
+                $mins = (int) round((strtotime($gapEnd) - strtotime($gapStart)) / 60);
+                if ($mins >= 5) {
+                    $breaks[] = ['weekday' => (int) $wd, 'start' => substr($gapStart, 0, 5), 'end' => substr($gapEnd, 0, 5), 'label' => $mins >= 30 ? 'Öğle arası' : 'Teneffüs', 'minutes' => $mins];
+                }
+            }
+        }
+
+        return $breaks;
     }
 
     /** Somut oturumlar (günlük liste / aylık takvim). */

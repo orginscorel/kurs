@@ -1,5 +1,16 @@
 [
   {
+    "version": "1.33.0",
+    "date": "2026-09-26",
+    "title": "Mola/teneffüs ders programında görünür",
+    "items": [
+      {
+        "type": "yeni",
+        "text": "Ders programı ızgarasında teneffüs ve öğle araları görsel blok olarak gösterilir (sınıfın Zaman şablonundaki ders saatleri arasındaki boşluklardan); dersler kalan slotlara eklenir"
+      }
+    ]
+  },
+  {
     "version": "1.32.2",
     "date": "2026-09-26",
     "title": "Şube değiştir sadeleşti",
