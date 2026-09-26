@@ -50,6 +50,10 @@ jobs:
           java-version: '21'
 
       - uses: android-actions/setup-android@v3
+        with:
+          # Varsayılan 'tools' paketi SDK'dan kaldırıldı ('Failed to find package tools' → hata).
+          # platform-tools yeter; Android Gradle Plugin gereken platform+build-tools'u kendi indirir.
+          packages: 'platform-tools'
 
       - name: Capacitor projesi + Android platformu
         working-directory: desktop/mobile

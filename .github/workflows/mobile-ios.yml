@@ -1,0 +1,150 @@
+# Erbaa Kurs — iOS (Capacitor çevrimiçi kabuk → canlı web uygulaması)
+# Tetik:
+#   - etiket:  mobile-ios-v<sürüm>  veya  mobile-v<sürüm>   → derle (+ secret'lar varsa imzalı TestFlight)
+#   - elle:    Actions › mobile-ios › Run workflow
+#
+# İMZA (yalnız gerçek cihaz/TestFlight için — Apple Developer hesabından üretilir):
+#   APPLE_TEAM_ID          (10 karakterli takım kimliği)
+#   ASC_KEY_ID             (App Store Connect API anahtar kimliği)
+#   ASC_ISSUER_ID          (App Store Connect issuer UUID)
+#   ASC_API_KEY_P8_B64     (AuthKey_XXXX.p8 dosyasının base64'ü)
+# Bu secret'lar yoksa iş yine ÇALIŞIR: projeyi imzasız derleyerek sağlığını doğrular.
+name: mobile-ios
+
+on:
+  push:
+    tags: ['mobile-ios-v*', 'mobile-v*']
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: 'İmzalı derle ve TestFlight''e yükle (secret''lar gerekir)'
+        type: boolean
+        default: true
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Sürüm belirle
+        id: ver
+        shell: bash
+        run: |
+          V="$(node -p "require('./desktop/mobile/package.json').version")"
+          if [ -n "${GITHUB_REF_NAME:-}" ] && printf '%s' "$GITHUB_REF_NAME" | grep -qE '^mobile(-ios)?-v'; then
+            V="$(printf '%s' "$GITHUB_REF_NAME" | sed -E 's/^mobile(-ios)?-v//')"
+          fi
+          [ -n "$V" ] || { echo "::error::Sürüm okunamadı"; exit 1; }
+          IFS=. read -r a b c <<<"$V"; a=${a:-0}; b=${b:-0}; c=${c:-0}
+          echo "version=$V" >> "$GITHUB_OUTPUT"
+          echo "build=$(( a*10000 + b*100 + c ))" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Capacitor projesi + iOS platformu
+        working-directory: desktop/mobile
+        run: |
+          npm install --no-audit --no-fund
+          npx cap add ios
+          npx cap sync ios
+
+      - name: Sürüm/derleme numarası
+        working-directory: desktop/mobile/ios/App
+        run: |
+          /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString ${{ steps.ver.outputs.version }}" App/Info.plist || true
+          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion ${{ steps.ver.outputs.build }}" App/Info.plist || true
+
+      - name: İmza durumunu belirle
+        id: mode
+        env:
+          P8: ${{ secrets.ASC_API_KEY_P8_B64 }}
+        run: |
+          if [ -n "$P8" ]; then echo "signed=true" >> "$GITHUB_OUTPUT"; else echo "signed=false" >> "$GITHUB_OUTPUT"; fi
+
+      # --- İMZASIZ: secret yoksa yalnız derlenebilirliği doğrula (cihaza kurulmaz) ---
+      - name: İmzasız derleme doğrulaması
+        if: steps.mode.outputs.signed == 'false'
+        working-directory: desktop/mobile/ios/App
+        run: |
+          echo "::warning::Apple secret'ları yok — imzasız derleniyor (yalnız doğrulama; cihaza kurulamaz)."
+          xcodebuild -workspace App.xcworkspace -scheme App -configuration Release \
+            -sdk iphoneos -destination 'generic/platform=iOS' \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" \
+            clean build | tail -30
+
+      # --- İMZALI: App Store Connect API anahtarıyla arşivle + TestFlight ---
+      - name: API anahtarını yerleştir
+        if: steps.mode.outputs.signed == 'true'
+        env:
+          P8: ${{ secrets.ASC_API_KEY_P8_B64 }}
+          KID: ${{ secrets.ASC_KEY_ID }}
+        run: |
+          mkdir -p ~/.appstoreconnect/private_keys ~/private_keys
+          echo "$P8" | base64 -d > ~/.appstoreconnect/private_keys/AuthKey_${KID}.p8
+          echo "$P8" | base64 -d > ~/private_keys/AuthKey_${KID}.p8
+
+      - name: Arşivle (otomatik imza)
+        if: steps.mode.outputs.signed == 'true'
+        working-directory: desktop/mobile/ios/App
+        env:
+          TEAM: ${{ secrets.APPLE_TEAM_ID }}
+          KID: ${{ secrets.ASC_KEY_ID }}
+          ISS: ${{ secrets.ASC_ISSUER_ID }}
+        run: |
+          xcodebuild -workspace App.xcworkspace -scheme App -configuration Release \
+            -archivePath "$RUNNER_TEMP/App.xcarchive" \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath ~/private_keys/AuthKey_${KID}.p8 \
+            -authenticationKeyID "$KID" -authenticationKeyIssuerID "$ISS" \
+            DEVELOPMENT_TEAM="$TEAM" CODE_SIGN_STYLE=Automatic PRODUCT_BUNDLE_IDENTIFIER=com.bogahostdeveloper.kurs \
+            archive
+
+      - name: IPA dışa aktar
+        if: steps.mode.outputs.signed == 'true'
+        working-directory: desktop/mobile/ios/App
+        env:
+          TEAM: ${{ secrets.APPLE_TEAM_ID }}
+          KID: ${{ secrets.ASC_KEY_ID }}
+          ISS: ${{ secrets.ASC_ISSUER_ID }}
+        run: |
+          cat > "$RUNNER_TEMP/ExportOptions.plist" <<PLIST
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0"><dict>
+            <key>method</key><string>app-store-connect</string>
+            <key>teamID</key><string>${TEAM}</string>
+            <key>destination</key><string>export</string>
+            <key>signingStyle</key><string>automatic</string>
+          </dict></plist>
+          PLIST
+          xcodebuild -exportArchive -archivePath "$RUNNER_TEMP/App.xcarchive" \
+            -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist" \
+            -exportPath "$RUNNER_TEMP/export" \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath ~/private_keys/AuthKey_${KID}.p8 \
+            -authenticationKeyID "$KID" -authenticationKeyIssuerID "$ISS"
+          ls -la "$RUNNER_TEMP/export"
+
+      - uses: actions/upload-artifact@v4
+        if: steps.mode.outputs.signed == 'true'
+        with:
+          name: ErbaaKurs-ios-${{ steps.ver.outputs.version }}
+          path: ${{ runner.temp }}/export/*.ipa
+
+      - name: TestFlight'e yükle
+        if: steps.mode.outputs.signed == 'true'
+        env:
+          KID: ${{ secrets.ASC_KEY_ID }}
+          ISS: ${{ secrets.ASC_ISSUER_ID }}
+        run: |
+          IPA="$(ls "$RUNNER_TEMP"/export/*.ipa | head -1)"
+          xcrun altool --upload-app -f "$IPA" -t ios \
+            --apiKey "$KID" --apiIssuer "$ISS" || \
+          xcrun notarytool submit "$IPA" --key ~/private_keys/AuthKey_${KID}.p8 --key-id "$KID" --issuer "$ISS" || true
+          echo "IPA yüklendi (App Store Connect › TestFlight)."
