@@ -1,9 +1,10 @@
 import { useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { Armchair, Box, Plus, Search, Trash2 } from 'lucide-react'
+import { Armchair, Box, LayoutGrid, Plus, Search, Trash2 } from 'lucide-react'
 import { useCan } from '@/app/auth'
-import { ApiError } from '@/lib/api'
+import { api, ApiError } from '@/lib/api'
 import { relative } from '@/lib/format'
 import { Button, ButtonLink } from '@/components/ui/Button'
 import { Badge, EmptyState, Skeleton } from '@/components/ui/feedback'
@@ -33,11 +34,16 @@ export default function LayoutListPage() {
   const designed = useMemo(() => new Set(rows.map((r) => r.classroom?.id).filter(Boolean)), [rows])
   const undesigned = (classrooms.data ?? []).filter((c) => c.is_active && !designed.has(c.id))
 
+  // Oluşturulan sınıflar (şubeler) otomatik gelir: her biri için kapasitesine göre görsel üretilir.
+  const academic = useQuery({ queryKey: ['academic', 'options'], queryFn: () => api.get<{ class_groups: { id: number; name: string; capacity: number; is_active: boolean }[] }>('/academic/options'), staleTime: 5 * 60_000 })
+  const classGroups = (academic.data?.class_groups ?? []).filter((c) => c.is_active)
+  const designedNames = useMemo(() => new Set(rows.map((r) => r.name?.replace(/\s*düzeni$/i, '').trim().toLocaleLowerCase('tr'))), [rows])
+
   return (
     <div>
       <PageHeader
-        title="Derslik tasarımı"
-        description="Derslikleri 3D modelleyin, masa düzenini sürükle-bırakla kurun, öğrencileri masalara yerleştirin."
+        title="Sınıf tasarımı"
+        description="Oluşturduğunuz sınıflar (şubeler) aşağıda; her biri için kapasitesine göre oturma düzeni görseli tek tıkla üretilir. Sürükle-bırakla düzenleyebilirsiniz."
         actions={
           canManage && (
             <ButtonLink to={classroomFilter ? `/derslik-tasarimi/yeni?derslik=${classroomFilter}` : '/derslik-tasarimi/yeni'} variant="primary" icon={<Plus className="size-4" />}>
@@ -47,8 +53,30 @@ export default function LayoutListPage() {
         }
       />
 
+      {canManage && classGroups.length > 0 && (
+        <section className="mb-5 rounded-[var(--radius-lg)] bg-surface ring-1 ring-line p-3.5">
+          <h2 className="mb-2 text-[13.5px] font-semibold text-ink">Sınıflar (şubeler)</h2>
+          <div className="flex flex-wrap gap-2">
+            {classGroups.map((c) => {
+              const has = designedNames.has(c.name.trim().toLocaleLowerCase('tr'))
+              return (
+                <Link key={c.id}
+                  to={`/derslik-tasarimi/yeni?students=${c.capacity}&ad=${encodeURIComponent(`${c.name} düzeni`)}`}
+                  className="inline-flex h-9 items-center gap-1.5 rounded-[8px] border border-line bg-surface px-3 text-[12.5px] text-ink-2 hover:border-primary/40 hover:text-ink">
+                  <LayoutGrid className="size-3.5" />
+                  <span className="font-medium text-ink">{c.name}</span>
+                  <span className="text-ink-3">· {c.capacity} kişi</span>
+                  {has ? <Badge tone="success">tasarlandı</Badge> : <span className="font-medium text-primary">· Görsel oluştur</span>}
+                </Link>
+              )
+            })}
+          </div>
+          <p className="mt-2 text-[12px] text-ink-3">Sınıfa tıklayınca kapasitesine göre masalar otomatik dizilir; kaydedip sürükle-bırakla düzenleyebilirsiniz.</p>
+        </section>
+      )}
+
       <div className="mb-4 flex flex-wrap items-center gap-2">
-        <Input className="w-full sm:w-72" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Tasarım ya da derslik ara" leading={<Search />} aria-label="Ara" />
+        <Input className="w-full sm:w-72" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Tasarım ara" leading={<Search />} aria-label="Ara" />
         <Select
           className="w-full sm:w-60"
           aria-label="Derslik"

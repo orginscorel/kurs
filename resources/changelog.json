@@ -1,5 +1,16 @@
 [
   {
+    "version": "1.30.0",
+    "date": "2026-09-26",
+    "title": "Sınıf tasarımı sınıflardan otomatik",
+    "items": [
+      {
+        "type": "yeni",
+        "text": "Sınıf tasarımı sayfası oluşturduğunuz sınıfları (şubeler) otomatik listeler; sınıfa tıklayınca kapasitesine göre oturma düzeni (masalar) otomatik dizilir, kaydedip düzenlersiniz"
+      }
+    ]
+  },
+  {
     "version": "1.29.0",
     "date": "2026-09-26",
     "title": "Derslik kaldırıldı + kurulum düzenle/sil",

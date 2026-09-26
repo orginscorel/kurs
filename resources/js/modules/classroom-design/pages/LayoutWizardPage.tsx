@@ -54,10 +54,13 @@ export default function LayoutWizardPage() {
   const navigate = useNavigate()
   const [params] = useSearchParams()
   const presetClassroom = params.get('derslik') ? Number(params.get('derslik')) : null
+  // Sınıf (şube) üzerinden gelindiğinde: kapasiteye göre otomatik masa üret + adı sınıf adı yap.
+  const presetStudents = params.get('students') ? Number(params.get('students')) : null
+  const presetName = params.get('ad') ?? ''
   const classrooms = useClassroomOptions()
   const save = useSaveLayout()
   const [step, setStep] = useState(0)
-  const [name, setName] = useState('')
+  const [name, setName] = useState(presetName)
   const [classroomId, setClassroomId] = useState<number | null>(presetClassroom)
   const [floor, setFloor] = useState('')
   const [preview, setPreview] = useState<'2d' | '3d'>('2d')
@@ -66,7 +69,7 @@ export default function LayoutWizardPage() {
   const [desks, setDesks] = useState(true)
   const [deskType, setDeskType] = useState<'desk-single' | 'desk-double'>('desk-single')
   const roster = useRoster(classroomId, null)
-  const [students, setStudents] = useState<number | null>(null)
+  const [students, setStudents] = useState<number | null>(presetStudents)
   const polygon = useClassroom((s) => s.doc.room.polygon)
   const problems = validatePolygon(polygon)
   const cls = classrooms.data?.find((c) => c.id === classroomId)
@@ -148,8 +151,8 @@ export default function LayoutWizardPage() {
   return (
     <div>
       <PageHeader
-        title="Yeni derslik tasarımı"
-        breadcrumbs={[{ label: 'Derslik tasarımı', to: '/derslik-tasarimi' }, { label: 'Yeni' }]}
+        title="Yeni sınıf tasarımı"
+        breadcrumbs={[{ label: 'Sınıf tasarımı', to: '/derslik-tasarimi' }, { label: 'Yeni' }]}
         description="Oda planını çizin; kapı ve pencereleri duvarlara yerleştirin. Sonra 3D düzenleyicide masaları kurarsınız."
       />
       <ol className="mb-5 flex flex-wrap items-center gap-2 text-[12.5px]">
