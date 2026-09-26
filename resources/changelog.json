@@ -1,5 +1,16 @@
 [
   {
+    "version": "1.25.1",
+    "date": "2026-09-26",
+    "title": "Ana derslik hızlı ekleme",
+    "items": [
+      {
+        "type": "duzeltme",
+        "text": "Sınıf düzenlemede 'Ana derslik' listesi boşsa (derslik tanımlı değilse) oracıkta 'Yeni derslik' ile ekleyip seçebilirsiniz"
+      }
+    ]
+  },
+  {
     "version": "1.25.0",
     "date": "2026-09-26",
     "title": "Kayıt sihirbazı",
