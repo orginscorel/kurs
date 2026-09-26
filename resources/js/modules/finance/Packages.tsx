@@ -15,7 +15,7 @@ import { ConfirmDialog, Menu, Modal } from '@/components/ui/overlay'
 import { MoneyInput } from './components'
 import { fromCents, toCents } from './shared'
 
-type Pkg = { id: number; name: string; type: string; program_id: number | null; program: string | null; academic_term_id: number | null; term: string | null; list_price: string; default_installments: number; includes: string | null; has_coaching: boolean; is_active: boolean; enrollment_count: number; monthly: string | null }
+type Pkg = { id: number; name: string; type: string; program_id: number | null; program: string | null; academic_term_id: number | null; term: string | null; list_price: string; default_installments: number; includes: string | null; has_coaching: boolean; has_exams: boolean; is_active: boolean; enrollment_count: number; monthly: string | null }
 type Options = { programs: { id: number; name: string }[]; terms: { id: number; name: string; is_current: boolean }[] }
 
 const PKG_TYPES: Record<string, string> = { course: 'Ders paketi', library: 'Kütüphane', study: 'Etüt' }
@@ -112,13 +112,13 @@ export default function Packages() {
 
 function PackageForm({ target, options, onClose }: { target: Pkg | 'new' | null; options?: Options; onClose: () => void }) {
   const qc = useQueryClient()
-  const [form, setForm] = useState({ name: '', type: 'course', program_id: '', academic_term_id: '', list_price: '', default_installments: '8', includes: '', has_coaching: false, is_active: true })
+  const [form, setForm] = useState({ name: '', type: 'course', program_id: '', academic_term_id: '', list_price: '', default_installments: '8', includes: '', has_coaching: false, has_exams: false, is_active: true })
   const [errors, setErrors] = useState<Record<string, string[]>>({})
   useEffect(() => {
     if (!target) return
     setErrors({})
-    if (target === 'new') setForm({ name: '', type: 'course', program_id: '', academic_term_id: String(options?.terms.find((t) => t.is_current)?.id ?? ''), list_price: '', default_installments: '8', includes: '', has_coaching: false, is_active: true })
-    else setForm({ name: target.name, type: target.type ?? 'course', program_id: String(target.program_id ?? ''), academic_term_id: String(target.academic_term_id ?? ''), list_price: target.list_price.replace('.', ','), default_installments: String(target.default_installments), includes: target.includes ?? '', has_coaching: !!target.has_coaching, is_active: target.is_active })
+    if (target === 'new') setForm({ name: '', type: 'course', program_id: '', academic_term_id: String(options?.terms.find((t) => t.is_current)?.id ?? ''), list_price: '', default_installments: '8', includes: '', has_coaching: false, has_exams: false, is_active: true })
+    else setForm({ name: target.name, type: target.type ?? 'course', program_id: String(target.program_id ?? ''), academic_term_id: String(target.academic_term_id ?? ''), list_price: target.list_price.replace('.', ','), default_installments: String(target.default_installments), includes: target.includes ?? '', has_coaching: !!target.has_coaching, has_exams: !!target.has_exams, is_active: target.is_active })
   }, [target, options])
   const set = (k: keyof typeof form, v: string | boolean) => setForm((f) => ({ ...f, [k]: v }))
   const cents = toCents(form.list_price)
@@ -151,6 +151,7 @@ function PackageForm({ target, options, onClose }: { target: Pkg | 'new' | null;
         <Field label="Varsayılan taksit sayısı" required hint={monthly ? `Aylık yaklaşık ${money(monthly, { short: true })}` : undefined} error={errors.default_installments?.[0]}><Input type="number" min={1} max={36} value={form.default_installments} onChange={(e) => set('default_installments', e.target.value)} /></Field>
         <Field label="Paket içeriği" optional className="sm:col-span-2"><Textarea rows={3} value={form.includes} onChange={(e) => set('includes', e.target.value)} maxLength={2000} placeholder="Ders, deneme sınavları, rehberlik, yayın seti" /></Field>
         <div className="sm:col-span-2 rounded-[var(--radius-sm)] bg-surface-2 px-3 py-2.5"><Switch checked={form.has_coaching} onChange={(v) => set('has_coaching', v)} label="Koçluk hizmeti dahil" /><p className="mt-1 text-[12px] text-ink-3">İşaretlenirse bu paketi alan öğrenci otomatik olarak Koçluk öğrencileri listesine girer (koçluk süresi kayıt tarihinden kaydın bitişine kadar).</p></div>
+        <div className="sm:col-span-2 rounded-[var(--radius-sm)] bg-surface-2 px-3 py-2.5"><Switch checked={form.has_exams} onChange={(v) => set('has_exams', v)} label="Deneme sistemi dahil" /><p className="mt-1 text-[12px] text-ink-3">İşaretlenirse bu paketi alan öğrenci Deneme öğrencileri listesine girer. Ayrıca yalnız deneme içeren "ekstra deneme paketi" olarak da tanımlayabilirsiniz.</p></div>
         <div className="sm:col-span-2"><Switch checked={form.is_active} onChange={(v) => set('is_active', v)} label="Aktif (kayıt ekranında seçilebilir)" /></div>
       </div>
     </Modal>

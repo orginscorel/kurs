@@ -1,4 +1,4 @@
-import { BarChart3, ClipboardList, FilePlus2, ScanLine, Target, Trophy } from 'lucide-react'
+import { BarChart3, ClipboardList, FilePlus2, GraduationCap, ScanLine, Target, Trophy } from 'lucide-react'
 import { lazyPage } from '@/app/lazy'
 import { page } from '@/app/page'
 import type { ModuleDef } from '@/app/modules'
@@ -10,11 +10,13 @@ const OpticalImportPage = lazyPage(() => import('./OpticalImportPage'))
 const ResultsPage = lazyPage(() => import('./ResultsPage'))
 const CommandCenter = lazyPage(() => import('./CommandCenter'))
 const TopicAnalysisPage = lazyPage(() => import('./TopicAnalysisPage'))
+const ExamStudents = lazyPage(() => import('./ExamStudents'))
 
 export default {
   id: 'exams',
   routes: [
     { path: 'sinavlar', element: page(<ExamList />) },
+    { path: 'sinavlar/ogrenciler', element: page(<ExamStudents />) },
     { path: 'sinavlar/:id', element: page(<ExamDetail />) },
     { path: 'sinavlar/:id/cevap-anahtari', element: page(<AnswerKeyEditor />) },
     { path: 'optik-okuma', element: page(<OpticalImportPage />) },
@@ -24,6 +26,7 @@ export default {
   ],
   nav: [
     { section: 'exams', label: 'Denemeler', to: '/sinavlar', icon: ClipboardList, permission: 'exams.view', order: 1 },
+    { section: 'exams', label: 'Deneme Öğrencileri', to: '/sinavlar/ogrenciler', icon: GraduationCap, permission: 'exams.view', order: 1.5 },
     { section: 'exams', label: 'Optik Okuma', to: '/optik-okuma', icon: ScanLine, permission: 'exams.import', order: 2 },
     { section: 'exams', label: 'Sonuçlar', to: '/sinav-sonuclari', icon: Trophy, permission: 'exams.view', order: 3 },
     { section: 'exams', label: 'Analizler', to: '/sinav-analizleri', icon: BarChart3, permission: 'exams.view', order: 4 },

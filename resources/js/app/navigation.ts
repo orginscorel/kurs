@@ -51,7 +51,7 @@ const ORDER: string[] = [
   // Akademik
   '/akademik/kurulum', '/ders-programi', '/takvim', '/siniflar', '/derslik-tasarimi', '/yerlestirme', '/odevler', '/etut', '/program-botu',
   // Sınavlar
-  '/sinavlar', '/optik-okuma', '/sinav-sonuclari', '/sinav-analizleri', '/kazanim-analizi',
+  '/sinavlar', '/sinavlar/ogrenciler', '/optik-okuma', '/sinav-sonuclari', '/sinav-analizleri', '/kazanim-analizi',
   // Rehberlik
   '/rehberlik/gorusmeler', '/rehberlik/riskli-ogrenciler', '/rehberlik/hedefler',
   // Disiplin

@@ -16,6 +16,7 @@ Route::middleware([\App\Http\Middleware\JsonFloatPrecision::class, 'permission:e
     Route::get('exams/options', [ExamController::class, 'options']);
     Route::get('exams/dashboard', [ExamController::class, 'dashboard']);
     Route::get('exams/topic-analysis', [ExamController::class, 'topics']);
+    Route::get('exams/deneme-students', [ExamController::class, 'denemeStudents']);
     Route::get('exams/imports', [OpticalImportController::class, 'index']);
     Route::get('exams/optical-layouts', [OpticalImportController::class, 'layouts']);
 

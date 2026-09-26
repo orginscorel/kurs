@@ -71,6 +71,42 @@ class ExamController extends ApiController
 
     public const STATUSES = ['draft' => 'Taslak', 'answer_key_ready' => 'Anahtar hazır', 'results_published' => 'Yayımlandı'];
 
+    /**
+     * Deneme öğrencileri: denemeye girecek öğrenciler kayıt oldukları paketten gelir.
+     * Kapsam = aktif enrollment'ı "deneme sistemi dahil" (has_exams) paketli öğrenciler
+     * (ekstra deneme paketi de has_exams'lı bir pakettir). Sınıf/program süzgeci opsiyonel.
+     */
+    public function denemeStudents(Request $request): JsonResponse
+    {
+        $examEnrollment = fn ($e) => $e->whereIn('status', ['active', 'pending', 'frozen'])
+            ->whereHas('package', fn ($p) => $p->where('has_exams', true));
+
+        $query = \App\Models\Student::query()
+            ->whereIn('status', ['active', 'enrolled', 'frozen'])
+            ->whereHas('enrollments', $examEnrollment)
+            ->with(['enrollments' => fn ($e) => $examEnrollment($e)->with('package:id,name,has_exams')->orderBy('enrolled_on')->limit(1)])
+            ->select('id', 'full_name', 'student_no', 'school_grade', 'field')
+            ->when($request->integer('class_group_id'), fn ($q, $id) => $q->whereHas('classGroups', fn ($g) => $g->where('class_groups.id', $id)))
+            ->when(trim((string) $request->query('q')), fn ($q, $s) => $q->where(fn ($w) => $w->where('full_name', 'like', "%$s%")->orWhere('student_no', 'like', "%$s%")));
+
+        $paginator = $query->orderBy('full_name')->paginate($this->perPage($request));
+
+        return $this->paginated($paginator, function (\App\Models\Student $s) {
+            $enr = $s->enrollments->first();
+
+            return [
+                'id' => $s->id,
+                'full_name' => $s->full_name,
+                'student_no' => $s->student_no,
+                'school_grade' => $s->school_grade,
+                'field' => $s->field,
+                'package' => $enr?->package?->name,
+                'start' => $enr?->enrolled_on?->toDateString(),
+                'end' => $enr?->ended_on?->toDateString(),
+            ];
+        });
+    }
+
     public function store(Request $request): JsonResponse
     {
         $exam = $this->exams->create($this->validated($request));

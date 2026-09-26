@@ -1,5 +1,20 @@
 [
   {
+    "version": "1.28.0",
+    "date": "2026-09-26",
+    "title": "Deneme sistemi paketi ve öğrencileri",
+    "items": [
+      {
+        "type": "yeni",
+        "text": "Pakete 'Deneme sistemi dahil' seçeneği; bu paketi ya da ekstra deneme paketini alan öğrenci Deneme Öğrencileri listesine girer"
+      },
+      {
+        "type": "yeni",
+        "text": "Denemeler altında 'Deneme Öğrencileri' — denemeye girecek öğrenciler kayıt oldukları paketten gelir; paket ve süre görünür"
+      }
+    ]
+  },
+  {
     "version": "1.27.0",
     "date": "2026-09-26",
     "title": "Koçluk paketi ve öğrencileri",

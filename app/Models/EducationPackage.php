@@ -18,9 +18,9 @@ class EducationPackage extends Model
         'study' => 'Etüt',
     ];
 
-    protected $fillable = ['branch_id', 'program_id', 'academic_term_id', 'type', 'name', 'list_price', 'default_installments', 'includes', 'has_coaching', 'is_active'];
+    protected $fillable = ['branch_id', 'program_id', 'academic_term_id', 'type', 'name', 'list_price', 'default_installments', 'includes', 'has_coaching', 'has_exams', 'is_active'];
 
-    protected $casts = ['list_price' => 'decimal:2', 'has_coaching' => 'boolean', 'is_active' => 'boolean'];
+    protected $casts = ['list_price' => 'decimal:2', 'has_coaching' => 'boolean', 'has_exams' => 'boolean', 'is_active' => 'boolean'];
 
     /** Ders paketi sınıfa yerleştirme gerektirir; kütüphane/etüt gerektirmez (mezun da alabilir). */
     public function requiresClass(): bool
