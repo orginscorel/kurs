@@ -1,5 +1,16 @@
 [
   {
+    "version": "1.25.2",
+    "date": "2026-09-26",
+    "title": "Program açıklaması + hızlı ekleme",
+    "items": [
+      {
+        "type": "duzeltme",
+        "text": "Sınıf eklerken 'Program' alanına açıklama eklendi (sınıfın bağlı olduğu kurs türü) ve liste boşsa oracıkta 'Yeni program' ile ekleyip seçebilirsiniz"
+      }
+    ]
+  },
+  {
     "version": "1.25.1",
     "date": "2026-09-26",
     "title": "Ana derslik hızlı ekleme",

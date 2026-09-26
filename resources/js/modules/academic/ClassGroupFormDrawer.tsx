@@ -27,6 +27,22 @@ export function ClassGroupFormDrawer({ open, onClose, onSaved, options, group }:
     },
     onError: (e) => toast.error(e instanceof ApiError ? e.firstError() : 'Derslik eklenemedi.'),
   })
+  // Program da boş olabilir (sıfırlama sonrası). Oracıkta program tanımlama kısayolu.
+  const [newProg, setNewProg] = useState<{ open: boolean; name: string; kind: string }>({ open: false, name: '', kind: 'group' })
+  const progCode = (name: string) => {
+    const tr: Record<string, string> = { ç: 'C', Ç: 'C', ğ: 'G', Ğ: 'G', ı: 'I', İ: 'I', ö: 'O', Ö: 'O', ş: 'S', Ş: 'S', ü: 'U', Ü: 'U' }
+    return (name.replace(/[çÇğĞıİöÖşŞüÜ]/g, (c) => tr[c] ?? c).toUpperCase().replace(/[^A-Z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 20)) || 'PRG'
+  }
+  const createProg = useMutation({
+    mutationFn: () => api.post<{ id: number }>('/programs', { name: newProg.name.trim(), code: progCode(newProg.name), kind: newProg.kind }),
+    onSuccess: async (r) => {
+      await qc.invalidateQueries({ queryKey: ['academic', 'options'] })
+      setForm((f) => ({ ...f, program_id: String(r.id) }))
+      setNewProg({ open: false, name: '', kind: 'group' })
+      toast.success('Program eklendi ve seçildi.')
+    },
+    onError: (e) => toast.error(e instanceof ApiError ? e.firstError() : 'Program eklenemedi.'),
+  })
 
   const optionsRef = useRef(options)
   optionsRef.current = options
@@ -85,8 +101,18 @@ export function ClassGroupFormDrawer({ open, onClose, onSaved, options, group }:
         <Field label="Eğitim dönemi" required error={err('academic_term_id')}>
           <Select placeholder="Dönem seçin" value={form.academic_term_id ?? ''} onChange={(e) => set('academic_term_id', e.target.value)} options={(options?.terms ?? []).map((t) => ({ value: t.id, label: t.name }))} />
         </Field>
-        <Field label="Program" required error={err('program_id')}>
-          <Select value={form.program_id ?? ''} onChange={(e) => set('program_id', e.target.value)} placeholder="Program seçin" options={(options?.programs ?? []).filter((p) => p.is_active).map((p) => ({ value: p.id, label: p.name }))} />
+        <Field label="Program" required error={err('program_id')} hint={(options?.programs ?? []).filter((p) => p.is_active).length === 0 ? 'Program = sınıfın bağlı olduğu kurs türü (örn. TYT-AYT Hazırlık, LGS). Henüz yok — "Yeni" ile ekleyin.' : 'Sınıfın bağlı olduğu eğitim programı (kurs türü)'}>
+          <div className="flex items-center gap-2">
+            <Select className="flex-1" value={form.program_id ?? ''} onChange={(e) => set('program_id', e.target.value)} placeholder="Program seçin" options={(options?.programs ?? []).filter((p) => p.is_active).map((p) => ({ value: p.id, label: p.name }))} />
+            <Button type="button" size="sm" variant="ghost" icon={<Plus className="size-3.5" />} onClick={() => setNewProg((n) => ({ ...n, open: !n.open }))}>Yeni</Button>
+          </div>
+          {newProg.open && (
+            <div className="mt-2 flex flex-wrap items-end gap-2 rounded-[var(--radius-sm)] bg-surface-2 p-2">
+              <Input className="min-w-[160px] flex-1" placeholder="Program adı (örn. TYT-AYT Hazırlık)" value={newProg.name} onChange={(e) => setNewProg((n) => ({ ...n, name: e.target.value }))} />
+              <Select className="w-32" value={newProg.kind} onChange={(e) => setNewProg((n) => ({ ...n, kind: e.target.value }))} options={[{ value: 'group', label: 'Grup dersi' }, { value: 'private', label: 'Birebir' }, { value: 'study', label: 'Etüt' }]} />
+              <Button type="button" size="sm" variant="primary" loading={createProg.isPending} disabled={newProg.name.trim().length < 2} onClick={() => createProg.mutate()}>Ekle</Button>
+            </div>
+          )}
         </Field>
         <Field label="Ana derslik" optional error={err('homeroom_classroom_id')} hint={room ? `Derslik kapasitesi ${room.capacity}` : ((options?.classrooms ?? []).filter((c) => c.is_active).length === 0 ? 'Henüz derslik yok — "Yeni derslik" ile ekleyin' : undefined)}>
           <div className="flex items-center gap-2">
