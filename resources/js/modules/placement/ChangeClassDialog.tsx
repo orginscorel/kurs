@@ -5,8 +5,8 @@ import { api, ApiError } from '@/lib/api'
 import { cn } from '@/lib/cn'
 import { num, todayISO } from '@/lib/format'
 import { Button } from '@/components/ui/Button'
-import { Field, Input, Textarea } from '@/components/ui/form'
-import { Alert, Badge, Skeleton } from '@/components/ui/feedback'
+import { Field, Input, Select, Textarea } from '@/components/ui/form'
+import { Alert, Skeleton } from '@/components/ui/feedback'
 import { Modal } from '@/components/ui/overlay'
 import type { ChangePreview, ClassOption } from './types'
 
@@ -73,7 +73,7 @@ export function ChangeClassDialog({
     },
   })
 
-  const ready = targetId !== null && !!p && reason.trim().length >= 3 && (!full || choice !== null)
+  const ready = targetId !== null && !!p && (!full || choice !== null)
   const submitLabel = !full ? (p?.current ? 'Sınıfı değiştir' : 'Şubeye yerleştir') : choice?.kind === 'waitlist' ? 'Bekleme listesine ekle' : 'Takası uygula'
 
   return (
@@ -94,26 +94,12 @@ export function ChangeClassDialog({
           <Alert tone="info">Bu seviyede geçilebilecek başka şube yok.</Alert>
         ) : (
           <Field label="Yeni şube" required>
-            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-              {selectable.map((o) => (
-                <button
-                  key={o.class_group_id}
-                  type="button"
-                  aria-pressed={targetId === o.class_group_id}
-                  onClick={() => { setTargetId(o.class_group_id); setChoice(null) }}
-                  className={cn(
-                    'flex items-center justify-between gap-2 rounded-[var(--radius-sm)] px-3 py-2.5 text-left ring-1 transition-shadow',
-                    targetId === o.class_group_id ? 'ring-2 ring-ink bg-surface' : 'ring-line bg-surface hover:ring-line-strong',
-                  )}
-                >
-                  <span className="text-[14px] font-semibold">{o.name}</span>
-                  <span className="flex items-center gap-1.5 text-[12px] text-ink-3 tabular">
-                    {o.count}/{o.capacity} öğrenci
-                    {o.full && <Badge tone="warning">Dolu</Badge>}
-                  </span>
-                </button>
-              ))}
-            </div>
+            <Select
+              value={targetId ?? ''}
+              onChange={(e) => { setTargetId(e.target.value ? Number(e.target.value) : null); setChoice(null) }}
+              placeholder="Şube seçin"
+              options={selectable.map((o) => ({ value: o.class_group_id, label: `${o.name} · ${o.count}/${o.capacity} kişi${o.full ? ' (Dolu)' : ''}` }))}
+            />
           </Field>
         )}
 
@@ -156,8 +142,8 @@ export function ChangeClassDialog({
           </div>
         )}
 
-        <Field label="Gerekçe" required error={errors.reason?.[0]} hint="En az 3 karakter. Sınıf geçmişinde ve denetim kaydında görünür.">
-          <Textarea rows={2} value={reason} maxLength={500} onChange={(e) => setReason(e.target.value)} placeholder="Ör. veli talebi, arkadaş grubu, ders saatleri uyumu" />
+        <Field label="Gerekçe" optional error={errors.reason?.[0]} hint="İsteğe bağlı. Sınıf geçmişinde/denetimde görünür.">
+          <Textarea rows={2} value={reason} maxLength={500} onChange={(e) => setReason(e.target.value)} placeholder="Ör. veli talebi (boş bırakılabilir)" />
         </Field>
         {choice?.kind !== 'waitlist' && (
           <Field label="Geçerlilik tarihi" required error={errors.effective_on?.[0]} hint="Bu tarihten itibaren öğrenci yeni şubenin derslerine ve yoklamasına girer.">

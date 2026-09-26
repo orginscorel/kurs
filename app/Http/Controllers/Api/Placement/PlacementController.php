@@ -94,13 +94,14 @@ class PlacementController extends ApiController
     {
         $v = $request->validate([
             'class_group_id' => ['required', 'integer'],
-            'reason' => ['required', 'string', 'min:3', 'max:500'],
+            'reason' => ['nullable', 'string', 'max:500'],   // gerekçe zorunlu değil
             'effective_on' => ['nullable', 'date'],
             'swap_with_student_id' => ['nullable', 'integer', Rule::notIn([$student->id])],
             'to_waitlist' => ['nullable', 'boolean'],
-        ], ['reason.required' => 'Sınıf değişimi için gerekçe yazın.', 'reason.min' => 'Gerekçe en az 3 karakter olmalı.'], [
+        ], [], [
             'class_group_id' => 'Yeni şube', 'reason' => 'Gerekçe', 'effective_on' => 'Geçerlilik tarihi', 'swap_with_student_id' => 'Takas yapılacak öğrenci', 'to_waitlist' => 'Bekleme listesi',
         ]);
+        $v['reason'] = trim((string) ($v['reason'] ?? '')) ?: 'Şube değişikliği';   // geçmiş/denetim için varsayılan
         ClassGroup::query()->findOrFail($v['class_group_id']);
 
         return response()->json($this->changes->change($student, $v));

@@ -1,5 +1,16 @@
 [
   {
+    "version": "1.32.2",
+    "date": "2026-09-26",
+    "title": "Şube değiştir sadeleşti",
+    "items": [
+      {
+        "type": "iyilestirme",
+        "text": "Şubeye yerleştir/değiştir artık gerekçe istemiyor; şube açılır listeden (select) seçilip tek adımda uygulanıyor. Buton adı 'Şube değiştir'"
+      }
+    ]
+  },
+  {
     "version": "1.32.1",
     "date": "2026-09-26",
     "title": "Sınıf düzenlemede şube seçimi",

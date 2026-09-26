@@ -33,7 +33,7 @@ export function StudentClassPanel({ studentId, onEditStudent }: { studentId: num
   const hasLevel = data.level !== null
   const headerAction = !canChange ? undefined
     : !hasLevel ? (onEditStudent ? <Button size="sm" icon={<GraduationCap className="size-3.5" />} onClick={onEditStudent}>Okul sınıfını belirle</Button> : undefined)
-    : selectable.length > 0 ? <Button size="sm" icon={<ArrowLeftRight className="size-3.5" />} onClick={() => setOpen(true)}>{c ? 'Sınıf değiştir' : 'Şubeye yerleştir'}</Button>
+    : selectable.length > 0 ? <Button size="sm" icon={<ArrowLeftRight className="size-3.5" />} onClick={() => setOpen(true)}>{c ? 'Şube değiştir' : 'Şubeye yerleştir'}</Button>
     : (can('academic.manage') ? <Button size="sm" icon={<Plus className="size-3.5" />} onClick={() => navigate('/siniflar?yeni=1')}>Şube oluştur</Button> : undefined)
 
   return (
