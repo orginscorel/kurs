@@ -10,23 +10,30 @@ import { useDebounced } from '@/hooks/useListState'
 import { PageHeader, Panel } from '@/components/ui/layout'
 import { Alert, EmptyState, Skeleton } from '@/components/ui/feedback'
 import { Button } from '@/components/ui/Button'
-import { Field, Input, Select, Switch } from '@/components/ui/form'
+import { Field, Input, Segmented, Select, Switch } from '@/components/ui/form'
 import { MetricRow, MoneyInput, StudentPicker, type PickedStudent } from './components'
 import { addDaysISO, addMonthsISO, fromCents, toCents } from './shared'
 
 type Options = {
   terms: { id: number; name: string; starts_on: string; ends_on: string; is_current: boolean }[]
   programs: { id: number; name: string; code: string }[]
-  packages: { id: number; name: string; program_id: number | null; academic_term_id: number | null; list_price: string; default_installments: number; includes: string | null }[]
+  packages: { id: number; name: string; type?: string; program_id: number | null; academic_term_id: number | null; list_price: string; default_installments: number; includes: string | null }[]
   class_groups: { id: number; name: string; program_id: number | null; academic_term_id: number | null; capacity: number; active_students: number }[]
 }
 type Guardian = { id: number; name: string; is_financially_responsible: boolean }
+type Kind = 'course' | 'library' | 'study'
+const KIND_LABEL: Record<Kind, string> = { course: 'Ders (sınıflı)', library: 'Kütüphane', study: 'Etüt' }
 
 export default function EnrollmentCreate() {
   const can = useCan()
   const navigate = useNavigate()
   const [params] = useSearchParams()
   const [student, setStudent] = useState<PickedStudent | null>(null)
+  // Sihirbaz: yeni öğrenciyi de buradan ekle (arama yerine). Veli zorunlu (en az 1).
+  const [newMode, setNewMode] = useState(false)
+  const [ns, setNs] = useState({ first_name: '', last_name: '', g_first: '', g_last: '', g_phone: '' })
+  // Kayıt türü: ders (sınıflı) / kütüphane / etüt. Kütüphane-etüt program/sınıf gerektirmez, mezun da alabilir.
+  const [kind, setKind] = useState<Kind>('course')
   const [form, setForm] = useState({
     academic_term_id: '', program_id: '', education_package_id: '', class_group_id: '', financial_guardian_id: '',
     list_price: '', discount_amount: '', discount_reason: '', scholarship_amount: '', scholarship_reason: '',
@@ -63,8 +70,13 @@ export default function EnrollmentCreate() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [options.data])
 
-  const packages = (options.data?.packages ?? []).filter((p) => (!form.program_id || p.program_id === Number(form.program_id)) && (!form.academic_term_id || !p.academic_term_id || p.academic_term_id === Number(form.academic_term_id)))
-  const groups = (options.data?.class_groups ?? []).filter((g) => (!form.program_id || g.program_id === Number(form.program_id)) && (!form.academic_term_id || !g.academic_term_id || g.academic_term_id === Number(form.academic_term_id)))
+  const termOk = (t: number | null) => !form.academic_term_id || !t || t === Number(form.academic_term_id)
+  const packages = (options.data?.packages ?? []).filter((p) => {
+    const pt = (p.type || 'course') as Kind
+    if (kind === 'course') return pt === 'course' && (!form.program_id || p.program_id === Number(form.program_id)) && termOk(p.academic_term_id)
+    return pt === kind && termOk(p.academic_term_id)
+  })
+  const groups = (options.data?.class_groups ?? []).filter((g) => (!form.program_id || g.program_id === Number(form.program_id)) && termOk(g.academic_term_id))
   const pkg = options.data?.packages.find((p) => p.id === Number(form.education_package_id))
 
   const listC = toCents(form.list_price) ?? 0
@@ -85,6 +97,21 @@ export default function EnrollmentCreate() {
     retry: false,
   })
   const previewError = preview.error instanceof ApiError ? preview.error.firstError() : null
+
+  const createStudent = useMutation({
+    mutationFn: () => api.post<{ id: number }>('/students', {
+      first_name: ns.first_name.trim(), last_name: ns.last_name.trim(),
+      guardians: [{ first_name: ns.g_first.trim(), last_name: ns.g_last.trim(), phone: ns.g_phone.trim(), is_financially_responsible: true }],
+    }),
+    onSuccess: (r) => {
+      setStudent({ id: r.id, full_name: `${ns.first_name.trim()} ${ns.last_name.trim()}`, student_no: '' })
+      setNewMode(false)
+      setNs({ first_name: '', last_name: '', g_first: '', g_last: '', g_phone: '' })
+      toast.success('Öğrenci oluşturuldu; kayda devam edin.')
+    },
+    onError: (e) => toast.error(e instanceof ApiError ? e.firstError() : 'Öğrenci oluşturulamadı.'),
+  })
+  const canCreateStudent = ns.first_name.trim().length >= 2 && ns.last_name.trim().length >= 2 && ns.g_first.trim().length >= 2 && ns.g_last.trim().length >= 2 && ns.g_phone.trim().length >= 7
 
   const save = useMutation({
     mutationFn: () =>
@@ -116,7 +143,8 @@ export default function EnrollmentCreate() {
   const missing = [
     !student && 'Öğrenci',
     !form.academic_term_id && 'Dönem',
-    !form.program_id && 'Program',
+    kind === 'course' && !form.program_id && 'Program',
+    kind !== 'course' && !form.education_package_id && 'Paket',
     !form.enrolled_on && 'Kayıt tarihi',
     listC <= 0 && 'Liste fiyatı',
     form.installment_count === '' && 'Taksit sayısı',
@@ -129,15 +157,29 @@ export default function EnrollmentCreate() {
   return (
     <div className="animate-fade-in">
       <PageHeader
-        title="Yeni dönem / program kaydı"
+        title="Yeni kayıt"
         breadcrumbs={[{ label: 'Finans', to: '/finans' }, { label: 'Kayıtlar', to: '/finans/kayitlar' }, { label: 'Yeni kayıt' }]}
-        description="Mevcut öğrenci için ücret, ödeme planı ve kayıt sözleşmesi oluşturun."
+        description="Tek akışta: öğrenci (yeni ya da mevcut) → kayıt türü (ders / kütüphane / etüt) → paket → ücret ve ödeme planı → sözleşme."
       />
 
       <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_380px] gap-4 items-start">
         <div className="flex flex-col gap-4 min-w-0">
-          <Panel title="Öğrenci">
-            {initial.isLoading && initialId ? <Skeleton className="h-12" /> : <StudentPicker value={student} onChange={setStudent} autoFocus={!initialId} />}
+          <Panel title="Öğrenci" actions={!student && can('students.create') ? <Button size="sm" variant={newMode ? 'primary' : 'ghost'} icon={<UserPlus className="size-3.5" />} onClick={() => setNewMode((v) => !v)}>{newMode ? 'Aramaya dön' : 'Yeni öğrenci'}</Button> : undefined}>
+            {student ? (
+              <div className="flex items-center justify-between gap-3 rounded-[var(--radius-md)] bg-surface-2 px-3 py-2.5">
+                <div><p className="font-medium">{student.full_name}</p>{student.student_no && <p className="text-[12px] text-ink-3 tabular">{student.student_no}</p>}</div>
+                <Button size="sm" variant="ghost" onClick={() => setStudent(null)}>Değiştir</Button>
+              </div>
+            ) : newMode ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <Field label="Öğrenci adı" required><Input value={ns.first_name} onChange={(e) => setNs((f) => ({ ...f, first_name: e.target.value }))} autoFocus /></Field>
+                <Field label="Öğrenci soyadı" required><Input value={ns.last_name} onChange={(e) => setNs((f) => ({ ...f, last_name: e.target.value }))} /></Field>
+                <Field label="Veli adı" required><Input value={ns.g_first} onChange={(e) => setNs((f) => ({ ...f, g_first: e.target.value }))} /></Field>
+                <Field label="Veli soyadı" required><Input value={ns.g_last} onChange={(e) => setNs((f) => ({ ...f, g_last: e.target.value }))} /></Field>
+                <Field label="Veli telefonu" required className="sm:col-span-2"><Input value={ns.g_phone} onChange={(e) => setNs((f) => ({ ...f, g_phone: e.target.value }))} placeholder="05xx xxx xx xx" /></Field>
+                <div className="sm:col-span-2"><Button variant="primary" disabled={!canCreateStudent} loading={createStudent.isPending} icon={<UserPlus className="size-4" />} onClick={() => createStudent.mutate()}>Öğrenciyi oluştur ve devam et</Button></div>
+              </div>
+            ) : initial.isLoading && initialId ? <Skeleton className="h-12" /> : <StudentPicker value={student} onChange={setStudent} autoFocus={!initialId} />}
             {errors.student_id?.[0] && <p className="mt-1.5 text-xs text-danger">{errors.student_id[0]}</p>}
             {student && (
               <Field label="Ödeme sorumlusu veli" optional error={errors.financial_guardian_id?.[0]} className="mt-3">
@@ -146,33 +188,44 @@ export default function EnrollmentCreate() {
             )}
           </Panel>
 
-          <Panel title="Program">
+          <Panel title={kind === 'course' ? 'Program ve paket' : `${KIND_LABEL[kind]} üyeliği`}>
+            <Field label="Kayıt türü" className="mb-3.5" hint={kind === 'course' ? 'Sınıfa yerleşen normal öğrenci kaydı.' : 'Sınıf/program gerektirmez; mezun öğrenci de alabilir.'}>
+              <Segmented
+                value={kind}
+                onChange={(v) => { setKind(v as Kind); setForm((f) => ({ ...f, education_package_id: '', program_id: '', class_group_id: '' })) }}
+                options={(Object.keys(KIND_LABEL) as Kind[]).map((k) => ({ value: k, label: KIND_LABEL[k] }))}
+              />
+            </Field>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
               <Field label="Dönem" required error={errors.academic_term_id?.[0]}>
                 <Select value={form.academic_term_id} onChange={(e) => set('academic_term_id', e.target.value)} placeholder="Seçin" options={(options.data?.terms ?? []).map((t) => ({ value: t.id, label: `${t.name}${t.is_current ? ' (güncel)' : ''}` }))} />
               </Field>
-              <Field label="Program" required error={errors.program_id?.[0]}>
-                <Select
-                  value={form.program_id}
-                  onChange={(e) => setForm((f) => ({ ...f, program_id: e.target.value, education_package_id: '', class_group_id: '' }))}
-                  placeholder="Seçin"
-                  options={(options.data?.programs ?? []).map((p) => ({ value: p.id, label: p.name }))}
-                />
-              </Field>
-              <Field label="Eğitim paketi" optional hint={pkg?.includes ?? 'Seçilirse liste fiyatı ve taksit sayısı doldurulur'} error={errors.education_package_id?.[0]}>
+              {kind === 'course' && (
+                <Field label="Program" required error={errors.program_id?.[0]}>
+                  <Select
+                    value={form.program_id}
+                    onChange={(e) => setForm((f) => ({ ...f, program_id: e.target.value, education_package_id: '', class_group_id: '' }))}
+                    placeholder="Seçin"
+                    options={(options.data?.programs ?? []).map((p) => ({ value: p.id, label: p.name }))}
+                  />
+                </Field>
+              )}
+              <Field label={kind === 'course' ? 'Eğitim paketi' : `${KIND_LABEL[kind]} paketi`} optional={kind === 'course'} required={kind !== 'course'} hint={pkg?.includes ?? (kind === 'course' ? 'Seçilirse liste fiyatı ve taksit sayısı doldurulur' : 'Fiyat ve taksit paketten gelir')} error={errors.education_package_id?.[0]}>
                 <Select
                   value={form.education_package_id}
                   onChange={(e) => {
                     const p = options.data?.packages.find((x) => x.id === Number(e.target.value))
-                    setForm((f) => ({ ...f, education_package_id: e.target.value, list_price: p ? p.list_price.replace('.', ',') : f.list_price, installment_count: p ? String(p.default_installments) : f.installment_count, program_id: p?.program_id ? String(p.program_id) : f.program_id }))
+                    setForm((f) => ({ ...f, education_package_id: e.target.value, list_price: p ? p.list_price.replace('.', ',') : f.list_price, installment_count: p ? String(p.default_installments) : f.installment_count, program_id: kind === 'course' && p?.program_id ? String(p.program_id) : f.program_id }))
                   }}
-                  placeholder="Paketsiz"
+                  placeholder={kind === 'course' ? 'Paketsiz' : 'Paket seçin'}
                   options={packages.map((p) => ({ value: p.id, label: `${p.name} · ${money(p.list_price, { short: true })}` }))}
                 />
               </Field>
-              <Field label="Sınıf" optional hint="Boş bırakılırsa sonra atanır" error={errors.class_group_id?.[0]}>
-                <Select value={form.class_group_id} onChange={(e) => set('class_group_id', e.target.value)} placeholder="Sonra atanacak" options={groups.map((g) => ({ value: g.id, label: `${g.name} · ${g.active_students}/${g.capacity}`, disabled: g.active_students >= g.capacity }))} />
-              </Field>
+              {kind === 'course' && (
+                <Field label="Sınıf" optional hint="Boş bırakılırsa sonra atanır" error={errors.class_group_id?.[0]}>
+                  <Select value={form.class_group_id} onChange={(e) => set('class_group_id', e.target.value)} placeholder="Sonra atanacak" options={groups.map((g) => ({ value: g.id, label: `${g.name} · ${g.active_students}/${g.capacity}`, disabled: g.active_students >= g.capacity }))} />
+                </Field>
+              )}
               <Field label="Kayıt tarihi" required error={errors.enrolled_on?.[0]}>
                 <Input type="date" value={form.enrolled_on} onChange={(e) => set('enrolled_on', e.target.value)} />
               </Field>

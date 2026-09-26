@@ -1,5 +1,20 @@
 [
   {
+    "version": "1.25.0",
+    "date": "2026-09-26",
+    "title": "Kayıt sihirbazı",
+    "items": [
+      {
+        "type": "yeni",
+        "text": "Yeni kayıt tek akışta — öğrenciyi (yeni ya da mevcut) burada ekleyin, kayıt türü / paket / ücret / sözleşme aynı ekranda"
+      },
+      {
+        "type": "yeni",
+        "text": "Kayıt türü Ders / Kütüphane / Etüt; kütüphane ve etüt kaydı program/sınıf gerektirmez, mezun öğrenciye de yapılabilir"
+      }
+    ]
+  },
+  {
     "version": "1.24.1",
     "date": "2026-09-26",
     "title": "Paket türü",

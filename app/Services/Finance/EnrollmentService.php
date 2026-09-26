@@ -84,7 +84,8 @@ class EnrollmentService
                 $this->assignClassGroup($student, ClassGroup::query()->findOrFail($data['class_group_id']), $data['enrolled_on']);
             }
 
-            if (! in_array($student->status, ['active'], true)) {
+            // Kütüphane/etüt üyeliği öğrencinin durumunu değiştirmez (mezun 'mezun' kalır); keep_status ile korunur.
+            if (empty($data['keep_status']) && ! in_array($student->status, ['active'], true)) {
                 $student->forceFill(['status' => 'active', 'registered_on' => $student->registered_on ?? $data['enrolled_on']])->save();
             }
 

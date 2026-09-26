@@ -130,7 +130,7 @@ class EnrollmentController extends FinanceController
             'terms' => AcademicTerm::query()->orderByDesc('starts_on')->get(['id', 'name', 'starts_on', 'ends_on', 'is_current'])
                 ->map(fn ($t) => ['id' => $t->id, 'name' => $t->name, 'starts_on' => $t->starts_on?->toDateString(), 'ends_on' => $t->ends_on?->toDateString(), 'is_current' => $t->is_current]),
             'programs' => Program::query()->where('is_active', true)->orderBy('name')->get(['id', 'name', 'code']),
-            'packages' => EducationPackage::query()->where('is_active', true)->orderBy('name')->get(['id', 'name', 'program_id', 'academic_term_id', 'list_price', 'default_installments', 'includes']),
+            'packages' => EducationPackage::query()->where('is_active', true)->orderBy('name')->get(['id', 'name', 'type', 'program_id', 'academic_term_id', 'list_price', 'default_installments', 'includes']),
             'class_groups' => ClassGroup::query()->where('is_active', true)->orderBy('name')
                 ->withCount(['students as active_students' => fn ($q) => $q->whereNull('class_group_student.left_on')])
                 ->get(['id', 'name', 'program_id', 'academic_term_id', 'capacity']),
@@ -150,7 +150,8 @@ class EnrollmentController extends FinanceController
         $data = $this->validateTr($request, [
             'student_id' => ['required', 'integer'],
             'academic_term_id' => ['required', 'integer'],
-            'program_id' => ['required', 'integer'],
+            // Kütüphane/etüt paketinde program gerekmez; ders paketinde (ya da paketsizde) zorunlu (aşağıda kontrol).
+            'program_id' => ['nullable', 'integer'],
             'education_package_id' => ['nullable', 'integer'],
             'class_group_id' => ['nullable', 'integer'],
             'financial_guardian_id' => ['nullable', 'integer'],
@@ -162,11 +163,20 @@ class EnrollmentController extends FinanceController
 
         $student = Student::query()->findOrFail($data['student_id']);
         $term = AcademicTerm::query()->findOrFail($data['academic_term_id']);
-        $program = Program::query()->findOrFail($data['program_id']);
-        if (! empty($data['education_package_id'])) {
-            EducationPackage::query()->findOrFail($data['education_package_id']);
+        $package = ! empty($data['education_package_id']) ? EducationPackage::query()->findOrFail($data['education_package_id']) : null;
+        // Kütüphane/etüt = sınıfsız üyelik; program/sınıf gerekmez ve mezun öğrenciye de atanabilir.
+        $needsClass = ! $package || $package->requiresClass();
+        if ($needsClass && empty($data['program_id'])) {
+            throw new BusinessRuleException('Ders kaydı için program seçilmelidir.', 'program_required');
         }
-        if (! empty($data['class_group_id'])) {
+        $program = ! empty($data['program_id']) ? Program::query()->findOrFail($data['program_id']) : null;
+        if (! $needsClass) {
+            $data['program_id'] = null;
+            $data['class_group_id'] = null;
+            $data['keep_status'] = true; // mezun ise 'mezun' kalsın, kütüphane üyeliği durumu değiştirmesin
+            $program = null;
+        }
+        if ($program && ! empty($data['class_group_id'])) {
             $group = ClassGroup::query()->findOrFail($data['class_group_id']);
             if ($group->program_id && $group->program_id !== $program->id) {
                 throw new BusinessRuleException("{$group->name} sınıfı seçilen programa ait değil.", 'class_group_program_mismatch');
@@ -175,16 +185,18 @@ class EnrollmentController extends FinanceController
         if (! empty($data['financial_guardian_id']) && ! $student->guardians()->whereKey($data['financial_guardian_id'])->exists()) {
             throw new BusinessRuleException('Seçilen veli bu öğrenciye bağlı değil.', 'guardian_mismatch');
         }
-        $duplicate = Enrollment::query()->where('student_id', $student->id)->where('academic_term_id', $term->id)->where('program_id', $program->id)
+        $duplicate = Enrollment::query()->where('student_id', $student->id)->where('academic_term_id', $term->id)
+            ->when($program, fn ($q) => $q->where('program_id', $program->id), fn ($q) => $q->whereNull('program_id')->where('education_package_id', $data['education_package_id'] ?? 0))
             ->whereIn('status', ['pending', 'active', 'frozen'])->exists();
         if ($duplicate) {
-            throw new BusinessRuleException("{$student->full_name} bu dönemde {$program->name} programına zaten kayıtlı.", 'duplicate_enrollment');
+            $what = $program ? "{$program->name} programına" : "\"{$package?->name}\" paketine";
+            throw new BusinessRuleException("{$student->full_name} bu dönemde {$what} zaten kayıtlı.", 'duplicate_enrollment');
         }
 
         $enrollment = DB::transaction(function () use ($service, $documents, $student, $data) {
             $enrollment = $service->enroll($student, [
                 'academic_term_id' => (int) $data['academic_term_id'],
-                'program_id' => (int) $data['program_id'],
+                'program_id' => ! empty($data['program_id']) ? (int) $data['program_id'] : null,
                 'education_package_id' => $data['education_package_id'] ?? null,
                 'class_group_id' => $data['class_group_id'] ?? null,
                 'list_price' => Money::of($data['list_price']),
@@ -197,6 +209,7 @@ class EnrollmentController extends FinanceController
                 'down_payment' => Money::of($data['down_payment'] ?? '0'),
                 'installment_count' => (int) $data['installment_count'],
                 'first_due_date' => $data['first_due_date'],
+                'keep_status' => $data['keep_status'] ?? false,
             ]);
 
             if ($data['create_contract'] ?? true) {
