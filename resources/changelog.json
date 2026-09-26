@@ -1,5 +1,16 @@
 [
   {
+    "version": "1.26.1",
+    "date": "2026-09-26",
+    "title": "İlişki senkronu düzeltmesi",
+    "items": [
+      {
+        "type": "duzeltme",
+        "text": "Web'de eklenen veli-öğrenci bağı, sınıf yerleştirme, etiket gibi ilişkiler artık uygulamaya da tam yansır (veri sıfırlaması senkron temelini silmişti; kendini onaran baseline eklendi)"
+      }
+    ]
+  },
+  {
     "version": "1.26.0",
     "date": "2026-09-26",
     "title": "Akademik kurulum sayfası",

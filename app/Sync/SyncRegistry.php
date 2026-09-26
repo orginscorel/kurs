@@ -106,6 +106,7 @@ final class SyncRegistry
         'lesson_schedules' => ['kind' => self::REFERENCE],
         // Oturumlar sunucuda üretilir (kurs:generate-sessions yerelde kapalı); yoklama işaretleri iki yönlü.
         'lesson_sessions' => ['kind' => self::REFERENCE, 'key' => ['lesson_schedule_id', 'date']],
+        'lesson_session_topic' => ['kind' => self::PIVOT, 'key' => ['lesson_session_id', 'topic_id'], 'branch' => 'via:lesson_session_id', 'since' => '2026-09-26'],
         'study_sessions' => ['kind' => self::REFERENCE],
         'study_session_student' => ['kind' => self::REFERENCE, 'branch' => 'via:study_session_id', 'key' => ['study_session_id', 'student_id']],
         'homework' => ['kind' => self::REFERENCE],

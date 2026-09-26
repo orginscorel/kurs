@@ -62,7 +62,15 @@ class Sweeper
             }
             $state = $states[$table] ?? null;
             if (! $state || ! $state['baselined_at']) {
-                continue;   // önce baseline (kurs:sync-prepare)
+                // Kendini onar: baseline'ı hiç alınmamış tablo (yeni tablo ya da sync_table_state sıfırlanmış).
+                // Baseline almadan süpürme atlanıyordu → olaysız/pivot yazmalar HİÇ senkronlanmıyordu.
+                // Şimdi otomatik baseline (mevcut satırlar başlangıç kabul edilir) → sonraki değişiklikler yazılır.
+                $s = $this->sweepTable($def, false);
+                DB::table('sync_table_state')->updateOrInsert(['table_name' => $table], [
+                    'baselined_at' => now(), 'last_swept_at' => now(), 'rows' => $s['rows'], 'fingerprint' => $this->fingerprint($def),
+                ]);
+
+                continue;
             }
             $fingerprint = $this->fingerprint($def);
             if (! $full && $fingerprint === $state['fingerprint']) {
